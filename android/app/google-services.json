@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "1075161631917",
+    "project_id": "questionapp-a3d85",
+    "storage_bucket": "questionapp-a3d85.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1075161631917:android:0a8c36350924af6e030a24",
+        "android_client_info": {
+          "package_name": "com.devansh.chit"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1075161631917-oh8t5pkgrjnr0fjlnkq4ttcjpscjmraj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfYazqEzNCvvGeDt-KSOg8yifrGppBG4k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1075161631917-oh8t5pkgrjnr0fjlnkq4ttcjpscjmraj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1075161631917-s8fn1kelelpmvnp13q0pgr07l017u6q7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.cashquiz"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1075161631917:android:c7c7f54063f65f19030a24",
+        "android_client_info": {
+          "package_name": "com.example.cashquiz"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1075161631917-tbkvuvue4hlimsb0h65mkh9khfqsnjvq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.cashquiz",
+            "certificate_hash": "f97a4bc800ce53fc74005ac2e674d6ce8cec37cb"
+          }
+        },
+        {
+          "client_id": "1075161631917-oh8t5pkgrjnr0fjlnkq4ttcjpscjmraj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfYazqEzNCvvGeDt-KSOg8yifrGppBG4k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1075161631917-oh8t5pkgrjnr0fjlnkq4ttcjpscjmraj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1075161631917-s8fn1kelelpmvnp13q0pgr07l017u6q7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.cashquiz"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
