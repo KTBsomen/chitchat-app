@@ -22,6 +22,7 @@ dependencies:
   page_transition: ^2.1.0
   youtube_player_flutter: ^9.1.1
   shimmer: ^3.0.0
+  just_audio: ^0.9.43
 
 dev_dependencies:
   flutter_test:

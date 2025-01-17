@@ -160,7 +160,7 @@ class UserService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${await UserService.getAccessToken()}',
+          'Authorization': 'Bearer $token',
         },
       );
 

@@ -129,3 +129,53 @@ class _ZoomableImagePopupState extends State<ZoomableImagePopup>
     );
   }
 }
+
+class ZoomableImage extends StatefulWidget {
+  final String imageUrl;
+
+  const ZoomableImage({required this.imageUrl, Key? key}) : super(key: key);
+
+  @override
+  _ZoomableImageState createState() => _ZoomableImageState();
+}
+
+class _ZoomableImageState extends State<ZoomableImage> {
+  double _scale = 1.0; // Current scale
+  double _previousScale = 1.0; // Scale before the current gesture
+  Offset _offset = Offset.zero; // Current translation offset
+  Offset _startOffset = Offset.zero; // Offset at the start of the gesture
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onScaleStart: (details) {
+        _previousScale = _scale;
+        _startOffset = details.focalPoint - _offset;
+      },
+      onScaleUpdate: (details) {
+        setState(() {
+          // Update the scale and offset
+          _scale = (_previousScale * details.scale)
+              .clamp(1.0, 4.0); // Limit zoom between 1x and 4x
+          _offset = details.focalPoint - _startOffset;
+        });
+      },
+      onScaleEnd: (_) {
+        // Optionally, add logic to reset or snap back to bounds
+      },
+      child: ClipRect(
+        // Clip the image to prevent it from overflowing
+        child: Transform.translate(
+          offset: _offset,
+          child: Transform.scale(
+            scale: _scale,
+            child: CachedNetworkImage(
+              imageUrl: widget.imageUrl,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
