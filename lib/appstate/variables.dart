@@ -18,14 +18,10 @@ class AppVariables {
   }
 
   static void setPersistent<T>(String key, T value) {
-    if (value is T) {
-      _variables[key] = value;
-      PrefsHelper.set<T>(key, value);
-      _notifyListeners(key, value);
-      _notifyUIUpdateCallbacks();
-    } else {
-      throw ArgumentError("Value type does not match expected type $T");
-    }
+    _variables[key] = value;
+    PrefsHelper.set<T>(key, value);
+    _notifyListeners(key, value);
+    _notifyUIUpdateCallbacks();
   }
 
   static Future<T?>? getPersistent<T>(String key) async {
@@ -34,13 +30,9 @@ class AppVariables {
   }
 
   static T? set<T>(String key, T value) {
-    if (value is T) {
-      _variables[key] = value;
-      _notifyListeners(key, value);
-      _notifyUIUpdateCallbacks();
-    } else {
-      throw ArgumentError("Value type does not match expected type $T");
-    }
+    _variables[key] = value;
+    _notifyListeners(key, value);
+    _notifyUIUpdateCallbacks();
   }
 
   static T? get<T>(String key) {
@@ -53,7 +45,7 @@ class AppVariables {
       _variables[key] = value;
       _notifyListeners(key, value);
       _notifyUIUpdateCallbacks();
-    } on Exception catch (e) {}
+    } on Exception {}
   }
 
   static void addListener<T>(String key, Function(T) listener) {

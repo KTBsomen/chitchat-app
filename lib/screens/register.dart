@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
+import 'package:deep_link_router/deep_link_router.dart';
 
 import '../components/AdvancedTextFormField.dart';
 
@@ -228,6 +229,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       await UserService.setAccessToken(data['token']);
       await UserService.setUserId(user['_id']);
       AppVariables.update("serverProfile", user);
+      await DeepLinkRouter.completePendingNavigation(context);
 
       // Registration successful
       Navigator.pushReplacement(

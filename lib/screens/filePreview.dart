@@ -1,14 +1,22 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/screens/createStory.dart';
+import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/services/fileUploader.dart';
+import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/posts.dart';
+import 'package:chitchat/services/story.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_editor_plus/image_editor_plus.dart';
+import 'package:page_transition/page_transition.dart';
 import 'package:video_editor/video_editor.dart';
 import 'package:video_player/video_player.dart';
 import 'package:file_picker/file_picker.dart';
@@ -17,6 +25,7 @@ import 'package:vs_story_designer/vs_story_designer.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:easy_video_editor/easy_video_editor.dart';
+import 'package:http/http.dart' as http;
 
 abstract class FileFormat {
   const FileFormat(this.extension, {required this.mimeType});
@@ -114,17 +123,99 @@ class FilePreviewPage extends StatefulWidget {
   State<FilePreviewPage> createState() => _FilePreviewPageState();
 }
 
+Set<String> _selectedMemberIds = {};
+bool AllSelected = true;
+String myGroupId = '';
+List<Member> _members = [];
+bool _isLoading = true;
+bool _hasError = false;
+
+String _errorMessage = '';
+
 class _FilePreviewPageState extends State<FilePreviewPage> {
   int _currentIndex = 0;
   late List<File> editedFiles;
-  static late List<PickedAssetModel> _files;
+  late List<PickedAssetModel> _files;
 
+  static String baseUrl =
+      AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
   PageController _pageController = PageController(initialPage: 0);
+
+  Future<void> _fetchMembers() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    String? userId = await UserService.getUserId();
+    if (userId == null) {
+      throw Exception('User ID is null');
+    }
+    String? xtoken = await UserService.getAccessToken();
+
+    try {
+      print("baseUrl: $baseUrl");
+      print("token: $xtoken");
+      final response = await http.get(
+        Uri.parse('$baseUrl/chits/members/$userId'),
+        headers: {'Authorization': 'Bearer $xtoken'},
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        print("jsonData: $jsonData");
+        final membersList = (jsonData['usersOwnGroupMembers']['myGroup']
+                ?['members'] as List?) ??
+            [];
+        final watchList = (jsonData['membersOfUserWatchList']?['results']?[0]
+                ?['members'] as List?) ??
+            [];
+
+        // Remove duplicate members by ID
+        final uniqueMembers = <String, Member>{};
+
+        for (var memberData in [...membersList, ...watchList]) {
+          final member = Member(
+            id: memberData['memberId'],
+            name: memberData['memberName'],
+            profilePic: memberData['memberProfilePic'],
+          );
+          uniqueMembers[member.id] = member;
+        }
+
+        setState(() {
+          _members = uniqueMembers.values.toList();
+          myGroupId =
+              (jsonData['usersOwnGroupMembers']?['myGroup']?["_id"]) ?? '';
+          if (myGroupId.isEmpty) {
+            throw Exception('You dont have a group so you cannot post a chit.');
+          }
+
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load members: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = e.toString();
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _fetchMembers();
     editedFiles = List.from(widget.files.map((file) => File(file.path!)));
-    _files = widget.files;
+    _files = List.from(widget.files);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (editedFiles.length == 1) {
+        _editFile(editedFiles[0], 0);
+      }
+    });
   }
 
 //ImageEditor(image: file.readAsBytesSync())
@@ -286,10 +377,23 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                   mediaPath: file.path,
                   themeType:
                       ThemeType.light, // OPTIONAL, Default ThemeType.dark
-                  onDone: (uri) {
+                  onDone: (uri) async {
                     debugPrint(uri);
                     //Share.shareUri(Uri.file(uri));
-                    Navigator.pop(context, uri);
+                    //Navigator.pop(context, uri);
+                    // Show bottom-right circular selector
+                    if (editedFiles.length > 1) {
+                      Navigator.pop(context, uri);
+                      return;
+                    }
+                    await showModalBottomSheet(
+                      context: context,
+                      backgroundColor: Colors.black.withValues(alpha: 0.3),
+                      barrierColor: Colors.black.withValues(alpha: 0.6),
+                      isScrollControlled: true,
+                      useSafeArea: true,
+                      builder: (_) => _OptionSelector(uri: uri),
+                    );
                   },
                   middleBottomWidget: SizedBox(),
                   onDoneButtonStyle: Container(
@@ -316,7 +420,11 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
     } else if (_isVideo(file)) {
       final editedVideo = await Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => VideoEditor(file: file)),
+        MaterialPageRoute(
+            builder: (context) => VideoEditor(
+                  file: file,
+                  totalFiles: editedFiles.length,
+                )),
       );
       if (editedVideo != null) {
         setState(() => editedFiles[index] = editedVideo);
@@ -524,7 +632,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   void _initializePlayer() {
     _controller = VideoPlayerController.file(widget.videoFile)
       ..initialize().then((_) => setState(() {}));
-    _controller.play();
+    // _controller.play();
+    _controller.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -572,9 +685,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                 children: [
                   IconButton(
                     icon: Icon(
+                      color: Colors.white,
                       _controller.value.isPlaying
                           ? Icons.pause
-                          : Icons.play_arrow,
+                          : _controller.value.isCompleted
+                              ? Icons.play_arrow
+                              : Icons.play_arrow,
                     ),
                     onPressed: () {
                       setState(() {
@@ -585,7 +701,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.replay_10),
+                    icon: const Icon(
+                      Icons.replay_10,
+                      color: Colors.white,
+                    ),
                     onPressed: () {
                       final newPosition = _controller.value.position -
                           const Duration(seconds: 10);
@@ -595,7 +714,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.forward_10),
+                    icon: const Icon(
+                      Icons.forward_10,
+                      color: Colors.white,
+                    ),
                     onPressed: () {
                       final newPosition = _controller.value.position +
                           const Duration(seconds: 10);
@@ -619,9 +741,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 //VIDEO EDITOR SCREEN//
 //-------------------//
 class VideoEditor extends StatefulWidget {
-  const VideoEditor({super.key, required this.file});
+  const VideoEditor({super.key, required this.file, required this.totalFiles});
 
   final File file;
+  final int totalFiles;
 
   @override
   State<VideoEditor> createState() => _VideoEditorState();
@@ -708,8 +831,19 @@ class _VideoEditorState extends State<VideoEditor> {
       startMs: _controller.startTrim.inMilliseconds,
       endMs: _controller.endTrim.inMilliseconds,
       onProgress: (p) => _exportingProgress.value = p,
-    ).then((_) {
-      Navigator.pop(context, File(execute.outputPath));
+    ).then((_) async {
+      if (widget.totalFiles > 1) {
+        Navigator.pop(context, File(execute.outputPath));
+        return;
+      }
+      await showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.black.withValues(alpha: 0.3),
+        barrierColor: Colors.black.withValues(alpha: 0.6),
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (_) => _OptionSelector(uri: File(execute.outputPath)),
+      );
     }).catchError((e) {
       _showErrorSnackBar('Error trimming video: $e');
     });
@@ -840,7 +974,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                                   MainAxisAlignment.center,
                                               children: _trimSlider(),
                                             ),
-                                            _coverSelection(),
+                                            // _coverSelection(),
                                           ],
                                         ),
                                       ),
@@ -1007,6 +1141,291 @@ class _VideoEditorState extends State<VideoEditor> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _OptionSelector extends StatefulWidget {
+  final dynamic uri;
+  const _OptionSelector({required this.uri});
+
+  @override
+  State<_OptionSelector> createState() => _OptionSelectorState();
+}
+
+class _OptionSelectorState extends State<_OptionSelector> {
+  final Map<String, dynamic>? profileDetails =
+      AppVariables.get<Map<String, dynamic>>('profile');
+  FriendCircleGroup? groupDetails;
+
+  uploadChits(context) async {
+    String? xtoken = await UserService.getAccessToken();
+
+    String baseurl =
+        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
+    ValueNotifier<FileUploadProgress> _progressNotifier =
+        ValueNotifier<FileUploadProgress>(
+      FileUploadProgress(fileName: 'Uploading...'),
+    );
+
+    S3Uploader uploader = S3Uploader(
+      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+      progressNotifier: _progressNotifier,
+    );
+    bool uploadFinished = false;
+    bool showErrorText = false;
+    final List<String>? images = [widget.uri];
+
+    if (images != null && images.isNotEmpty) {
+      // Handle the selected image
+      images.map((e) => print);
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return PopScope(
+            canPop: false,
+
+            // Optional: Handle the attempted pop with onPopInvoked
+            onPopInvokedWithResult: (didPop, res) {
+              // This callback is triggered when a pop is attempted
+              // didPop will be false since canPop is false
+
+              // You could show a snackbar or provide feedback here
+              if (!didPop) {
+                setState(() {
+                  showErrorText = true;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(
+                          'Please use the close button to dismiss this dialog')),
+                );
+              }
+            },
+            child: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) {
+                return AlertDialog(
+                  title: Column(
+                    children: [
+                      Text(
+                        'Uploading Chits...',
+                        style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            fontFamily: 'Poppins'),
+                      ),
+                      const SizedBox(height: 10),
+                      if (showErrorText)
+                        Text(
+                          'Do not close this dialog until the upload is complete.',
+                          style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Poppins'),
+                        ),
+                    ],
+                  ),
+                  content:
+                      UploadProgressWidget(progressNotifier: _progressNotifier),
+                  actions: <Widget>[
+                    TextButton(
+                      child: const Text('OK'),
+                      onPressed: () {
+                        if (uploadFinished == true) {
+                          Navigator.pushReplacement(
+                              context,
+                              PageTransition(
+                                  type: PageTransitionType.leftToRight,
+                                  child: HomePage()));
+                        } else {
+                          if (showErrorText == true) {
+                            Navigator.of(context).pop();
+                          } else {
+                            setState(() {
+                              showErrorText = true;
+                            });
+                          }
+                        }
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      );
+      List<String> files =
+          await uploader.uploadFiles(files: images, compressionParams: {
+        'width': 600,
+        'quality': 95,
+      });
+      print(files);
+      _progressNotifier.value = _progressNotifier.value.copyWith(
+        stage: UploadStage.uploading,
+        customStageText: "Processing...",
+        customStageTextDetail: "saving on server...",
+      );
+      Map<String, dynamic> result = await StoryService.CreateStory(
+        members: _members.map((m) => m.id).toList(),
+        files: files,
+        myGroupId: myGroupId,
+        sendToAll: AllSelected,
+      ).catchError((error) {
+        print(error);
+        _progressNotifier.value = _progressNotifier.value.copyWith(
+          stage: UploadStage.failed,
+          customStageTextDetail: "can't upload this chits",
+        );
+        setState(() {
+          uploadFinished = true;
+        });
+      });
+      if (result['success']) {
+        print(result);
+        _progressNotifier.value = _progressNotifier.value.copyWith(
+          stage: UploadStage.completed,
+          customStageText: "Uploaded Successfully",
+          customStageTextDetail: "You are set! now you can close this dialog",
+        );
+        setState(() {
+          // posts.add(result['data']);
+          uploadFinished = true;
+        });
+      } else {
+        print(result);
+        _progressNotifier.value = _progressNotifier.value.copyWith(
+          stage: UploadStage.failed,
+          customStageTextDetail: "can't upload this chits",
+        );
+        setState(() {
+          uploadFinished = true;
+        });
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // _controller.initialize();
+    // _fetchMembers();
+    groupDetails =
+        GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 220,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 30),
+      decoration: const BoxDecoration(
+        color: Color.fromARGB(97, 0, 0, 0),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      child: Column(
+        children: [
+          const Text("Share To",
+              style: TextStyle(color: Colors.white, fontSize: 18)),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _circleButton(
+                icon: Icon(Icons.groups_2_outlined, color: Colors.white),
+                image: groupDetails!.groupData['GroupProfilePic'],
+                label: "Group",
+                onTap: () {
+                  // Save file logic here
+                  Navigator.pushAndRemoveUntil(
+                      context,
+                      PageTransition(
+                        type: PageTransitionType.leftToRight,
+                        child: ChatScreen(data: [widget.uri.toString()]),
+                      ),
+                      (route) => route.isFirst);
+                },
+              ),
+              _circleButton(
+                icon: Icon(Icons.share, color: Colors.redAccent),
+                label: "All",
+                onTap: () {
+                  uploadChits(context);
+                },
+              ),
+              _circleButton(
+                icon: Icon(Icons.send, color: Colors.lightGreenAccent),
+                label: "Members",
+                onTap: () {
+                  Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MemberSelectionPage(
+                            files: widget.uri is List<String>
+                                ? widget.uri
+                                : [widget.uri.toString()]),
+                      ));
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _circleButton({
+    required Widget icon,
+    String? image,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(50),
+          child: SizedBox(
+            width: 60,
+            height: 60,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Try loading image
+                if (image != null)
+                  ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: image,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorWidget: (context, error, stackTrace) {
+                        return CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.white10,
+                          child: icon,
+                        );
+                      },
+                    ),
+                  )
+                else
+                  // No image provided, show icon directly
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white10,
+                    child: icon,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      ],
     );
   }
 }

@@ -10,6 +10,7 @@ import 'package:chitchat/screens/story.dart';
 import 'package:chitchat/screens/watchlist.dart';
 import 'package:chitchat/services/chats.dart';
 import 'package:chitchat/services/story.dart';
+import 'package:deep_link_router/deep_link_router.dart';
 import 'package:event_handeler/event_handeler.dart';
 import "package:story_view/story_view.dart";
 import 'package:chitchat/appstate/variables.dart';
@@ -52,12 +53,21 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = false;
   final List<dynamic> _feedItems = [];
   StreamSubscription? _subscription;
+  Future<void> _handelDeepLinks() async {
+    Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
+    print("Pending Link on homepage: $pendingLink");
+    if (pendingLink != null) {
+      await DeepLinkRouter.completePendingNavigation(context);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     AppVariables.registerState(this);
     AppVariables.set("selectedTabIndex", 0);
+    _handelDeepLinks();
     _loadMoreItems(invalidate: "true");
     _getMyStories();
     _getStories();

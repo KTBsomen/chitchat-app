@@ -98,13 +98,20 @@ class _ZoomableImagePopupState extends State<ZoomableImagePopup>
           child: Stack(
             children: [
               Container(
-                color: Colors.black.withOpacity(0.9),
+                color: Colors.black.withValues(alpha: 0.9),
                 child: Center(
                   child: Hero(
                     tag: widget.imageUrl,
                     child: (() {
                       if (isUrl(widget.imageUrl)) {
                         return CachedNetworkImage(
+                          progressIndicatorBuilder: (context, url, p) => Center(
+                            child: CircularProgressIndicator(
+                              value: p.progress,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.error, color: Colors.red),
                           imageUrl: widget.imageUrl,
                           fit: BoxFit.contain,
                         );

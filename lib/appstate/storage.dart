@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Interface for serializable objects
 abstract class JsonSerializable {

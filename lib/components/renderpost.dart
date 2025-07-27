@@ -211,6 +211,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
 //get comments
   Future<void> _getComments() async {
     if (isCommentsAreLoading) return;
+    if (!mounted) return;
     setState(() {
       isCommentsAreLoading = true;
     });
@@ -219,27 +220,31 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
       final fetchedComments = await PostService.fetchComments(widget.postId,
           limit: 20, lastId: lastCommentId);
       print(fetchedComments);
-      setState(() {
-        if (comments.isNotEmpty &&
-            !comments.contains(fetchedComments["comments"])) {
-          comments.addAll(fetchedComments["comments"]);
-          lastCommentId = fetchedComments["lastId"];
-          hasMoreComments = fetchedComments["hasMore"];
-        } else {
-          comments = fetchedComments["comments"];
+      if (mounted) {
+        setState(() {
+          if (comments.isNotEmpty &&
+              !comments.contains(fetchedComments["comments"])) {
+            comments.addAll(fetchedComments["comments"]);
+            lastCommentId = fetchedComments["lastId"];
+            hasMoreComments = fetchedComments["hasMore"];
+          } else {
+            comments = fetchedComments["comments"];
 
-          lastCommentId = fetchedComments["lastId"];
-          hasMoreComments = fetchedComments["hasMore"];
-        }
-        // comments = fetchedComments;
-      });
+            lastCommentId = fetchedComments["lastId"];
+            hasMoreComments = fetchedComments["hasMore"];
+          }
+          // comments = fetchedComments;
+        });
+      }
       dispatchCustomEvent([comments, isCommentsAreLoading], "comments");
     } catch (e) {
       print('Failed to fetch comments: $e');
     } finally {
-      setState(() {
-        isCommentsAreLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isCommentsAreLoading = false;
+        });
+      }
       dispatchCustomEvent([comments, isCommentsAreLoading], "comments");
     }
   }

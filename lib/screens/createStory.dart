@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/chat.dart';
+import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/recomandedgroups.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/story.dart';
@@ -90,7 +91,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                   showErrorText = true;
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  const SnackBar(
                       content: Text(
                           'Please use the close button to dismiss this dialog')),
                 );
@@ -101,9 +102,9 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                 return AlertDialog(
                   title: Column(
                     children: [
-                      Text(
+                      const Text(
                         'Uploading Chits...',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
@@ -111,9 +112,9 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                       ),
                       const SizedBox(height: 10),
                       if (showErrorText)
-                        Text(
+                        const Text(
                           'Do not close this dialog until the upload is complete.',
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: Colors.red,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -129,10 +130,19 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                       onPressed: () {
                         if (uploadFinished == true) {
                           Navigator.of(context).pop();
+                          Navigator.pushReplacement(
+                              context,
+                              PageTransition(
+                                  type: PageTransitionType.leftToRight,
+                                  child: const HomePage()));
                         } else {
-                          setState(() {
-                            showErrorText = true;
-                          });
+                          if (showErrorText == true) {
+                            Navigator.of(context).pop();
+                          } else {
+                            setState(() {
+                              showErrorText = true;
+                            });
+                          }
                         }
                       },
                     ),
@@ -168,6 +178,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
         setState(() {
           uploadFinished = true;
         });
+        return {'success': false, 'error': error.toString()};
       });
       if (result['success']) {
         print(result);
@@ -452,7 +463,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                       fontWeight: FontWeight.bold,
                     ),
                   )),
-              SizedBox(
+              const SizedBox(
                 height: 20,
               ),
               const Text(
@@ -463,7 +474,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                     fontWeight: FontWeight.bold,
                     color: Colors.white),
               ),
-              SizedBox(
+              const SizedBox(
                 height: 20,
               ),
             ],

@@ -4,7 +4,6 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/simpleaudioplayer.dart';
 import 'package:chitchat/components/videoWidget.dart';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
 
 Map<String, dynamic> myProfile =
     AppVariables.get<Map<String, dynamic>>('profile') ?? {};

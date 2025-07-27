@@ -182,56 +182,56 @@ class UserService {
     if (token == null) {
       throw Exception('User is not authenticated. Please log in.');
     }
-    try {
-      final url = Uri.parse('$baseurl/myprofile');
+    // try {
+    final url = Uri.parse('$baseurl/myprofile');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
 
-        if (responseData.containsKey('user')) {
-          // Response schema 1
-          final userProfile = responseData['user'];
-          print(userProfile);
-          AppVariables.update('profile', userProfile);
+      if (responseData.containsKey('user')) {
+        // Response schema 1
+        final userProfile = responseData['user'];
+        print(userProfile);
+        AppVariables.update('profile', userProfile);
 
-          AppVariables.update(
-              'watchlist', userProfile['watchList'] as List<dynamic>);
+        AppVariables.update(
+            'watchlist', userProfile['watchList'] as List<dynamic>);
 
-          // Check for `myGroup` and parse if present
-          if (userProfile.containsKey('myGroup')) {
-            final groupData = userProfile['myGroup'];
-            final friendCircleGroup =
-                GroupsService.buildFriendCircleGroup(groupData);
+        // Check for `myGroup` and parse if present
+        if (userProfile.containsKey('myGroup')) {
+          final groupData = userProfile['myGroup'];
+          final friendCircleGroup =
+              GroupsService.buildFriendCircleGroup(groupData);
 
-            return {
-              'success': true,
-              'data': userProfile,
-              'group': friendCircleGroup,
-            };
-          }
-
-          return {'success': true, 'data': userProfile, 'group': null};
-        } else {
-          return {'success': false, 'error': 'Invalid response format'};
+          return {
+            'success': true,
+            'data': userProfile,
+            'group': friendCircleGroup,
+          };
         }
+
+        return {'success': true, 'data': userProfile, 'group': null};
       } else {
-        return {
-          'success': false,
-          'error':
-              jsonDecode(response.body)['message'] ?? 'Failed to fetch profile'
-        };
+        return {'success': false, 'error': 'Invalid response format'};
       }
-    } catch (e) {
-      return {'success': false, 'error': e.toString()};
+    } else {
+      return {
+        'success': false,
+        'error':
+            jsonDecode(response.body)['message'] ?? 'Failed to fetch profile'
+      };
     }
+    // } catch (e) {
+    //   return {'success': false, 'error': e.toString()};
+    // }
   }
 
   static Future<Map<String, dynamic>> fetchUserPublicProfile(

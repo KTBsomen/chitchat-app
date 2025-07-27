@@ -24,6 +24,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutterdb/flutterdb.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 
 class GroupPrivateViewScreen extends StatefulWidget {
@@ -491,10 +492,67 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
           ),
         ),
         actions: [
-          const NotificationIcon(
+          NotificationIcon(
             icon: Icons.notifications,
             type: NotificationIconType.Notification,
           ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) async {
+              switch (value) {
+                case 'share':
+                  // Add share functionality
+                  Share.share(
+                      'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}');
+                  break;
+                case 'leave':
+                  // Show confirmation dialog
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text('Leave Group'),
+                        content: const Text(
+                            'Are you sure you want to leave this group?'),
+                        actions: [
+                          TextButton(
+                            child: const Text('Cancel'),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          TextButton(
+                            child: const Text('Leave'),
+                            onPressed: () {
+                              // Add leave group functionality
+                              // GroupsService.leaveGroup(groupId);
+                              Navigator.pop(context); // Close dialog
+                              Navigator.pop(
+                                  context); // Return to previous screen
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'share',
+                child: ListTile(
+                  leading: Icon(Icons.share),
+                  title: Text('Share Group'),
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'leave',
+                child: ListTile(
+                  leading: Icon(Icons.exit_to_app),
+                  title: Text('Leave Group'),
+                ),
+              ),
+            ],
+          )
         ],
       ),
       body: Stack(

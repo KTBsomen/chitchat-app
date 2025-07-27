@@ -19,6 +19,7 @@ import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/mqtt.dart';
 import 'package:flutterdb/flutterdb.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 //TODO
 //Add retry for each message if not delivered
 //add refresh of mqtt connection if disconnected
@@ -362,7 +363,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   messageId: id,
                   message:
                       "${_chatController.currentUser.name} sent you a chit"),
-              MessageType.image);
+              MessageType.image,
+              true);
 
           data
               .where((x) => x.contains(".mp4") || x.contains(".mov"))
@@ -374,15 +376,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     replyTo: _chatController.currentUser.id,
                     messageId: _chatController.initialMessageList.first.id,
                     message: "sent you a chit"),
-                MessageType.video);
+                MessageType.video,
+                true);
           });
         } else if (widget.data.runtimeType == String) {
-          _onSendTap([widget.data], const ReplyMessage(), MessageType.text);
+          _onSendTap(
+              [widget.data], const ReplyMessage(), MessageType.text, true);
         } else if (widget.data.runtimeType == Map) {
           Map<String, dynamic> data = widget.data as Map<String, dynamic>;
           if (data['message'] != null) {
-            _onSendTap(
-                [data['message']], const ReplyMessage(), MessageType.text);
+            _onSendTap([data['message']], const ReplyMessage(),
+                MessageType.text, true);
           }
         }
       }
@@ -946,6 +950,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                   onTap: (Message message) {
                     /// Do something when user taps on image
+
                     debugPrint(message.message);
                     Navigator.of(context).push(
                       PageRouteBuilder(
@@ -960,6 +965,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       ),
                     );
+                    if (message.isOneTime) {
+                      unsendMessage(message);
+                    }
                   },
                   shareIconConfig: ShareIconConfiguration(
                     defaultIconBackgroundColor: theme.shareIconBackgroundColor,
@@ -967,6 +975,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: (imageUrl) {
                       /// Do something when user taps on share icon
                       debugPrint(imageUrl);
+                      // Implement sharing functionality here
+                      // For example, using the 'share_plus' package:
+
+                      Share.share(imageUrl);
                     },
                   ),
                 ),
@@ -1012,7 +1024,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 onTap: (item) => _onSendTap(
-                    [item.text], const ReplyMessage(), MessageType.text),
+                    [item.text], const ReplyMessage(), MessageType.text, false),
               ),
             )
           : const Center(
@@ -1036,7 +1048,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _onSendTap(List<String> filePaths, ReplyMessage replyMessage,
-      MessageType messageType,
+      MessageType messageType, bool isOneTime,
       {String? id}) async {
     if (filePaths.isEmpty) return;
 
@@ -1044,16 +1056,16 @@ class _ChatScreenState extends State<ChatScreen> {
       final file = File(path);
 
       final message = Message(
-        id: id ?? '${DateTime.now().millisecondsSinceEpoch}',
-        createdAt: DateTime.now(),
-        message: path,
-        reaction: Reaction(reactions: [], reactedUserIds: []),
-        sentBy: _chatController.currentUser.id,
-        replyMessage: replyMessage,
-        messageType: messageType,
-        uploadProgress: ValueNotifier(0.0),
-        onRetry: onRetryTap,
-      );
+          id: id ?? '${DateTime.now().millisecondsSinceEpoch}',
+          createdAt: DateTime.now(),
+          message: path,
+          reaction: Reaction(reactions: [], reactedUserIds: []),
+          sentBy: _chatController.currentUser.id,
+          replyMessage: replyMessage,
+          messageType: messageType,
+          uploadProgress: ValueNotifier(0.0),
+          onRetry: onRetryTap,
+          isOneTime: isOneTime);
 
       _chatController.addMessage(message);
       if (messageType == MessageType.video ||

@@ -23,6 +23,13 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme"
             />
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="groups.chitzchat.com" android:pathPrefix="/" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -37,10 +44,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            <service
-    android:name="com.hiennv.flutter_callkit_incoming.CallkitIncomingService"
-    android:exported="true"
-    android:foregroundServiceType="mediaProjection|camera|microphone"/>
+        <service
+            android:name="com.hiennv.flutter_callkit_incoming.CallkitIncomingService"
+            android:exported="true"
+            android:foregroundServiceType="mediaProjection|camera|microphone" />
 
     </application>
     <!-- Required to query activities that can process text, see:
@@ -55,10 +62,8 @@
         </intent>
     </queries>
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="31" />
-    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Permission is required if you are targeting android 33 and above -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />

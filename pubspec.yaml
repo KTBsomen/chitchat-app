@@ -41,6 +41,8 @@ dependencies:
   gallery_saver_plus: ^3.2.4
   chatview:
     path: ../../../chatview
+  deep_link_router:
+    path: ../../../deep_link_router
   mqtt_client: ^10.5.1
   flutterdb: ^0.0.2
   jitsi_meet_flutter_sdk: ^11.2.0

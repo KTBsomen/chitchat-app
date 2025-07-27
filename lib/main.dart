@@ -12,10 +12,13 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:page_transition/page_transition.dart';
 import 'firebase_options.dart';
-
+import 'screens/groupPublic.dart';
 import 'screens/home.dart';
 import 'screens/register.dart';
 import 'package:oktoast/oktoast.dart';
+import 'package:deep_link_router/deep_link_router.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +26,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await FCMHandler.initialize();
-  runApp(OKToast(child: MaterialApp(home: LoginScreen())));
+  runApp(OKToast(
+      child: MaterialApp(navigatorKey: navigatorKey, home: LoginScreen())));
 }
 
 class LoginScreen extends StatefulWidget {
@@ -45,28 +49,55 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    DeepLinkRouter.instance.configure(routes: [
+      // Match /join?group=abc
+      DeepLinkRoute(
+        matcher: (uri) =>
+            uri.path == '/join' && uri.queryParameters.containsKey('group'),
+        handler: (context, uri) async {
+          try {
+            final groupId = uri.queryParameters['group']!;
+
+            print("Navigating to GroupPublicViewScreen with groupId: $groupId");
+            navigatorKey.currentState?.push(MaterialPageRoute(
+              builder: (_) => GroupPublicViewScreen(groupId: groupId),
+            ));
+            return true;
+          } catch (e) {
+            return false;
+          }
+        },
+      ),
+    ]);
+
+    DeepLinkRouter.instance.initialize(context);
     AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
     UserService.isLoggedIn().then((value) async {
       if (value) {
         await UserService.refreshFCMToken();
         Map<String, dynamic> result = await UserService.fetchMyProfile();
         if (result['success']) {
-          if (result['group'] != null) {
+          if (result['group'] != null && mounted) {
             FriendCircleGroup myGroup = result['group'] as FriendCircleGroup;
             await NotificationService.getGroupJoinRequests(
                 context, myGroup.groupId,
                 showLoaders: false, showMessage: false);
           }
         }
-
-        Future.delayed(Duration(seconds: 3), () {
-          Navigator.pushReplacement(
-              context,
-              PageTransition(
-                  isIos: true,
-                  type: PageTransitionType.leftToRight,
-                  child: HomePage()));
-        });
+        Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
+        print("Pending Link: $pendingLink");
+        if (pendingLink != null) {
+          await DeepLinkRouter.completePendingNavigation(context);
+        } else {
+          Future.delayed(Duration(seconds: 2), () {
+            Navigator.pushReplacement(
+                context,
+                PageTransition(
+                    isIos: true,
+                    type: PageTransitionType.leftToRight,
+                    child: HomePage()));
+          });
+        }
       } else {
         setState(() {
           showSplashScreen = false;

@@ -94,6 +94,7 @@ class FCMHandler {
     final data = message.data;
     final type = data['type'];
     final id = data['id'];
+    print("FCM Message: $data");
 
     if (id != null) {
       await NotificationService.storeUnreadIds([id]);
