@@ -376,7 +376,9 @@ class _ChatScreenState extends State<ChatScreen> {
       await chats
           .updateMany({"id": reactions.id}, {"reaction": reactions.reaction});
       Message mtu = _findMessage(reactions);
-      mtu = reactions;
+      setState(() {
+        mtu.reaction = reactions.reaction;
+      });
       if (!isFromMQTT) {
         mqtt.publish(
           jsonEncode({

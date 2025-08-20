@@ -177,6 +177,17 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
         allPosts.addAll(newPosts);
       }
 
+      // Remove duplicates by post ID
+      final uniquePosts = <Map<String, dynamic>>[];
+      final ids = <String>{};
+      for (final post in allPosts) {
+        final postId = post['_id'];
+        if (postId is String && ids.add(postId)) {
+          uniquePosts.add(post);
+        }
+      }
+      allPosts = uniquePosts;
+
       // Sort all posts by creation time (most recent first)
       // Use createdAt for sorting since that's available in your response
       allPosts.sort((a, b) {
