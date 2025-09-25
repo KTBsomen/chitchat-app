@@ -142,9 +142,6 @@ class PostService {
     }
   }
 
-
-  
-
   static Future<Map<String, dynamic>> createPost(
       {required List<String> files,
       required bool isGroupPost,
@@ -203,6 +200,132 @@ class PostService {
     }
   }
 
+  static Future<Map<String, dynamic>> deletePost(String postId) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      if (token == null) {
+        return {
+          "success": false,
+          "error": "User not authenticated",
+        };
+      }
+      final response = await http.delete(
+        Uri.parse('$baseurl/posts/$postId'),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "message": "Post deleted successfully",
+        };
+      } else {
+        return {
+          "success": false,
+          "error": "Failed to delete Post",
+        };
+      }
+    } catch (e) {
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchMyGroupMemories(
+      {required String groupId, int limit = 10, String? next}) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      if (token == null) {
+        return {
+          "success": false,
+          "error": "User not authenticated",
+        };
+      }
+      final response = await http.get(
+          Uri.parse(
+              "$baseurl/memories/$groupId?limit=$limit${next != null ? "&next=$next" : ""}"),
+          headers: {
+            "Authorization": "Bearer $token",
+            "Content-Type": "application/json"
+          });
+
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "data": jsonDecode(response.body),
+        };
+      } else {
+        return {
+          "success": false,
+          "error": "Failed to fetch posts",
+        };
+      }
+    } catch (e) {
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> createMemories(
+      {required List<String> files, required String myGroupId}) async {
+    List<Map<String, dynamic>> media = [];
+    for (String file in files) {
+      String mediaType;
+      if (file.endsWith('.mp4')) {
+        mediaType = 'video';
+      } else if (file.endsWith('.mp3')) {
+        mediaType = 'audio';
+      } else {
+        mediaType = 'image';
+      }
+      media.add({
+        "type": mediaType,
+        "url": file,
+      });
+    }
+    try {
+      String? token = await UserService.getAccessToken();
+      if (token == null) {
+        return {
+          "success": false,
+          "error": "User not authenticated",
+        };
+      }
+      final response = await http.post(Uri.parse("$baseurl/memories"),
+          headers: {
+            "Authorization": "Bearer $token",
+            "Content-Type": "application/json"
+          },
+          body: jsonEncode({
+            "media": media,
+            "groupId": myGroupId,
+          }));
+
+      if (response.statusCode == 201) {
+        return {
+          "success": true,
+          "data": jsonDecode(response.body),
+        };
+      } else {
+        return {
+          "success": false,
+          "error": "Failed to fetch memories",
+        };
+      }
+    } catch (e) {
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
+    }
+  }
+
   static Future<Map<String, dynamic>?> fetchRelatedPosts({
     required String postId,
     int limit = 10,
@@ -229,7 +352,7 @@ class PostService {
       final uri = Uri.parse('$baseurl/posts/$postId/related')
           .replace(queryParameters: queryParams);
       String? token = await UserService.getAccessToken();
-          if (token == null) {
+      if (token == null) {
         return {
           "success": false,
           "error": "User not authenticated",
@@ -239,7 +362,7 @@ class PostService {
         uri,
         headers: {
           'Content-Type': 'application/json',
-           'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $token',
         },
       );
 
@@ -251,22 +374,18 @@ class PostService {
       } else {
         print('Failed to load posts: ${response.statusCode}');
         return {
-           "success": false,
+          "success": false,
           "error": "Failed to fetch posts",
         };
       }
     } catch (e) {
       print('Network error: $e');
-        return {
-           "success": false,
-          "error": e.toString(),
-        };
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
     }
   }
-
-
-
-
 
   static Future<Map<String, dynamic>> toggleLikeOnPost(String postId) async {
     try {

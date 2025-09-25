@@ -829,7 +829,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (messages.isNotEmpty) {
                   _chatController.initialMessageList.insertAll(
                       0,
-                      messages.map((e) {
+                      messages.reversed.map((e) {
                         return Message.fromJson(e);
                       }).toList());
                   _chatController.messageStreamController

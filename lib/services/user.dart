@@ -68,7 +68,7 @@ class UserService {
   static Future<bool> checkLoginStatus() async {
     final isLoggedIn = await UserService.isLoggedIn();
     final userId = await UserService.getUserId();
-    return isLoggedIn! && userId != null;
+    return isLoggedIn && userId != null;
   }
 
   /// Signs in the user using Google authentication.

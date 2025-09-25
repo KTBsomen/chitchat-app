@@ -27,6 +27,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:vs_media_picker/vs_media_picker.dart';
 
 class GroupPrivateViewScreen extends StatefulWidget {
   @override
@@ -503,8 +504,12 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               switch (value) {
                 case 'share':
                   // Add share functionality
-                  Share.share(
-                      'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}');
+                  SharePlus.instance.share(ShareParams(
+                    title: "ChitChat Group Invitation",
+                    text:
+                        'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}',
+                    subject: 'Join my group on ChitChat!',
+                  ));
                   break;
                 case 'leave':
                   // Show confirmation dialog
@@ -858,7 +863,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                     const BorderRadius.all(Radius.circular(50)),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.grey.withOpacity(0.5),
+                                    color: Colors.grey.withValues(alpha: 0.5),
                                     spreadRadius: 2,
                                     blurRadius: 5,
                                     offset: const Offset(0, 3),
@@ -1000,7 +1005,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                         child: TabBarView(
                           controller: _tabController,
                           children: [
-                            // Chat View
+                            // post View
                             MasonryGridView.builder(
                                 controller: scrollController,
                                 gridDelegate:
@@ -1033,44 +1038,86 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                       authorName: post['authorName'],
                                       profilePic: post['profilePic'],
                                       likes: post['likes'],
+                                      public: post['public'],
                                     );
                                   } on Exception catch (e) {
                                     return Container();
                                   }
                                 }),
 
-                            // Posts View (Masonry Grid)
+                            // memories View (Masonry Grid)
                             MasonryGridView.builder(
                               controller: scrollController,
                               gridDelegate:
                                   const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
+                                crossAxisCount: 4,
                               ),
                               mainAxisSpacing: 8,
                               crossAxisSpacing: 8,
-                              itemCount: memories.length,
+                              // add +1 for one static item
+                              itemCount: memories.length + 1,
                               itemBuilder: (context, index) {
+                                // First static item
+                                if (index == 0) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      // Upload action
+                                      CreatePost.show(
+                                        context,
+                                        myGroupId: groupDetails!.groupId,
+                                        isGroupPost: false,
+                                        isPost: false,
+                                        isMemory: true,
+                                        message: "Share a memory",
+                                      );
+                                    },
+                                    child: Container(
+                                      height: 150,
+                                      width: 50,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blueAccent,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.upload,
+                                                color: Colors.white, size: 30),
+                                            Text(
+                                              "Upload",
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 15),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                // Adjust index for memories list
+                                final memory = memories[index - 1];
+
                                 return ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: memories[index].messageType ==
-                                            MessageType.video
-                                        ? VideoMessageView(
-                                            url: memories[index].message,
-                                          )
-                                        : memories[index].messageType ==
-                                                MessageType.image
-                                            ? CachedNetworkImage(
-                                                imageUrl:
-                                                    memories[index].message,
-                                                placeholder: (context, url) =>
-                                                    const CircularProgressIndicator(),
-                                                errorWidget:
-                                                    (context, url, error) =>
-                                                        const Icon(Icons.error),
-                                              )
-                                            : null);
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: memory.messageType == MessageType.video
+                                      ? VideoMessageView(url: memory.message)
+                                      : memory.messageType == MessageType.image
+                                          ? CachedNetworkImage(
+                                              imageUrl: memory.message,
+                                              placeholder: (context, url) =>
+                                                  const CircularProgressIndicator(),
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      const Icon(Icons.error),
+                                            )
+                                          : null,
+                                );
                               },
-                            ),
+                            )
                           ],
                         ),
                       ),

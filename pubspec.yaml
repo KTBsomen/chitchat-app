@@ -8,27 +8,27 @@ environment:
 
 dependencies:
   cached_network_image: ^3.4.1
-  firebase_messaging: ^15.1.0
+  firebase_messaging: ^16.0.1
   flutter:
     sdk: flutter
   flutter_staggered_grid_view: ^0.7.0
-  google_sign_in: ^6.2.2
+  google_sign_in: ^6.3.0
   image_picker: ^1.1.2
   shared_preferences: ^2.3.3
   story_view: ^0.16.5
-  google_mlkit_face_detection: ^0.12.0
+  google_mlkit_face_detection: ^0.13.1
   image: ^4.3.0
   dio: ^5.7.0
   page_transition: ^2.1.0
   youtube_player_flutter: ^9.1.1
   shimmer: ^3.0.0
-  just_audio: ^0.9.43
-  video_player: ^2.9.2
+  just_audio: ^0.10.5
+  video_player: 
   flutter_expandable_fab: ^2.3.0
   event_handeler: ^0.0.2
-  file_picker: ^8.0.1
+  file_picker: ^10.3.3
   vs_story_designer: ^2.2.0
-  share_plus: ^10.1.4
+  share_plus: ^12.0.0
   oktoast: ^3.4.0
   camerawesome: ^2.5.0
   permission_handler: ^11.4.0
@@ -44,18 +44,18 @@ dependencies:
   deep_link_router:
     path: ../../../deep_link_router
   mqtt_client: ^10.5.1
-  flutterdb: ^0.0.2
-  jitsi_meet_flutter_sdk: ^11.2.0
+  flutterdb: ^0.0.4
+  jitsi_meet_flutter_sdk: ^10.0.0
   # flutter_ringtone_player: ^4.0.0+4
   video_thumbnail: ^0.5.6
-  flutter_callkit_incoming: ^2.5.2
+  flutter_callkit_incoming: ^3.0.0
   flutter_local_notifications: ^19.2.1
   easy_video_editor: ^0.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
@@ -79,3 +79,92 @@ flutter:
           weight: 700
         - asset: assets/fonts/Poppins/Poppins-Italic.ttf
           style: italic
+
+
+
+
+
+
+
+
+# name: chitchat
+# description: "A new Flutter project."
+# publish_to: 'none'
+# version: 0.1.0
+
+# environment:
+#   sdk: ^3.5.4
+
+# dependencies:
+#   cached_network_image: ^3.4.1
+#   firebase_messaging: ^15.1.0
+#   flutter:
+#     sdk: flutter
+#   flutter_staggered_grid_view: ^0.7.0
+#   google_sign_in: ^6.2.2
+#   image_picker: ^1.1.2
+#   shared_preferences: ^2.3.3
+#   story_view: ^0.16.5
+#   google_mlkit_face_detection: ^0.12.0
+#   image: ^4.3.0
+#   dio: ^5.7.0
+#   page_transition: ^2.1.0
+#   youtube_player_flutter: ^9.1.1
+#   shimmer: ^3.0.0
+#   just_audio: ^0.9.43
+#   video_player: ^2.9.2
+#   flutter_expandable_fab: ^2.3.0
+#   event_handeler: ^0.0.2
+#   file_picker: ^8.0.1
+#   vs_story_designer: ^2.2.0
+#   share_plus: ^10.1.4
+#   oktoast: ^3.4.0
+#   camerawesome: ^2.5.0
+#   permission_handler: ^11.4.0
+#   better_open_file:
+#     git:
+#       url: https://github.com/AndreLuizNogueira/better_open_file.git
+#   vs_media_picker: ^1.0.4
+#   video_editor: ^3.0.0
+#   image_editor_plus: ^1.0.6
+#   gallery_saver_plus: ^3.2.4
+#   chatview:
+#     path: ../../../chatview
+#   deep_link_router:
+#     path: ../../../deep_link_router
+#   mqtt_client: ^10.5.1
+#   flutterdb: ^0.0.2
+#   jitsi_meet_flutter_sdk: ^11.2.0
+#   # flutter_ringtone_player: ^4.0.0+4
+#   video_thumbnail: ^0.5.6
+#   flutter_callkit_incoming: ^3.0.0
+#   flutter_local_notifications: ^19.2.1
+#   easy_video_editor: ^0.1.2
+
+# dev_dependencies:
+#   flutter_test:
+#     sdk: flutter
+#   flutter_lints: ^4.0.0
+
+# flutter:
+#   uses-material-design: true
+#   assets:
+#     - assets/fonts/
+#     - assets/images/
+#     - assets/emojies/
+  
+
+#   fonts:
+#     - family: PassionOne
+#       fonts:
+#         - asset: assets/fonts/Passion_One/PassionOne-Regular.ttf
+#         - asset: assets/fonts/Passion_One/PassionOne-Bold.ttf
+#           weight: 700
+
+#     - family: Poppins
+#       fonts:
+#         - asset: assets/fonts/Poppins/Poppins-Regular.ttf
+#         - asset: assets/fonts/Poppins/Poppins-Bold.ttf
+#           weight: 700
+#         - asset: assets/fonts/Poppins/Poppins-Italic.ttf
+#           style: italic

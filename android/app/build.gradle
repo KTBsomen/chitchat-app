@@ -30,7 +30,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -44,10 +44,26 @@ android {
 
         }
     }
+    
 }
+
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+
+//   implementation('com.facebook.react:react-native-video:6.13.0-jitsi-20801642') {
+//         exclude group: 'androidx.media3'
+//     }
+
 }
+
+// configurations.all {
+//     resolutionStrategy {
+//         force 'androidx.media3:media3-exoplayer-rtsp:1.5.1'
+//         force 'androidx.media3:media3-exoplayer:1.5.1'
+//         force 'androidx.media3:media3-common:1.5.1'
+//     }
+// }
+
 flutter {
     source = "../.."
 }

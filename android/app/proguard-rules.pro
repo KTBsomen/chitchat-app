@@ -127,3 +127,16 @@
 # Flutter Play Store Split
 -keep class io.flutter.app.FlutterPlayStoreSplitApplication { *; }
 -keep class io.flutter.embedding.engine.deferredcomponents.** { *; }
+
+# Media3 and ExoPlayer2 conflict resolution
+-keep class androidx.media3.** { *; }
+-keep class com.google.android.exoplayer2.** { *; }
+-dontwarn com.google.android.exoplayer2.**
+# Prevent class renaming that could cause conflicts
+-keepnames class androidx.media3.** { *; }
+-keepnames class com.google.android.exoplayer2.** { *; }
+
+# If JitsiMeetSDK tries to create an ExoPlayer2 PlayerView
+-dontwarn com.google.android.exoplayer2.ui.PlayerView
+-dontwarn com.google.android.exoplayer2.ui.DefaultTimeBar
+-dontwarn com.google.android.exoplayer2.ui.TimeBar

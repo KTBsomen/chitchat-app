@@ -12,7 +12,9 @@ import 'package:chitchat/components/simpleaudioplayer.dart';
 import 'package:chitchat/components/videoWidget.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/notifications.dart';
 import 'package:chitchat/services/fileUploader.dart';
+import 'package:chitchat/services/notification.dart';
 import 'package:chitchat/services/posts.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
@@ -33,19 +35,22 @@ class DynamicPostWidget extends StatefulWidget {
   final int likes;
   final bool? showAuthor;
   final bool? showCount;
+  final bool? public;
 
-  DynamicPostWidget(
-      {required this.content,
-      required this.media,
-      required this.postId,
-      required this.author,
-      required this.group,
-      this.authorName,
-      this.profilePic,
-      this.borderRadius = 12,
-      this.likes = 0,
-      this.showAuthor = false,
-      this.showCount = false});
+  DynamicPostWidget({
+    required this.content,
+    required this.media,
+    required this.postId,
+    required this.author,
+    required this.group,
+    this.authorName,
+    this.profilePic,
+    this.borderRadius = 12,
+    this.likes = 0,
+    this.showAuthor = false,
+    this.showCount = false,
+    this.public = true,
+  });
 
   @override
   State<DynamicPostWidget> createState() => _DynamicPostWidgetState();
@@ -210,6 +215,28 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     //initStores();
   }
 
+  final ValueNotifier<List<NotificationModel>> notificationsNotifier =
+      ValueNotifier([]);
+  bool _isLoading = false;
+  void _getNotifications() async {
+    if (widget.public == true) {
+      return;
+    }
+    List<Map<String, dynamic>> jsonData =
+        (await NotificationService.getGroupPostRequests(context, widget.postId,
+            showLoaders: false))!;
+    print("jsonData: $jsonData");
+
+    if (mounted) {
+      setState(() {
+        notificationsNotifier.value =
+            jsonData.map((data) => NotificationModel.fromJson(data)).toList();
+
+        _isLoading = false;
+      });
+    }
+  }
+
   bool isCommentsAreLoading = false;
   bool hasMoreComments = true;
   String? lastCommentId;
@@ -270,31 +297,31 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
-                  color:
-                      Colors.black.withOpacity(0.2), // Optional overlay color
+                  color: Colors.black
+                      .withValues(alpha: 0.2), // Optional overlay color
                 ),
               ),
             ),
-            GestureDetector(
-              onDoubleTap: () {
-                Navigator.of(context).push(
-                  PageRouteBuilder(
-                    opaque: false,
-                    barrierDismissible: true,
-                    pageBuilder: (BuildContext context, _, __) {
-                      return ZoomableImagePopup(
-                        imageUrl: mediaItem['url']!,
-                        onEdit: null,
-                        onClose: () => Navigator.of(context).pop(),
-                      );
-                    },
-                  ),
-                );
-              },
-              child: Center(
+            Positioned.fill(
+              child: GestureDetector(
+                onDoubleTap: () {
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      opaque: false,
+                      barrierDismissible: true,
+                      pageBuilder: (BuildContext context, _, __) {
+                        return ZoomableImagePopup(
+                          imageUrl: mediaItem['url']!,
+                          onEdit: null,
+                          onClose: () => Navigator.of(context).pop(),
+                        );
+                      },
+                    ),
+                  );
+                },
                 child: CachedNetworkImage(
                   imageUrl: mediaItem['url']!,
-                  fit: BoxFit.contain,
+                  fit: BoxFit.fitWidth,
                 ),
               ),
             ),
@@ -338,7 +365,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
   // Open BottomSheet with media slider
   void _openBottomSheet(BuildContext context) {
     int mediaIndex = 1;
-
+    _getNotifications();
     showModalBottomSheet(
       enableDrag: true,
       context: context,
@@ -384,7 +411,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                             SliverAppBar(
                               backgroundColor: Colors.transparent,
                               pinned: true,
-                              expandedHeight: 400,
+                              expandedHeight: 500,
                               automaticallyImplyLeading: false,
                               flexibleSpace: FlexibleSpaceBar(
                                 background: PageView.builder(
@@ -403,102 +430,84 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                 ),
                               ),
                             ),
-                            SliverToBoxAdapter(
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: LikeButton(
-                                          buttonType: ButtonType.post,
-                                          postId: widget.postId,
-                                          initialLikes: widget.likes,
-                                          initiallyLiked: false,
-                                          onLikeChanged: (isLiked) async {
-                                            Map<String, dynamic> result =
-                                                await PostService
-                                                    .toggleLikeOnPost(
-                                                        widget.postId);
-                                            if (result["success"] && mounted) {
-                                              setState(() {
-                                                // Update the like count and state based on the result
-                                              });
-                                              return true;
-                                            } else {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(SnackBar(
-                                                      content: Text(
-                                                          result["message"])));
-                                              return false;
-                                            }
-                                          },
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: Row(
-                                          children: [
-                                            const Icon(Icons.comment,
-                                                color: Colors.white),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              comments.length.toString(),
-                                              style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 14),
-                                            ),
-                                          ],
-                                        ),
-                                        onPressed: () =>
-                                            _openCommentSheet(context),
-                                      ),
-                                    ],
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      mediaIndex == widget.media.length
-                                          ? ""
-                                          : "$mediaIndex/${widget.media.length}",
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SliverToBoxAdapter(
-                              child: Container(
-                                height: 60,
-                                child: const Center(
-                                  child: Column(
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.explore),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            "Explore",
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14),
+                            //likes comments
+                            if (widget.public == false)
+                              SliverToBoxAdapter(child: _buildVotingSection())
+                            else
+                              RelatedPostsWidget(
+                                postId: widget.postId,
+                                authorId: widget.author,
+                                profilePic: widget.profilePic ?? "",
+                                authorName: widget.authorName ?? "",
+                                scrollController: scrollController,
+                                middleItem: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: LikeButton(
+                                            buttonType: ButtonType.post,
+                                            postId: widget.postId,
+                                            initialLikes: widget.likes,
+                                            initiallyLiked: false,
+                                            onLikeChanged: (isLiked) async {
+                                              Map<String, dynamic> result =
+                                                  await PostService
+                                                      .toggleLikeOnPost(
+                                                          widget.postId);
+                                              if (result["success"] &&
+                                                  mounted) {
+                                                setState(() {
+                                                  // Update the like count and state based on the result
+                                                });
+                                                return true;
+                                              } else {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(SnackBar(
+                                                        content: Text(result[
+                                                            "message"])));
+                                                return false;
+                                              }
+                                            },
                                           ),
-                                        ],
-                                      )
-                                    ],
-                                  ),
+                                        ),
+                                        IconButton(
+                                          icon: Row(
+                                            children: [
+                                              const Icon(Icons.comment,
+                                                  color: Colors.white),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                comments.length.toString(),
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14),
+                                              ),
+                                            ],
+                                          ),
+                                          onPressed: () =>
+                                              _openCommentSheet(context),
+                                        ),
+                                      ],
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text(
+                                        mediaIndex == widget.media.length
+                                            ? ""
+                                            : "$mediaIndex/${widget.media.length}",
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                            RelatedPostsWidget(
-                                postId: widget.postId,
-                                scrollController: scrollController),
                           ],
                         ),
                       ),
@@ -792,7 +801,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                             BoxShadow(
                               offset: const Offset(0, -2),
                               blurRadius: 4,
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                             ),
                           ],
                         ),
@@ -891,15 +900,382 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     });
   }
 
+// ValueNotifiers for reactive updates
+
+  ValueNotifier<double> votesNotifier = ValueNotifier<double>(0);
+
+  int get totalMembers {
+    return notificationsNotifier.value.isNotEmpty
+        ? notificationsNotifier.value.last.totalMembers
+        : 0;
+  }
+
+  double get _voteProgress {
+    if (totalMembers == 0) return 0.0;
+    return (votesNotifier.value / totalMembers).clamp(0.0, 1.0);
+  }
+
+// Get progress for majority (>50% of total members)
+  double get _majorityProgress {
+    if (totalMembers == 0) return 0.0;
+    final majorityNeeded = (totalMembers / 2) + 1;
+    return (votesNotifier.value / majorityNeeded).clamp(0.0, 1.0);
+  }
+
+  void _handleVote() async {
+    votesNotifier.value += 1;
+    bool success = await NotificationService.vote(
+        context, notificationsNotifier.value.last.id);
+    if (!success) {
+      votesNotifier.value -= 1; // Revert if vote failed
+    }
+    print("valuenotier==== ${votesNotifier.value}, sucess =$success");
+    // widget.onVote(widget.notification.id);
+  }
+
+  Widget _buildVotingSection() {
+    return ValueListenableBuilder<List<NotificationModel>>(
+      valueListenable: notificationsNotifier,
+      builder: (context, notifications, _) {
+        if (notifications.isEmpty) {
+          return const SizedBox(
+            height: 200,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        // _notifications = notifications;
+        votesNotifier.value = notifications.last.votes.toDouble();
+        return _buildvotingSectionUI();
+      },
+    );
+  }
+
+  Widget _buildvotingSectionUI() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ValueListenableBuilder<double>(
+        valueListenable: votesNotifier,
+        builder: (context, votes, child) {
+          final majorityProgress = _majorityProgress;
+          final isNearMajority = majorityProgress >= 0.8;
+          final isMajority = majorityProgress >= 1.0;
+
+          return Column(
+            children: [
+              // Combined Button-ProgressBar with Animation
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _handleVote,
+                    borderRadius: BorderRadius.circular(12),
+                    splashColor:
+                        AppColors.Secondarybackground.withValues(alpha: 0.3),
+                    highlightColor:
+                        AppColors.Secondarybackground.withValues(alpha: 0.1),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: double.infinity,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isMajority
+                              ? Colors.green.withValues(alpha: 0.5)
+                              : AppColors.Secondarybackground.withValues(
+                                  alpha: 0.3),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isMajority
+                                    ? Colors.green
+                                    : AppColors.Secondarybackground)
+                                .withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Stack(
+                          children: [
+                            // Background with subtle pattern
+                            Container(
+                              width: double.infinity,
+                              height: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+
+                            // Animated Progress fill
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.easeOutCubic,
+                              width: MediaQuery.of(context).size.width *
+                                  majorityProgress,
+                              height: double.infinity,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: isMajority
+                                      ? [
+                                          Colors.green[400]!
+                                              .withValues(alpha: 0.8),
+                                          Colors.green[500]!,
+                                        ]
+                                      : isNearMajority
+                                          ? [
+                                              AppColors.Secondarybackground
+                                                  .withValues(alpha: 0.6),
+                                              AppColors.Secondarybackground
+                                                  .withValues(alpha: 0.9),
+                                            ]
+                                          : [
+                                              AppColors.Secondarybackground
+                                                  .withValues(alpha: 0.3),
+                                              AppColors.Secondarybackground
+                                                  .withValues(alpha: 0.6),
+                                            ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                              ),
+                            ),
+
+                            // Shimmer effect when near majority
+                            if (isNearMajority && !isMajority)
+                              AnimatedOpacity(
+                                duration: const Duration(milliseconds: 1000),
+                                opacity: 0.6,
+                                child: Container(
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.white.withValues(alpha: 0.0),
+                                        Colors.white.withValues(alpha: 0.4),
+                                        Colors.white.withValues(alpha: 0.0),
+                                      ],
+                                      stops: const [0.0, 0.5, 1.0],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // Button content with dynamic colors
+                            Center(
+                              child: AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 300),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: majorityProgress > 0.4
+                                      ? Colors.white
+                                      : AppColors.Secondarybackground,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    AnimatedSwitcher(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      child: Icon(
+                                        isMajority
+                                            ? Icons.check_circle
+                                            : Icons.touch_app,
+                                        key: ValueKey(isMajority),
+                                        size: 20,
+                                        color: majorityProgress > 0.4
+                                            ? Colors.white
+                                            : AppColors.Secondarybackground,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    AnimatedSwitcher(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      child: Text(
+                                        isMajority
+                                            ? 'Majority Reached!'
+                                            : 'Tap in (${votes.toInt()})',
+                                        key: ValueKey(isMajority),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // Ripple effect overlay
+                            Positioned.fill(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _handleVote,
+                                  borderRadius: BorderRadius.circular(12),
+                                  splashColor:
+                                      Colors.white.withValues(alpha: 0.3),
+                                  highlightColor:
+                                      Colors.white.withValues(alpha: 0.1),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Progress info with better styling
+              Column(
+                children: [
+                  Text(
+                    '${votes.toInt()} / ${((totalMembers / 2) + 1).ceil()} votes for majority',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (!isMajority) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${(((totalMembers / 2) + 1).ceil() - votes.toInt())} more needed • ${totalMembers} total members',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[500],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '🎉 Decision can proceed with majority support',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.green[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+// Don't forget to dispose the ValueNotifier
   @override
   void dispose() {
+    votesNotifier.dispose();
     super.dispose();
-    // EventManager().dispose();
+  }
+
+  void _openMore(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // if (isFromCurrentUser)
+                //   ListTile(
+                //     leading: Icon(Icons.edit, color: Colors.blue),
+                //     title: Text("Edit"),
+                //     onTap: () {
+                //       Navigator.pop(context);
+                //       _showEditMessagePopup(message);
+                //     },
+                //   ),
+                ListTile(
+                  leading: Icon(Icons.delete, color: Colors.red),
+                  title: Text("Delete"),
+                  onTap: () {
+                    // Navigator.pop(context);
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (BuildContext context) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      },
+                    );
+
+                    PostService.deletePost(widget.postId).then((result) {
+                      Navigator.of(context).pop(); // Close loader
+                      if (result['success'] == true) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              backgroundColor: Colors.green,
+                              content: Text('Post deleted successfully!')),
+                        );
+                        Navigator.of(context)
+                            .pop(); // Optionally close the dialog or screen
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              backgroundColor: Colors.red,
+                              content: Text(result['message'] ??
+                                  'Failed to delete post')),
+                        );
+                        Navigator.of(context)
+                            .pop(); // Optionally close the dialog or screen
+                      }
+                    }).catchError((e) {
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            backgroundColor: Colors.red,
+                            content: Text(
+                                'An error occurred while deleting the post')),
+                      );
+                    });
+                    // Handle pin action
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onLongPress: () {
+        _openMore(context);
+      },
       onTap: () => _openBottomSheet(context),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -938,7 +1314,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -963,7 +1339,8 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                       Shadow(
                                         offset: const Offset(0, 1),
                                         blurRadius: 3.0,
-                                        color: Colors.black.withOpacity(0.5),
+                                        color:
+                                            Colors.black.withValues(alpha: 0.5),
                                       ),
                                     ])),
                           ],
@@ -985,7 +1362,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
+                              color: Colors.black.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -998,15 +1375,52 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                           Shadow(
                                             offset: const Offset(0, 1),
                                             blurRadius: 3.0,
-                                            color:
-                                                Colors.black.withOpacity(0.5),
+                                            color: Colors.black
+                                                .withValues(alpha: 0.5),
                                           ),
                                         ])),
                               ],
                             ),
                           ),
                         ),
-                      ))
+                      )),
+            if (widget.public == false)
+              Positioned(
+                  top: 5,
+                  right: 5,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.lock,
+                                size: 12, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text("Private",
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        offset: const Offset(0, 1),
+                                        blurRadius: 3.0,
+                                        color:
+                                            Colors.black.withValues(alpha: 0.5),
+                                      ),
+                                    ])),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )),
           ],
         ),
       ),

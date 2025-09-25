@@ -18,6 +18,8 @@ class CreatePost {
   static dynamic show(BuildContext context,
       {bool isGroupPost = false,
       bool isPost = true,
+      bool isMemory = false,
+      String? message,
       required String? myGroupId}) {
     ValueNotifier<bool> isNextButtonVisible = ValueNotifier(false);
     List<PickedAssetModel> selectedFiles = <PickedAssetModel>[];
@@ -93,6 +95,7 @@ class CreatePost {
                                                 files: selectedFiles,
                                                 isGroupPost: isGroupPost,
                                                 isPost: isPost,
+                                                isMemory: isMemory,
                                                 myGroupId: myGroupId,
                                               )),
                                     );
@@ -170,7 +173,7 @@ class CreatePost {
               ),
               child: Center(
                 child: Text(
-                  'Select files to send',
+                  message ?? 'Select files to send',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,

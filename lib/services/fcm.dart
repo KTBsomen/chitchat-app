@@ -235,6 +235,9 @@ class FCMHandler {
         // TODO: Handle this case.
         case Event.actionCallCustom:
         // TODO: Handle this case.
+        case Event.actionCallConnected:
+          // TODO: Handle this case.
+          throw UnimplementedError();
       }
     });
   }

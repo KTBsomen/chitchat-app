@@ -111,12 +111,14 @@ class FilePreviewPage extends StatefulWidget {
   bool? isGroupPost = false;
   bool? isPost = false;
   String? myGroupId = "";
+  bool? isMemory = false;
 
   FilePreviewPage(
       {super.key,
       required this.files,
       this.isGroupPost = false,
       this.isPost = false,
+      this.isMemory = false,
       this.myGroupId = ""});
 
   @override
@@ -333,7 +335,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
         print(error);
         _progressNotifier.value = _progressNotifier.value.copyWith(
           stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this chits",
+          customStageTextDetail: "can't upload these chits",
         );
         setState(() {
           uploadFinished = true;
@@ -355,6 +357,149 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
         _progressNotifier.value = _progressNotifier.value.copyWith(
           stage: UploadStage.failed,
           customStageTextDetail: "can't upload this chits",
+        );
+        setState(() {
+          uploadFinished = true;
+        });
+      }
+    }
+  }
+
+  uploadMemory(context) async {
+    String? xtoken = await UserService.getAccessToken();
+
+    String baseurl =
+        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
+
+    ValueNotifier<FileUploadProgress> _progressNotifier =
+        ValueNotifier<FileUploadProgress>(
+      FileUploadProgress(fileName: 'Uploading...'),
+    );
+
+    S3Uploader uploader = S3Uploader(
+      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+      progressNotifier: _progressNotifier,
+    );
+    bool uploadFinished = false;
+    bool showErrorText = false;
+    final List<String>? images = editedFiles.map((f) => f.path).toList();
+
+    if (images != null && images.isNotEmpty) {
+      // Handle the selected image
+      images.map((e) => print);
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return PopScope(
+            canPop: false,
+
+            // Optional: Handle the attempted pop with onPopInvoked
+            onPopInvokedWithResult: (didPop, res) {
+              // This callback is triggered when a pop is attempted
+              // didPop will be false since canPop is false
+
+              // You could show a snackbar or provide feedback here
+              if (!didPop) {
+                setState(() {
+                  showErrorText = true;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(
+                          'Please use the close button to dismiss this dialog')),
+                );
+              }
+            },
+            child: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) {
+                return AlertDialog(
+                  title: Column(
+                    children: [
+                      Text(
+                        'Uploading...',
+                        style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            fontFamily: 'Poppins'),
+                      ),
+                      const SizedBox(height: 10),
+                      if (showErrorText)
+                        Text(
+                          'Do not close this dialog until the upload is complete.',
+                          style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Poppins'),
+                        ),
+                    ],
+                  ),
+                  content:
+                      UploadProgressWidget(progressNotifier: _progressNotifier),
+                  actions: <Widget>[
+                    TextButton(
+                      child: const Text('OK'),
+                      onPressed: () {
+                        if (uploadFinished == true) {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).pop();
+                        } else {
+                          setState(() {
+                            showErrorText = true;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      );
+      List<String> files =
+          await uploader.uploadFiles(files: images, compressionParams: {
+        'width': 600,
+        'quality': 95,
+      });
+      print(files);
+      _progressNotifier.value = _progressNotifier.value.copyWith(
+        stage: UploadStage.uploading,
+        customStageText: "Processing...",
+        customStageTextDetail: "saving on server...",
+      );
+      Map<String, dynamic> result = await PostService.createMemories(
+        files: files,
+        myGroupId: widget.myGroupId ?? '',
+      ).catchError((error) {
+        print(error);
+        _progressNotifier.value = _progressNotifier.value.copyWith(
+          stage: UploadStage.failed,
+          customStageTextDetail: "can't upload this memory",
+        );
+        setState(() {
+          uploadFinished = true;
+        });
+      });
+      if (result['success']) {
+        print(result);
+        _progressNotifier.value = _progressNotifier.value.copyWith(
+          stage: UploadStage.completed,
+          customStageText: "Uploaded Successfully",
+          customStageTextDetail: "You are set! now you can close this dialog",
+        );
+        setState(() {
+          // posts.add(result['data']);
+          uploadFinished = true;
+        });
+      } else {
+        print(result);
+        _progressNotifier.value = _progressNotifier.value.copyWith(
+          stage: UploadStage.failed,
+          customStageTextDetail: "can't upload this memory",
         );
         setState(() {
           uploadFinished = true;
@@ -385,7 +530,8 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                     // Show bottom-right circular selector
                     if (editedFiles.length > 1 ||
                         widget.isPost! ||
-                        widget.isGroupPost!) {
+                        widget.isGroupPost! ||
+                        widget.isMemory!) {
                       Navigator.pop(context, uri);
                       return;
                     }
@@ -498,7 +644,9 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
             ),
             onPressed: () {
               // Upload editedFiles list
-              if (widget.isPost != null && widget.isPost != true) {
+              if (widget.isMemory == true) {
+                uploadMemory(context);
+              } else if (widget.isPost != null && widget.isPost != true) {
                 print(
                     "Files to upload: ${editedFiles.map((f) => f.path).toList()}");
                 Navigator.pushReplacement(

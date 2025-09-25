@@ -160,6 +160,56 @@ class NotificationService {
     }
   }
 
+// Fetch post requests and update unread notifications
+  static Future<List<Map<String, dynamic>>?> getGroupPostRequests(
+      BuildContext context, String postId,
+      {bool showMessage = true, bool showLoaders = true}) async {
+    try {
+      String? accessToken = await UserService.getAccessToken();
+
+      if (showLoaders) {
+        showLoader(context);
+      }
+      final response = await http.get(
+        Uri.parse("$baseurl/group/postrequests/$postId"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      final data = jsonDecode(response.body);
+      if (showLoaders) {
+        hideLoader(context);
+      }
+
+      if (response.statusCode == 404) {
+        await storeUnreadIds([]); // Reset unread count if no data
+        return [];
+      }
+
+      if (response.statusCode != 200) {
+        throw Exception("Failed to fetch join requests");
+      }
+
+      // Extract unique notification IDs
+      List<String> newUnreadIds = data["postRequests"]
+          .map<String>((req) => req["_id"].toString())
+          .toList();
+
+      // Store only unique IDs
+      await storeUnreadIds(newUnreadIds);
+
+      return List<Map<String, dynamic>>.from(data["postRequests"]);
+    } catch (error) {
+      if (showMessage) {
+        hideLoader(context);
+        showPopup(context, error.toString());
+      }
+      return [];
+    }
+  }
+
   // Vote function
   static Future<bool> vote(BuildContext context, String voteId) async {
     try {
@@ -187,6 +237,9 @@ class NotificationService {
           onRefresh: () => Navigator.of(context).pop(), // Refresh group
         );
         return true;
+      } else if (data["message"] == "You have already voted for this group") {
+        showPopup(context, data["message"]);
+        return false;
       } else {
         showPopup(context, data["message"]);
         return true;
