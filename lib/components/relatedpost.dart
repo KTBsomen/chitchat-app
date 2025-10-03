@@ -3,12 +3,15 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/components/renderpost.dart';
+import 'package:chitchat/screens/groupPublic.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/posts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+import 'package:page_transition/page_transition.dart';
 
 class RelatedPostsWidget extends StatefulWidget {
   final String postId;
@@ -618,56 +621,76 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
               ),
               widget.middleItem,
               if (group != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 10, right: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          children: [
-                            const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [Text("<-- explore my group -->")],
-                            ),
-                            SizedBox(
-                              height: 15,
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  group!.groupData["name"],
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                            ),
-                          ],
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      PageTransition(
+                        type: PageTransitionType.rightToLeft,
+                        child: GroupPublicViewScreen(
+                          groupId: group!.groupId,
                         ),
                       ),
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundImage: group!
-                                .groupData["GroupProfilePic"].isNotEmpty
-                            ? NetworkImage(group!.groupData['GroupProfilePic'])
-                            : null,
-                        child: group!.groupData["GroupProfilePic"].isEmpty
-                            ? Text(
-                                group!.groupData["name"].isNotEmpty
-                                    ? group!.groupData["name"][0].toUpperCase()
-                                    : 'G',
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              )
-                            : null,
-                      ),
-                    ],
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10, right: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("<-- explore my group -->",
+                                      style: TextStyle(color: Colors.white))
+                                ],
+                              ),
+                              SizedBox(
+                                height: 15,
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    group!.groupData["name"],
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundImage:
+                              group!.groupData["GroupProfilePic"].isNotEmpty
+                                  ? NetworkImage(
+                                      group!.groupData['GroupProfilePic'])
+                                  : null,
+                          child: group!.groupData["GroupProfilePic"].isEmpty
+                              ? Text(
+                                  group!.groupData["name"].isNotEmpty
+                                      ? group!.groupData["name"][0]
+                                          .toUpperCase()
+                                      : 'G',
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                )
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],

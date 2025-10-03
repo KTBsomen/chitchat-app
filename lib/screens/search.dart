@@ -10,6 +10,7 @@ import 'package:chitchat/screens/groupPrivet.dart';
 import 'package:chitchat/screens/groupPublic.dart';
 import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/profilePublic.dart';
+import 'package:chitchat/screens/searchResults.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,58 @@ class _SearchPageState extends State<SearchPage> {
   List<Map<String, dynamic>> searchResultUsers = [];
   List<Map<String, dynamic>> searchResultColleges = [];
   List<Map<String, dynamic>> searchResultUniversities = [];
+  List<Map<String, dynamic>> topUniversities = [
+    {
+      "_id": "674dc00e8cefe7ce6e00c3d4",
+      "Name of the University": "COER University, Roorkee",
+      "Address": "7KM. on Roorkee -Haridwar Road, Vardhmanpuram, Roorkee",
+      "Zip": "247667",
+      "State": "Uttarakhand"
+    },
+    {
+      "_id": "674dc00e8cefe7ce6e00c64e",
+      "Name of the University":
+          "Rani Rashmoni Green University(formerly West Bengal Green University.)",
+      "Address":
+          "At the premises of Singur General Degree College, Singur, Hooghly, West Bengal",
+      "Zip": "712409",
+      "state": "West Bengal"
+    },
+    {
+      "_id": "674dc00e8cefe7ce6e00c31f",
+      "Name of the University": "Amity University",
+      "Address": "Rajarhat,  New Town,  Dist. North 24 Parganas",
+      "Zip": "700135",
+      "State": "West Bengal"
+    },
+    {
+      "_id": "674dc00f8cefe7ce6e00c792",
+      "Name of the University": "Woxsen University",
+      "Address": "Woxsen Campus, Kamkole, Sadasivpet, Medak District",
+      "State": "Telangana"
+    },
+    {
+      "_id": "674dc00e8cefe7ce6e00c430",
+      "Name of the University": "Flame University",
+      "Address": "GAT No. 1270Village LavaleTaluka Mulshi, Pune",
+      "Zip": "411042",
+      "state": "Maharashtra"
+    },
+    {
+      "_id": "674dc00e8cefe7ce6e00c397",
+      "Name of the University": "Calcutta University",
+      "Address": "Calcutta University, College Square, Kolkata",
+      "Zip": "700073",
+      "state": "West Bengal"
+    },
+    {
+      "_id": "674dc00f8cefe7ce6e00c70b",
+      "Name of the University": "Symbiosis International University",
+      "Address": "Gram: Lavale, Taluka: Mulshi, District: Pune",
+      "Zip": "412115",
+      "state": "Maharashtra"
+    }
+  ];
   double scale = 0.0;
   bool isLoading = true;
   bool isLoadingError = false;
@@ -72,7 +125,7 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
-  String selectedType = "Name";
+  String selectedType = "University";
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -757,75 +810,149 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   List<Widget> _searchUniversities() {
-    return [
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 10,
-          ),
-          Text(
-            "${searchResultUniversities.length} Universities Found",
-            textAlign: TextAlign.left,
-            style: TextStyle(
-                fontSize: 15,
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.bold,
-                color: Colors.white),
-          ),
-          SizedBox(
-            height: 10,
-            child: Divider(),
-          ),
-        ],
-      ),
-      Expanded(
-          child: ListView.builder(
-        itemCount: searchResultUniversities.length,
-        itemBuilder: (context, index) {
-          final user = searchResultUniversities[index];
-          return Card(
-            color: Colors.transparent,
-            margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+    return searchResultUniversities.isEmpty
+        ? [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 10,
+                ),
+                Text(
+                  "Top Universities",
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                ),
+                SizedBox(
+                  height: 10,
+                  child: Divider(),
+                ),
+              ],
             ),
-            child: ListTile(
-              title: Text(
-                user['Name of the University'] ?? 'Unknown',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                    color: Colors.white),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (user['Address'] != null)
-                    Text(
-                      'Address: ${user['Address']}',
+            Expanded(
+                child: ListView.builder(
+              itemCount: topUniversities.length,
+              itemBuilder: (context, index) {
+                final user = topUniversities[index];
+                return Card(
+                  color: Colors.transparent,
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      user['Name of the University'] ?? 'Unknown',
                       style: TextStyle(
-                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                           fontFamily: 'Poppins',
-                          color: Colors.white70),
+                          color: Colors.white),
                     ),
-                ],
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  PageTransition(
-                    type: PageTransitionType.rightToLeft,
-                    child: PublicProfilePage(
-                        dbIndex: user['dbIndex'], uid: user['id']),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (user['Address'] != null)
+                          Text(
+                            'Address: ${user['Address']}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Poppins',
+                                color: Colors.white70),
+                          ),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.rightToLeft,
+                          child: SearchResultsPage(
+                            name: user['Name of the University'],
+                            type: "University",
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               },
+            )),
+          ]
+        : [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 10,
+                ),
+                Text(
+                  "${searchResultUniversities.length} Universities Found",
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                ),
+                SizedBox(
+                  height: 10,
+                  child: Divider(),
+                ),
+              ],
             ),
-          );
-        },
-      )),
-    ];
+            Expanded(
+                child: ListView.builder(
+              itemCount: searchResultUniversities.length,
+              itemBuilder: (context, index) {
+                final user = searchResultUniversities[index];
+                return Card(
+                  color: Colors.transparent,
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      user['Name of the University'] ?? 'Unknown',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                          color: Colors.white),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (user['Address'] != null)
+                          Text(
+                            'Address: ${user['Address']}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Poppins',
+                                color: Colors.white70),
+                          ),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.rightToLeft,
+                          child: SearchResultsPage(
+                            name: user['Name of the University'],
+                            type: "University",
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            )),
+          ];
   }
 
   List<Widget> _searchColleges() {
@@ -896,8 +1023,10 @@ class _SearchPageState extends State<SearchPage> {
                   context,
                   PageTransition(
                     type: PageTransitionType.rightToLeft,
-                    child: PublicProfilePage(
-                        dbIndex: user['dbIndex'], uid: user['id']),
+                    child: SearchResultsPage(
+                      name: user['Name of the college'],
+                      type: "College",
+                    ),
                   ),
                 );
               },

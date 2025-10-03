@@ -72,6 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     DeepLinkRouter.instance.initialize(context);
     AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
+
+    ///https://chitzchat.com/api/v1
     UserService.isLoggedIn().then((value) async {
       if (value) {
         await UserService.refreshFCMToken();

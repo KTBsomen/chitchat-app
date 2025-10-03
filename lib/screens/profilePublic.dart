@@ -580,8 +580,10 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                             ? CircularProgressIndicator()
                                             : Icon(
                                                 isInWatchList
-                                                    ? Icons.favorite
-                                                    : Icons.favorite_border,
+                                                    ? Icons
+                                                        .remove_red_eye_rounded
+                                                    : Icons
+                                                        .remove_red_eye_outlined,
                                                 color: Colors.red,
                                                 size: 30,
                                               ),
