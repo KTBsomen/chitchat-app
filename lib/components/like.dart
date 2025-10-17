@@ -8,6 +8,7 @@ class LikeButton extends StatefulWidget {
   final ButtonType buttonType;
   final int initialLikes;
   final bool initiallyLiked;
+  final bool showLikeCount;
   final Future<bool> Function(bool isLiked) onLikeChanged;
 
   LikeButton({
@@ -15,6 +16,7 @@ class LikeButton extends StatefulWidget {
     required this.initialLikes,
     required this.initiallyLiked,
     required this.onLikeChanged,
+    this.showLikeCount = false,
     this.postId,
   });
 
@@ -99,10 +101,11 @@ class _LikeButtonState extends State<LikeButton> {
                   color: isLiked ? Colors.red : Colors.white54,
                 ),
               ),
-              Text(
-                formatLikes(likes),
-                style: TextStyle(fontSize: 10, color: Colors.white54),
-              ),
+              if (widget.showLikeCount)
+                Text(
+                  formatLikes(likes),
+                  style: TextStyle(fontSize: 10, color: Colors.white54),
+                ),
             ],
           );
   }

@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatview/chatview.dart';
 import 'package:chitchat/screens/search.dart';
 import 'package:chitchat/services/user.dart';
+import 'package:chitchat/services/userOnline.dart';
 import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 
 import 'package:chitchat/appstate/variables.dart';
@@ -398,6 +399,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     clearMessageNotification();
     print(profileDetails);
+    PresenceManager().onChatPageOpened();
     initDB().then((value) {
       print('Database initialized successfully');
 
@@ -495,6 +497,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     // TODO: implement dispose
     super.dispose();
+    PresenceManager().onChatPageClosed();
+
     try {
       mqtt.disconnect();
     } catch (e) {

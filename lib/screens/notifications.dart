@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/notification.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
+import 'package:page_transition/page_transition.dart';
 
 class NotificationModel {
   final String id;
@@ -100,45 +102,44 @@ class _NotificationCardState extends State<NotificationCard> {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: isDarkMode ? 8 : 2,
-      shadowColor: Colors.black.withOpacity(0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.cardColor,
-              theme.cardColor.withOpacity(0.95),
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with title and type indicator
-              _buildHeader(),
-              const SizedBox(height: 16),
+    return widget.notification.type != 'joinGroup'
+        ? const SizedBox.shrink()
+        : Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            elevation: isDarkMode ? 8 : 2,
+            shadowColor: Colors.black.withOpacity(0.1),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: AppColors.Secondarybackground,
+                // gradient: LinearGradient(
+                //   begin: Alignment.topLeft,
+                //   end: Alignment.bottomRight,
+                //   colors: [Colors.black, Colors.grey[900]!],
+                // ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with title and type indicator
+                    _buildHeader(),
+                    const SizedBox(height: 16),
 
-              // Main content area
-              _buildMainContent(),
-              const SizedBox(height: 20),
+                    // Main content area
+                    _buildMainContent(),
 
-              // Voting section
-              _buildVotingSection(),
-            ],
-          ),
-        ),
-      ),
-    );
+                    // Voting section
+                    _buildVotingSection(),
+                  ],
+                ),
+              ),
+            ),
+          );
   }
 
   Widget _buildHeader() {
@@ -194,68 +195,83 @@ class _NotificationCardState extends State<NotificationCard> {
   Widget _buildJoinGroupContent() {
     final requestBody = widget.notification.requestBody;
 
-    return Row(
-      children: [
-        // Profile image with online indicator
-        Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey[300]!, width: 2),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(40),
-                child: Image.network(
-                  requestBody['memberProfilePic'] ??
-                      'https://via.placeholder.com/80',
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Colors.grey[400],
-                      ),
-                    );
-                  },
-                ),
-              ),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          PageTransition(
+            type: PageTransitionType.fade,
+            child: PublicProfilePage(
+              dbIndex: requestBody['dbIndex'],
+              uid: requestBody['memberId'],
             ),
-          ],
-        ),
-        const SizedBox(width: 16),
-
-        // User details
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        );
+      },
+      child: Row(
+        children: [
+          // Profile image with online indicator
+          Stack(
             children: [
-              Text(
-                requestBody['memberName'] ?? 'Unknown User',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.grey[300]!, width: 2),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(40),
+                  child: Image.network(
+                    requestBody['memberProfilePic'] ??
+                        'https://via.placeholder.com/80',
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Colors.grey[400],
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _buildEducationInfo('School', requestBody['school']),
-              _buildEducationInfo('College', requestBody['college']),
-              _buildEducationInfo('University', requestBody['university']),
-              _buildEducationInfo(
-                  'Education Level', requestBody['educationLevel']),
             ],
           ),
-        ),
-      ],
+          const SizedBox(width: 16),
+
+          // User details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  requestBody['memberName'] ?? 'Unknown User',
+                  style: const TextStyle(
+                    color: AppColors.surface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // _buildEducationInfo('School', requestBody['school']),
+                // _buildEducationInfo('College', requestBody['college']),
+                // _buildEducationInfo('University', requestBody['university']),
+                _buildEducationInfo(
+                    'Education Level', requestBody['educationLevel']),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -273,7 +289,7 @@ class _NotificationCardState extends State<NotificationCard> {
               '$label:',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey[600],
+                color: Colors.white60,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -283,7 +299,7 @@ class _NotificationCardState extends State<NotificationCard> {
               value,
               style: const TextStyle(
                 fontSize: 13,
-                color: Colors.black87,
+                color: Color.fromARGB(255, 222, 222, 222),
               ),
             ),
           ),
@@ -325,83 +341,84 @@ class _NotificationCardState extends State<NotificationCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        // border: Border.all(color: Colors.grey[200]!),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Vote button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _handleVote,
-              icon: const Icon(Icons.thumb_up, size: 20),
-              label: Text(
-                'Vote ($votes)',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
+          // "Progress" text row
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          //   children: [
+          //     Text(
+          //       'Progress',
+          //       style: TextStyle(
+          //         fontSize: 14,
+          //         color: Colors.grey[600],
+          //         fontWeight: FontWeight.w500,
+          //       ),
+          //     ),
+          //     Text(
+          //       '${(_voteProgress * 100).toInt()}%',
+          //       style: TextStyle(
+          //         fontSize: 14,
+          //         color: Colors.grey[600],
+          //         fontWeight: FontWeight.w600,
+          //       ),
+          //     ),
+          //   ],
+          // ),
+          // const SizedBox(height: 8),
+
+          // Progress bar styled like a button
+          GestureDetector(
+            onTap: _handleVote,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                ClipRRect(
                   borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: _voteProgress,
+                    minHeight: 50,
+                    backgroundColor: AppColors.background,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      _voteProgress > 0.5 ? Colors.green : Colors.orange,
+                    ),
+                  ),
                 ),
-                elevation: 2,
-              ),
+                // Centered text on top of progress bar
+                Text(
+                  'Tapin ($votes)',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 4,
+                        color: Colors.black45,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
 
-          // Progress indicator
-          Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Progress',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    '${((_voteProgress) * 100).toInt()}%',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: _voteProgress,
-                  minHeight: 8,
-                  backgroundColor: Colors.grey[300],
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    _voteProgress > 0.5 ? Colors.green : Colors.orange,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '$votes out of $totalMembers members voted',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+
+          // "x out of y members voted" text
+          Text(
+            '$votes out of $totalMembers members voted',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
           ),
         ],
       ),
@@ -534,6 +551,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
   }
 
+  Future<void> _refreshNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      _getGroupJoinReqests(); // replace with your API or DB fetch function
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -545,26 +571,40 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _notifications.isEmpty
-              ? const Center(
-                  child: Text(
-                  'No notifications yet.',
-                  style: TextStyle(
-                    color: Colors.white,
-                  ),
-                ))
-              : ListView.builder(
-                  controller: _scrollController,
-                  itemCount: _notifications.length,
-                  itemBuilder: (context, index) {
-                    final notification =
-                        _notifications.reversed.toList()[index];
-                    return NotificationCard(
-                      notification: notification,
-                      onVote: _onVote,
-                    );
-                  },
-                ),
+          : RefreshIndicator(
+              color: Colors.white,
+              backgroundColor: AppColors.primary,
+              onRefresh: _refreshNotifications,
+              child: _notifications.isEmpty
+                  ? const SingleChildScrollView(
+                      // required to allow pull-down gesture even when empty
+                      physics: AlwaysScrollableScrollPhysics(),
+                      child: SizedBox(
+                        height: 500, // give some height to allow pull
+                        child: Center(
+                          child: Text(
+                            'No notifications yet.',
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _notifications.length,
+                      itemBuilder: (context, index) {
+                        final notification =
+                            _notifications.reversed.toList()[index];
+                        return NotificationCard(
+                          notification: notification,
+                          onVote: _onVote,
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }

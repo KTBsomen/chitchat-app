@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/createStory.dart';
 import 'package:chitchat/services/fcm.dart';
 import 'package:chitchat/services/notification.dart';
+import 'package:chitchat/services/userOnline.dart';
 import 'package:flutter/material.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -85,6 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 context, myGroup.groupId,
                 showLoaders: false, showMessage: false);
           }
+          await PresenceManager().init();
         }
         Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
         print("Pending Link: $pendingLink");

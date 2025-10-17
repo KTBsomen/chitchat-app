@@ -7,12 +7,15 @@ class FriendCircleMember {
   final String avatarUrl;
   final String id;
   final Map<String, dynamic> additionalData;
+  String? status; // e.g., 'online', 'offline','away'.
+  String? lastSeen; // Optional lastSeen field
 
-  const FriendCircleMember({
-    required this.avatarUrl,
-    required this.id,
-    this.additionalData = const {},
-  });
+  FriendCircleMember(
+      {required this.avatarUrl,
+      required this.id,
+      this.additionalData = const {},
+      this.status,
+      this.lastSeen});
 }
 
 // Data class for group information

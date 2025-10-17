@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatview/chatview.dart';
@@ -8,6 +10,7 @@ import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/createPost.dart';
 import 'package:chitchat/components/friendcircle.dart';
+import 'package:chitchat/components/memoryviewer.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/components/videoWidget.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
@@ -20,6 +23,7 @@ import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/posts.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/user.dart';
+import 'package:chitchat/services/userOnline.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutterdb/flutterdb.dart';
@@ -32,6 +36,18 @@ import 'package:vs_media_picker/vs_media_picker.dart';
 class GroupPrivateViewScreen extends StatefulWidget {
   @override
   _GroupPrivateViewScreenState createState() => _GroupPrivateViewScreenState();
+}
+
+class MemoryItem {
+  final String url;
+  final MessageType type;
+  final bool isLocal;
+
+  MemoryItem({
+    required this.url,
+    required this.type,
+    this.isLocal = false,
+  });
 }
 
 class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
@@ -50,10 +66,11 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   late Collection chats;
   int windowSize = 20;
   int pageinmemories = 2;
-  List<Message> memories = [];
+  List<MemoryItem> memories = [];
   FriendCircleGroup? userGroup;
   Map<String, dynamic>? userProfile;
   Map<String, dynamic>? myProfile;
+  Timer? _refreshTimer;
 
   final ScrollController _scrollController = ScrollController();
   String? next;
@@ -64,8 +81,13 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   bool isInWatchList = false;
   bool isWatchListLoading = false;
   bool isJoinLoading = false;
+  List<MemoryItem> remoteMemories = []; // fetched from API
+  String? nextPageCursor; // API pagination cursor
+  bool isLoading = false;
 
-  Future<List<Message>> initDB() async {
+  final ScrollController _memoriesController = ScrollController();
+
+  Future<List<MemoryItem>> initDB() async {
     final db = FlutterDB();
 
     try {
@@ -78,13 +100,56 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         ]
       });
       return _memories.map((e) {
-        return Message.fromJson(e);
+        Message _temp = Message.fromJson(e);
+        return MemoryItem(
+            url: _temp.message, type: _temp.messageType, isLocal: true);
       }).toList();
     } on Exception catch (e) {
       // Handle the exception here
       print('Error initializing database: $e');
       return Future.value([]);
     }
+  }
+
+  Future<void> _fetchMemories({bool refresh = false}) async {
+    if (isLoading) return;
+    setState(() => isLoading = true);
+
+    try {
+      Map<String, dynamic> data = await PostService.fetchMyGroupMemories(
+          groupId: groupDetails!.groupId, limit: 10, next: nextPageCursor);
+
+      if (data['success']) {
+        final List<dynamic> fetched = data["data"]['_memories'];
+        // normalize
+        List<MemoryItem> newRemoteMemories = fetched.map((item) {
+          String url = item['media'][0]['url'];
+          String type = item['media'][0]['type'];
+          // your API gives image/video URLs — detect type by extension
+          final isVideo = type.contains("video");
+          return MemoryItem(
+            url: url.toString(),
+            type: isVideo ? MessageType.video : MessageType.image,
+            isLocal: false,
+          );
+        }).toList();
+
+        setState(() {
+          if (refresh) remoteMemories.clear();
+          remoteMemories.addAll(newRemoteMemories);
+          nextPageCursor = data["next"];
+          hasMore = data["next"] != null;
+        });
+      }
+    } catch (e) {
+      print("Error fetching memories: $e");
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  List<MemoryItem> get allMemories {
+    return [...memories, ...remoteMemories];
   }
 
   @override
@@ -122,9 +187,76 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         _fetchPosts();
       }
     });
+    _fetchMemories();
+
+    _memoriesController.addListener(() {
+      if (_memoriesController.position.pixels >=
+          _memoriesController.position.maxScrollExtent - 200) {
+        if (hasMore && !isLoading) {
+          _fetchMemories();
+        }
+        ;
+      }
+    });
+    _fetchUserStatus();
+    _startRandomRefreshTimer();
   }
 
-  _fetchPosts() async {
+  void _fetchUserStatus() async {
+    final ids = groupDetails!.members.map((e) => e.id).toList();
+
+    try {
+      final result = await PresenceManager().fetchMembersStatus(userIds: ids);
+      print("Presence Data: $result");
+
+      if (result['success'] != true || result['data'] == null) {
+        throw Exception('Failed to get user status');
+      }
+
+      final List<dynamic> data = result['data'];
+
+      if (!mounted) return;
+
+      setState(() {
+        for (var member in groupDetails!.members) {
+          final presence = data.firstWhere(
+            (entry) => entry['userId'] == member.id,
+            orElse: () => null,
+          );
+
+          if (presence != null) {
+            member.status = presence['status'] ?? 'offline';
+            member.lastSeen = presence['timestamp'].toString();
+          } else {
+            member.status = 'offline';
+            member.lastSeen = null;
+          }
+        }
+      });
+    } catch (e) {
+      print("Failed to fetch presence data: $e");
+    }
+  }
+
+  void _startRandomRefreshTimer() {
+    _refreshTimer?.cancel(); // cancel old timer if any
+
+    void scheduleNext() {
+      final random = Random();
+      // Pick a random interval between 60–120 seconds
+      final seconds = 60 + random.nextInt(61);
+      print("Next presence refresh in $seconds seconds");
+
+      _refreshTimer = Timer(Duration(seconds: seconds), () async {
+        _fetchUserStatus();
+        scheduleNext(); // schedule again after completion
+      });
+    }
+
+    scheduleNext(); // start the loop
+  }
+
+  void _fetchPosts() async {
     if (isLoadingPost) return;
     setState(() {
       isLoadingPost = true;
@@ -441,6 +573,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _refreshTimer?.cancel();
+
     AppVariables.unregisterState(this);
     super.dispose();
   }
@@ -597,9 +731,29 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                       ),
                     );
                   },
-                  leading: CircleAvatar(
-                    radius: 25,
-                    backgroundImage: NetworkImage(member.avatarUrl),
+                  leading: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 25,
+                        backgroundImage: NetworkImage(member.avatarUrl),
+                      ),
+                      if (member.status != null)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: member.status == 'online'
+                                  ? Colors.green
+                                  : member.status == 'offline'
+                                      ? Colors.grey
+                                      : Colors.orange,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   title: Text(
                     member.additionalData['memberName'],
@@ -1047,7 +1201,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
                             // memories View (Masonry Grid)
                             MasonryGridView.builder(
-                              controller: scrollController,
+                              controller: _memoriesController,
                               gridDelegate:
                                   const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 4,
@@ -1055,7 +1209,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                               mainAxisSpacing: 8,
                               crossAxisSpacing: 8,
                               // add +1 for one static item
-                              itemCount: memories.length + 1,
+                              itemCount: allMemories.length + 2,
                               itemBuilder: (context, index) {
                                 // First static item
                                 if (index == 0) {
@@ -1098,23 +1252,58 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   );
                                 }
 
+                                if (index == allMemories.length + 1) {
+                                  // Loader
+                                  return hasMore
+                                      ? const Center(
+                                          child: CircularProgressIndicator())
+                                      : const SizedBox.shrink();
+                                }
                                 // Adjust index for memories list
-                                final memory = memories[index - 1];
+                                final memory = allMemories[index - 1];
 
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: memory.messageType == MessageType.video
-                                      ? VideoMessageView(url: memory.message)
-                                      : memory.messageType == MessageType.image
-                                          ? CachedNetworkImage(
-                                              imageUrl: memory.message,
-                                              placeholder: (context, url) =>
-                                                  const CircularProgressIndicator(),
-                                              errorWidget:
-                                                  (context, url, error) =>
-                                                      const Icon(Icons.error),
-                                            )
-                                          : null,
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => MemoryViewer(
+                                          memories: allMemories,
+                                          initialIndex: index -
+                                              1, // adjust since first item is Upload
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: memory.type == MessageType.video
+                                        ? VideoMessageView(
+                                            url: memory.url,
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => MemoryViewer(
+                                                    memories: allMemories,
+                                                    initialIndex: index -
+                                                        1, // adjust since first item is Upload
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          )
+                                        : memory.type == MessageType.image
+                                            ? CachedNetworkImage(
+                                                imageUrl: memory.url,
+                                                placeholder: (context, url) =>
+                                                    const CircularProgressIndicator(),
+                                                errorWidget:
+                                                    (context, url, error) =>
+                                                        const Icon(Icons.error),
+                                              )
+                                            : null,
+                                  ),
                                 );
                               },
                             )

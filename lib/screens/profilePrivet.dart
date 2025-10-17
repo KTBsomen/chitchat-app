@@ -104,7 +104,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
       isLoadingPost = true;
     });
     Map<String, dynamic> result = await PostService.fetchMyPosts(
-      userid: "673f607d6fbb68a8c5368967",
+      userid: myProfile?['_id'] ?? "673f607d6fbb68a8c5368967",
       limit: 10,
       next: next,
     );
