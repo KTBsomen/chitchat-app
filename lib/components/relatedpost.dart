@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/screens/groupPublic.dart';
+import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/posts.dart';
 import 'package:flutter/material.dart';
@@ -268,6 +269,11 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [_buildUserInfo()],
+          ),
+          widget.middleItem,
           Icon(
             Icons.post_add,
             size: 64,
@@ -382,124 +388,162 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
   }
 
   Widget _buildUserInfo() {
-    FriendCircleMember authorMember = group!.members.firstWhere(
-      (element) => element.id == widget.authorId,
-      orElse: () => FriendCircleMember(
-        avatarUrl:
-            "https://unsplash.it/200/200?random&${widget.authorId.hashCode}",
-        id: "",
-        additionalData: {},
-      ),
-    );
+    FriendCircleMember authorMember = group != null
+        ? group!.members.firstWhere(
+            (element) => element.id == widget.authorId,
+            orElse: () => FriendCircleMember(
+              avatarUrl:
+                  "https://unsplash.it/200/200?random&${widget.authorId.hashCode}",
+              id: "",
+              additionalData: {},
+            ),
+          )
+        : FriendCircleMember(
+            avatarUrl:
+                "https://unsplash.it/200/200?random&${widget.authorId.hashCode}",
+            id: "",
+            additionalData: {},
+          );
 
     String? educationField = _getEducationField(authorMember.additionalData);
     String displayEducation = _formatEducationTextTwoLine(educationField);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(25),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.black.withValues(alpha: 0.4),
-                Colors.black.withValues(alpha: 0.2),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          PageTransition(
+            type: PageTransitionType.rightToLeft,
+            child: PublicProfilePage(
+              dbIndex: group != null
+                  ? group!.members
+                      .firstWhere(
+                        (element) => element.id == widget.authorId,
+                        orElse: () {
+                          return FriendCircleMember(
+                            avatarUrl:
+                                "https://unsplash.it/200/200?random&${widget.authorId.hashCode}",
+                            id: "",
+                            additionalData: {
+                              'dbIndex': "x",
+                            },
+                          );
+                        },
+                      )
+                      .additionalData['dbIndex']
+                      .toString()
+                  : "x",
+              uid: widget.authorId,
             ),
           ),
-          child: IntrinsicWidth(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Profile Picture with subtle glow
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    radius: 14,
-                    backgroundImage: widget.profilePic != null
-                        ? CachedNetworkImageProvider(widget.profilePic!)
-                        : null,
-                    child: widget.profilePic != null
-                        ? null
-                        : const Icon(Icons.person,
-                            size: 18, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Text information with better layout
-                Flexible(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Name with elegant styling
-                      Text(
-                        widget.authorName ?? "",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          letterSpacing: 0.3,
-                          shadows: [
-                            Shadow(
-                              offset: const Offset(0, 1),
-                              blurRadius: 2.0,
-                              color: Colors.black.withValues(alpha: 0.6),
-                            ),
-                          ],
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(25),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withValues(alpha: 0.4),
+                  Colors.black.withValues(alpha: 0.2),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+                width: 1,
+              ),
+            ),
+            child: IntrinsicWidth(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Profile Picture with subtle glow
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          blurRadius: 4,
+                          spreadRadius: 1,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(width: 12),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 14,
+                      backgroundImage: widget.profilePic != null
+                          ? CachedNetworkImageProvider(widget.profilePic!)
+                          : null,
+                      child: widget.profilePic != null
+                          ? null
+                          : const Icon(Icons.person,
+                              size: 18, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
 
-                      if (displayEducation.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        // Education with smart formatting - supports two lines
+                  // Text information with better layout
+                  Flexible(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Name with elegant styling
                         Text(
-                          displayEducation,
+                          widget.authorName ?? "",
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.blue[200],
-                            letterSpacing: 0.2,
-                            height: 1.3,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
                             shadows: [
                               Shadow(
                                 offset: const Offset(0, 1),
                                 blurRadius: 2.0,
-                                color: Colors.black.withValues(alpha: 0.7),
+                                color: Colors.black.withValues(alpha: 0.6),
                               ),
                             ],
                           ),
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.start,
                         ),
+                        const SizedBox(width: 12),
+
+                        if (displayEducation.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          // Education with smart formatting - supports two lines
+                          Text(
+                            displayEducation,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.blue[200],
+                              letterSpacing: 0.2,
+                              height: 1.3,
+                              shadows: [
+                                Shadow(
+                                  offset: const Offset(0, 1),
+                                  blurRadius: 2.0,
+                                  color: Colors.black.withValues(alpha: 0.7),
+                                ),
+                              ],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.start,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

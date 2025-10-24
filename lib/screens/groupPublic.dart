@@ -590,6 +590,7 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                             ),
                           ),
                           trailing: LikeButton(
+                              postId: member.id,
                               buttonType: ButtonType.user,
                               initialLikes: member.additionalData['likes'] ?? 0,
                               initiallyLiked: false,

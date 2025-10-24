@@ -829,23 +829,36 @@ class _StoryItem extends StatelessWidget {
                 color: userStory.isViewed ? Colors.grey : userStory.getColor(),
                 shape: BoxShape.circle,
               ),
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF121212),
-                  shape: BoxShape.circle,
-                ),
-                child: CachedNetworkImage(
-                  imageUrl: userStory.profilePic,
-                  imageBuilder: (context, imageProvider) => CircleAvatar(
-                    radius: 35,
-                    backgroundImage: imageProvider,
+              child: Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF121212),
+                      shape: BoxShape.circle,
+                    ),
+                    child: CachedNetworkImage(
+                      imageUrl: userStory.profilePic,
+                      imageBuilder: (context, imageProvider) => CircleAvatar(
+                        radius: 35,
+                        backgroundImage: imageProvider,
+                      ),
+                      placeholder: (context, url) => const CircleAvatar(
+                        radius: 35,
+                        backgroundColor: Color(0xFF2A2A2A),
+                      ),
+                    ),
                   ),
-                  placeholder: (context, url) => const CircleAvatar(
-                    radius: 35,
-                    backgroundColor: Color(0xFF2A2A2A),
-                  ),
-                ),
+                  if (userStory.username == "Me")
+                    Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Icon(
+                          Icons.add_circle_outlined,
+                          color: AppColors.surface,
+                          size: 30,
+                        ))
+                ],
               ),
             ),
             const SizedBox(height: 4),

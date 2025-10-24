@@ -53,7 +53,7 @@ class UserStory {
   Color getColor() {
     if (visibleTo == "members") return Colors.yellow;
     if (visibleTo == "singleUser") return Colors.green;
-    if (visibleTo == "me") return Colors.blue;
+    if (visibleTo == "me") return Colors.transparent;
     return Colors.red;
   }
 }

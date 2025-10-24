@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum ButtonType { post, comment, user }
 
 class LikeButton extends StatefulWidget {
-  final String? postId;
+  final String postId;
   final ButtonType buttonType;
   final int initialLikes;
   final bool initiallyLiked;
@@ -17,7 +17,7 @@ class LikeButton extends StatefulWidget {
     required this.initiallyLiked,
     required this.onLikeChanged,
     this.showLikeCount = false,
-    this.postId,
+    required this.postId,
   });
 
   @override

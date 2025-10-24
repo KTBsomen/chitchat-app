@@ -38,6 +38,14 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
   bool hasMore = true;
   bool isLoadingMore = false;
   bool isLoadingGroup = true;
+  void _handlePostUpdate(value) {
+    print("Posts updated from AppVariables listener $value");
+    if (mounted) {
+      setState(() {
+        posts.add(value);
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -45,6 +53,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     super.initState();
     _getMyprofile();
     _fetchPosts();
+    AppVariables.registerState(this);
+    AppVariables.addListener<Map<String, dynamic>>("posts", _handlePostUpdate);
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 100 &&
@@ -53,6 +63,14 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
         _fetchPosts();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    AppVariables.unregisterState(this);
+    AppVariables.removeListener("posts", _handlePostUpdate);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   _getMyprofile() async {
@@ -113,6 +131,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
 
       next = result['data']['next'];
       posts.addAll(result['data']['posts']);
+      AppVariables.update("posts", posts);
       setState(() {
         isLoadingPost = false;
         hasMore = next != null;
@@ -125,7 +144,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     }
   }
 
-  pickimage(context) async {
+  void pickimage(context) async {
     String baseurl =
         AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
     ValueNotifier<FileUploadProgress> _progressNotifier =
@@ -487,10 +506,12 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                     ],
                                   ),
                                   TextButton.icon(
-                                    onPressed: () => CreatePost.show(context,
-                                        isGroupPost: false,
-                                        isPost: true,
-                                        myGroupId: myGroup!.groupId),
+                                    onPressed: () {
+                                      CreatePost.show(context,
+                                          isGroupPost: false,
+                                          isPost: true,
+                                          myGroupId: myGroup!.groupId);
+                                    },
                                     style: TextButton.styleFrom(
                                       backgroundColor: Colors.blue,
                                       shape: RoundedRectangleBorder(

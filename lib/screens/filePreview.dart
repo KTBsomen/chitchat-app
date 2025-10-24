@@ -238,6 +238,8 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
     );
     bool uploadFinished = false;
     bool showErrorText = false;
+    Map<String, dynamic> result =
+        AppVariables.get<Map<String, dynamic>>("posts") ?? {};
     final List<String>? images = editedFiles.map((f) => f.path).toList();
 
     if (images != null && images.isNotEmpty) {
@@ -301,7 +303,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                       onPressed: () {
                         if (uploadFinished == true) {
                           Navigator.of(context).pop();
-                          Navigator.of(context).pop();
+                          Navigator.of(context).pop(result["data"]);
                         } else {
                           setState(() {
                             showErrorText = true;
@@ -327,7 +329,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
         customStageText: "Processing...",
         customStageTextDetail: "saving on server...",
       );
-      Map<String, dynamic> result = await PostService.createPost(
+      result = await PostService.createPost(
         files: files,
         myGroupId: widget.myGroupId ?? '',
         isGroupPost: widget.isGroupPost ?? false,
@@ -335,7 +337,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
         print(error);
         _progressNotifier.value = _progressNotifier.value.copyWith(
           stage: UploadStage.failed,
-          customStageTextDetail: "can't upload these chits",
+          customStageTextDetail: "can't upload these ",
         );
         setState(() {
           uploadFinished = true;
@@ -349,7 +351,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
           customStageTextDetail: "You are set! now you can close this dialog",
         );
         setState(() {
-          // posts.add(result['data']);
+          AppVariables.update("posts", result['data']);
           uploadFinished = true;
         });
       } else {

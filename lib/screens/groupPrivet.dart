@@ -152,6 +152,14 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     return [...memories, ...remoteMemories];
   }
 
+  void _handleProfileUpdate(Map<String, dynamic>? data) {
+    if (mounted) {
+      setState(() {
+        groupDetails = GroupsService.buildFriendCircleGroup(data!['myGroup']);
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -166,13 +174,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     _getUserLikes();
     _tabController = TabController(length: 2, vsync: this);
     AppVariables.registerState(this);
-    AppVariables.addListener("profile", (Map<String, dynamic>? data) {
-      if (mounted) {
-        setState(() {
-          groupDetails = GroupsService.buildFriendCircleGroup(data!['myGroup']);
-        });
-      }
-    });
+    AppVariables.addListener("profile", _handleProfileUpdate);
     _tabController.addListener(() {
       setState(() {
         selectedTab = _tabController.index;
@@ -576,6 +578,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     _refreshTimer?.cancel();
 
     AppVariables.unregisterState(this);
+    AppVariables.removeListener("posts", _handleProfileUpdate);
     super.dispose();
   }
 
