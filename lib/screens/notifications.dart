@@ -438,6 +438,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final _scrollController = ScrollController();
   bool _isLoading = false;
   List<NotificationModel> _notifications = [];
+  List<UnifiedNotification> _unifiedNotifications = [];
+
   int _page = 1;
   int _limit = 10;
   int _total = 0;
@@ -490,15 +492,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         (await NotificationService.getGroupJoinRequests(
             context, myGroup!.groupId,
             showLoaders: false))!;
-    print(jsonData);
 
-    if (mounted) {
-      setState(() {
-        _notifications =
-            jsonData.map((data) => NotificationModel.fromJson(data)).toList();
-        _isLoading = false;
-      });
-    }
+    final apiNotifications =
+        jsonData.map((data) => NotificationModel.fromJson(data)).toList();
+
+    final unifiedApiNotifications = apiNotifications
+        .map((n) => UnifiedNotification.fromNotificationModel(n))
+        .toList();
+
+    setState(() {
+      _unifiedNotifications
+          .removeWhere((n) => n.sourceType == NotificationSourceType.api);
+      _unifiedNotifications.addAll(unifiedApiNotifications);
+      _unifiedNotifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _isLoading = false;
+    });
+  }
+
+  void _getNotification() async {
+    List<AppNotification>? jsonData =
+        await NotificationService.getNotifications(context, showLoaders: false);
+
+    if (jsonData == null) return;
+
+    final unifiedRedisNotifications = jsonData
+        .map((n) => UnifiedNotification.fromAppNotification(n))
+        .toList();
+
+    setState(() {
+      _unifiedNotifications
+          .removeWhere((n) => n.sourceType == NotificationSourceType.redis);
+      _unifiedNotifications.addAll(unifiedRedisNotifications);
+      _unifiedNotifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    });
   }
 
   List _voted = [];
@@ -531,7 +557,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted) {
         _getGroupJoinReqests();
+        _getNotification();
       }
+      print(
+          'Notifications refreshed at ${DateTime.now()} , $_unifiedNotifications');
     });
   }
 
@@ -548,13 +577,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _startNotificationTimer();
     _getMyprofile().then((_) {
       _getGroupJoinReqests();
+      _getNotification();
     });
   }
 
   Future<void> _refreshNotifications() async {
     setState(() => _isLoading = true);
     try {
-      _getGroupJoinReqests(); // replace with your API or DB fetch function
+      _getGroupJoinReqests();
+      _getNotification();
     } finally {
       setState(() => _isLoading = false);
     }
@@ -575,7 +606,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               color: Colors.white,
               backgroundColor: AppColors.primary,
               onRefresh: _refreshNotifications,
-              child: _notifications.isEmpty
+              child: _unifiedNotifications.isEmpty
                   ? const SingleChildScrollView(
                       // required to allow pull-down gesture even when empty
                       physics: AlwaysScrollableScrollPhysics(),
@@ -594,17 +625,96 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   : ListView.builder(
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _notifications.length,
+                      itemCount: _unifiedNotifications.length,
                       itemBuilder: (context, index) {
-                        final notification =
-                            _notifications.reversed.toList()[index];
-                        return NotificationCard(
-                          notification: notification,
-                          onVote: _onVote,
-                        );
+                        final n = _unifiedNotifications[index];
+
+                        switch (n.sourceType) {
+                          case NotificationSourceType.api:
+                            return NotificationCard(
+                              notification: n.source as NotificationModel,
+                              onVote: _onVote,
+                            );
+
+                          case NotificationSourceType.redis:
+                            final appNotif = n.source as AppNotification;
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              leading: appNotif.icon != null
+                                  ? Image.network(appNotif.icon!)
+                                  : const Icon(Icons.notifications),
+                              title: Text(
+                                appNotif.title ?? "Notification",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              subtitle: Text(
+                                appNotif.body ?? "",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              onTap: () {
+                                if (appNotif.link != null) {
+                                  // Handle deep link or navigation
+                                }
+                              },
+                            );
+
+                          default:
+                            return const SizedBox.shrink();
+                        }
                       },
                     ),
             ),
+    );
+  }
+}
+
+enum NotificationSourceType { api, redis, unknown }
+
+class UnifiedNotification {
+  final String id;
+  final String? title;
+  final String? body;
+  final String type;
+  final String? userId;
+  final dynamic source; // can hold NotificationModel or AppNotification
+  final DateTime createdAt;
+  final NotificationSourceType sourceType;
+
+  UnifiedNotification({
+    required this.id,
+    required this.type,
+    this.title,
+    this.body,
+    this.userId,
+    required this.source,
+    required this.createdAt,
+    required this.sourceType,
+  });
+
+  factory UnifiedNotification.fromNotificationModel(NotificationModel n) {
+    return UnifiedNotification(
+      id: n.id,
+      type: n.type,
+      title: n.type,
+      body: "Votes: ${n.votes}/${n.totalMembers}",
+      userId: n.userId,
+      source: n,
+      createdAt: DateTime.now(),
+      sourceType: NotificationSourceType.api,
+    );
+  }
+
+  factory UnifiedNotification.fromAppNotification(AppNotification a) {
+    return UnifiedNotification(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: a.type ?? 'system',
+      title: a.title,
+      body: a.body,
+      userId: null,
+      source: a,
+      createdAt: DateTime.now(),
+      sourceType: NotificationSourceType.redis,
     );
   }
 }

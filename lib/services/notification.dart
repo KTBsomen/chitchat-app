@@ -5,6 +5,142 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+class AppNotification {
+  final String? title;
+  final String? body;
+  final String? type;
+  final String? icon;
+  final List<String>? image;
+  final Map<String, dynamic>? data;
+  final String? clickAction;
+  final String? link;
+
+  const AppNotification({
+    this.title,
+    this.body,
+    this.type,
+    this.icon,
+    this.image,
+    this.data,
+    this.clickAction,
+    this.link,
+  });
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic>? parsedData;
+
+    final rawData = json['data'];
+    if (rawData is Map) {
+      parsedData = Map<String, dynamic>.from(rawData);
+    } else if (rawData is String) {
+      try {
+        parsedData = Map<String, dynamic>.from(jsonDecode(rawData));
+      } catch (_) {
+        parsedData = null;
+      }
+    }
+
+    return AppNotification(
+      title: json['title'] as String?,
+      body: json['body'] as String?,
+      type: json['type'] as String?,
+      icon: json['icon'] as String?,
+      image: (json['image'] as List?)?.map((e) => e as String).toList(),
+      data: parsedData,
+      // support both snake_case and camelCase keys
+      clickAction: (json['click_action'] ?? json['clickAction']) as String?,
+      link: json['link'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'body': body,
+      'type': type,
+      'icon': icon,
+      'image': image,
+      'data': data,
+      'click_action': clickAction,
+      'link': link,
+    }..removeWhere((_, v) => v == null);
+  }
+
+  AppNotification copyWith({
+    String? title,
+    String? body,
+    String? type,
+    String? icon,
+    List<String>? image,
+    Map<String, dynamic>? data,
+    String? clickAction,
+    String? link,
+  }) {
+    return AppNotification(
+      title: title ?? this.title,
+      body: body ?? this.body,
+      type: type ?? this.type,
+      icon: icon ?? this.icon,
+      image: image ?? this.image,
+      data: data ?? this.data,
+      clickAction: clickAction ?? this.clickAction,
+      link: link ?? this.link,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'AppNotification(title: $title, body: $body, type: $type, icon: $icon, image: $image, data: $data, clickAction: $clickAction, link: $link)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is AppNotification &&
+        other.title == title &&
+        other.body == body &&
+        other.type == type &&
+        other.icon == icon &&
+        other.image == image &&
+        _mapEquals(other.data, data) &&
+        other.clickAction == clickAction &&
+        other.link == link;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      title,
+      body,
+      type,
+      icon,
+      image,
+      data == null ? null : _deepMapHash(data!),
+      clickAction,
+      link,
+    );
+  }
+
+  static bool _mapEquals(Map<String, dynamic>? a, Map<String, dynamic>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key)) return false;
+      if (a[key] != b[key]) return false;
+    }
+    return true;
+  }
+
+  static int _deepMapHash(Map<String, dynamic> m) {
+    var h = 0;
+    m.forEach((k, v) {
+      h = h ^ k.hashCode ^ (v?.hashCode ?? 0);
+    });
+    return h;
+  }
+}
+
 class NotificationService {
   static bool _isLoading = false;
   static String baseurl =
@@ -108,6 +244,58 @@ class NotificationService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove("unreadIds");
     await prefs.remove("unreadcount");
+  }
+
+// fetch notifications
+  static Future<List<AppNotification>?> getNotifications(BuildContext context,
+      {bool showMessage = true, bool showLoaders = true}) async {
+    try {
+      String? accessToken = await UserService.getAccessToken();
+
+      if (showLoaders) {
+        showLoader(context);
+      }
+      final response = await http.get(
+        Uri.parse(
+            "$baseurl/notifications?id=${await UserService.getUserId()}&invalidate=true"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      final data = jsonDecode(response.body);
+      if (showLoaders) {
+        hideLoader(context);
+      }
+
+      if (response.statusCode != 200) {
+        throw Exception("Failed to fetch notifications");
+      }
+
+      // Parse and return the notifications
+      List<AppNotification> notifications = List<AppNotification>.from(
+          data.map((notif) => AppNotification.fromJson(notif)));
+
+      return notifications;
+
+      // Extract unique notification IDs
+      // List<String> newUnreadIds = data["notifications"]
+      //     .where((notif) => notif["isRead"] == false)
+      //     .map<String>((notif) => notif["_id"].toString())
+      //     .toList();
+
+      // // Store only unique IDs
+      // await storeUnreadIds(newUnreadIds);
+
+      // return List<Map<String, dynamic>>.from(data["notifications"]);
+    } catch (error) {
+      if (showMessage) {
+        hideLoader(context);
+        showPopup(context, error.toString());
+      }
+      return [];
+    }
   }
 
 // Fetch join requests and update unread notifications
