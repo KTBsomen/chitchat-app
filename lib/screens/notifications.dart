@@ -642,7 +642,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 8),
                               leading: appNotif.icon != null
-                                  ? Image.network(appNotif.icon!)
+                                  ? GestureDetector(
+                                      onTap: () {
+                                        if (appNotif.type == "post_like") {
+                                          Navigator.push(
+                                            context,
+                                            PageTransition(
+                                              type: PageTransitionType.fade,
+                                              child: PublicProfilePage(
+                                                dbIndex: appNotif
+                                                        .data!['dbIndex']
+                                                        .toString() ??
+                                                    "x",
+                                                uid: appNotif.data!['author'],
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: ClipOval(
+                                        child: Image.network(
+                                          appNotif.icon!,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    )
                                   : const Icon(Icons.notifications),
                               title: Text(
                                 appNotif.title ?? "Notification",
