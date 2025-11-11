@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:chitchat/screens/StoryListScreen.dart';
 import 'package:chitchat/screens/camera.dart';
 import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/screens/createStory.dart';
@@ -384,6 +385,7 @@ class _HomePageState extends State<HomePage> {
   dispose() {
     _subscription?.cancel();
     _scrollController.dispose();
+    AppVariables.unregisterState(this);
     super.dispose();
   }
 
@@ -431,7 +433,7 @@ class _HomePageState extends State<HomePage> {
                                   PageTransition(
                                     isIos: true,
                                     type: PageTransitionType.rightToLeft,
-                                    child: StoryViewScreen(
+                                    child: StoryListScreen(
                                       storyItems: myStories,
                                       initialIndex: "Me",
                                     ),
