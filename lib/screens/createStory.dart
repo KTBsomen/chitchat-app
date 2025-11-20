@@ -231,12 +231,14 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         print("jsonData: $jsonData");
-        final membersList = (jsonData['usersOwnGroupMembers']['myGroup']
+        final membersList = (jsonData['usersOwnGroupMembers']?['myGroup']
                 ?['members'] as List?) ??
             [];
-        final watchList = (jsonData['membersOfUserWatchList']?['results']?[0]
-                ?['members'] as List?) ??
-            [];
+        final watchListResults = jsonData['membersOfUserWatchList']?['results'];
+        final watchList =
+            (watchListResults != null && watchListResults.isNotEmpty)
+                ? (watchListResults[0]?['members'] as List?) ?? []
+                : [];
 
         // Remove duplicate members by ID
         final uniqueMembers = <String, Member>{};

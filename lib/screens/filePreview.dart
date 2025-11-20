@@ -547,7 +547,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                       barrierColor: Colors.black.withValues(alpha: 0.6),
                       isScrollControlled: true,
                       useSafeArea: true,
-                      builder: (_) => _OptionSelector(uri: uri),
+                      builder: (_) => _OptionSelector(uri: [uri]),
                     );
                   },
                   middleBottomWidget: SizedBox(),
@@ -582,7 +582,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                 )),
       );
       if (editedVideo != null) {
-        setState(() => editedFiles[index] = editedVideo);
+        setState(() => editedFiles[index] = File(editedVideo));
       }
     }
   }
@@ -648,19 +648,27 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
               // Upload editedFiles list
               if (widget.isMemory == true) {
                 uploadMemory(context);
               } else if (widget.isPost != null && widget.isPost != true) {
                 print(
                     "Files to upload: ${editedFiles.map((f) => f.path).toList()}");
-                Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MemberSelectionPage(
-                          files: editedFiles.map((f) => f.path).toList()),
-                    ));
+                await showModalBottomSheet(
+                    context: context,
+                    backgroundColor: Colors.black.withValues(alpha: 0.3),
+                    barrierColor: Colors.black.withValues(alpha: 0.6),
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => _OptionSelector(
+                        uri: editedFiles.map((f) => f.path).toList()));
+                // Navigator.pushReplacement(
+                //     context,
+                //     MaterialPageRoute(
+                //       builder: (context) => MemberSelectionPage(
+                //           files: editedFiles.map((f) => f.path).toList()),
+                //     ));
               } else {
                 uploadChits(context);
               }
@@ -974,6 +982,7 @@ class _VideoEditorState extends State<VideoEditor> {
 
     final config = VideoFFmpegVideoEditorConfig(
       _controller,
+      outputDirectory: (await getApplicationSupportDirectory()).path,
       commandBuilder: (config, videoPath, outputPath) {
         final command =
             '-i $videoPath -ss $startTime -t $duration -c copy -y $outputPath';
@@ -982,6 +991,7 @@ class _VideoEditorState extends State<VideoEditor> {
     );
 
     final execute = await config.getExecuteConfig();
+
     trimVideo(
       inputPath: config.controller.file.path,
       outputPath: execute.outputPath,
@@ -990,7 +1000,7 @@ class _VideoEditorState extends State<VideoEditor> {
       onProgress: (p) => _exportingProgress.value = p,
     ).then((_) async {
       if (widget.totalFiles > 1) {
-        Navigator.pop(context, File(execute.outputPath));
+        Navigator.pop(context, execute.outputPath);
         return;
       }
       await showModalBottomSheet(
@@ -999,7 +1009,7 @@ class _VideoEditorState extends State<VideoEditor> {
         barrierColor: Colors.black.withValues(alpha: 0.6),
         isScrollControlled: true,
         useSafeArea: true,
-        builder: (_) => _OptionSelector(uri: File(execute.outputPath)),
+        builder: (_) => _OptionSelector(uri: [execute.outputPath]),
       );
     }).catchError((e) {
       _showErrorSnackBar('Error trimming video: $e');
@@ -1303,7 +1313,7 @@ class _VideoEditorState extends State<VideoEditor> {
 }
 
 class _OptionSelector extends StatefulWidget {
-  final dynamic uri;
+  final List<String> uri;
   const _OptionSelector({required this.uri});
 
   @override
@@ -1331,9 +1341,9 @@ class _OptionSelectorState extends State<_OptionSelector> {
     );
     bool uploadFinished = false;
     bool showErrorText = false;
-    final List<String>? images = [widget.uri];
+    final List<String> images = widget.uri;
 
-    if (images != null && images.isNotEmpty) {
+    if (images.isNotEmpty) {
       // Handle the selected image
       images.map((e) => print);
 
@@ -1492,21 +1502,22 @@ class _OptionSelectorState extends State<_OptionSelector> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _circleButton(
-                icon: Icon(Icons.groups_2_outlined, color: Colors.white),
-                image: groupDetails!.groupData['GroupProfilePic'],
-                label: "Group",
-                onTap: () {
-                  // Save file logic here
-                  Navigator.pushAndRemoveUntil(
-                      context,
-                      PageTransition(
-                        type: PageTransitionType.leftToRight,
-                        child: ChatScreen(data: [widget.uri.toString()]),
-                      ),
-                      (route) => route.isFirst);
-                },
-              ),
+              if (groupDetails != null)
+                _circleButton(
+                  icon: Icon(Icons.groups_2_outlined, color: Colors.white),
+                  image: groupDetails!.groupData['GroupProfilePic'],
+                  label: "Group",
+                  onTap: () {
+                    // Save file logic here
+                    Navigator.pushAndRemoveUntil(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.leftToRight,
+                          child: ChatScreen(data: [widget.uri.toString()]),
+                        ),
+                        (route) => route.isFirst);
+                  },
+                ),
               _circleButton(
                 icon: Icon(Icons.share, color: Colors.redAccent),
                 label: "All",

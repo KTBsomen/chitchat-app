@@ -519,173 +519,201 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                   if (userGroup!.members.isNotEmpty)
                                     Tooltip(
                                       message: "Add to watchList",
-                                      child: InkWell(
-                                        onTap: isInWatchList
-                                            ? () async {
-                                                setState(() {
-                                                  isWatchListLoading = true;
-                                                });
-                                                Map<String, dynamic> result =
-                                                    await GroupsService
-                                                        .removeFromWatchList(
-                                                            userGroup!.groupId);
-                                                setState(() {
-                                                  isWatchListLoading = false;
-                                                });
-                                                if (result['success']) {
-                                                  setState(() {
-                                                    isInWatchList = false;
-                                                    AppVariables.update(
-                                                        'watchlist',
-                                                        watchlist
-                                                          ..remove(userGroup!
-                                                              .groupId));
-                                                  });
-                                                  showDialog(
-                                                    context: context,
-                                                    builder:
-                                                        (BuildContext context) {
-                                                      return AlertDialog(
-                                                        title: Text('Success'),
-                                                        content: Text(
-                                                            "Group removed from watchlist successfully"),
-                                                        actions: [
-                                                          TextButton(
-                                                            child: Text('OK'),
-                                                            onPressed: () {
-                                                              Navigator.of(
-                                                                      context)
-                                                                  .pop();
-                                                            },
-                                                          ),
-                                                        ],
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          InkWell(
+                                            onTap: isInWatchList
+                                                ? () async {
+                                                    setState(() {
+                                                      isWatchListLoading = true;
+                                                    });
+                                                    Map<String, dynamic>
+                                                        result =
+                                                        await GroupsService
+                                                            .removeFromWatchList(
+                                                                userGroup!
+                                                                    .groupId);
+                                                    setState(() {
+                                                      isWatchListLoading =
+                                                          false;
+                                                    });
+                                                    if (result['success']) {
+                                                      setState(() {
+                                                        isInWatchList = false;
+                                                        AppVariables.update(
+                                                            'watchlist',
+                                                            watchlist
+                                                              ..remove(userGroup!
+                                                                  .groupId));
+                                                      });
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (BuildContext
+                                                            context) {
+                                                          return AlertDialog(
+                                                            title:
+                                                                Text('Success'),
+                                                            content: Text(
+                                                                "Group removed from watchlist successfully"),
+                                                            actions: [
+                                                              TextButton(
+                                                                child:
+                                                                    Text('OK'),
+                                                                onPressed: () {
+                                                                  Navigator.of(
+                                                                          context)
+                                                                      .pop();
+                                                                },
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
                                                       );
-                                                    },
-                                                  );
-                                                } else {
-                                                  showDialog(
-                                                    context: context,
-                                                    builder:
-                                                        (BuildContext context) {
-                                                      return AlertDialog(
-                                                        title: Text('Error',
-                                                            style: TextStyle(
-                                                                color: AppColors
-                                                                    .background,
-                                                                fontFamily:
-                                                                    "Poppins")),
-                                                        content: Text(
-                                                            "Failed to remove group from watchlist: ${result['error']}",
-                                                            style: TextStyle(
-                                                                color:
-                                                                    Colors.red,
-                                                                fontFamily:
-                                                                    "Poppins")),
-                                                        actions: [
-                                                          TextButton(
-                                                            child: Text('OK'),
-                                                            onPressed: () {
-                                                              Navigator.of(
-                                                                      context)
-                                                                  .pop();
-                                                            },
-                                                          ),
-                                                        ],
+                                                    } else {
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (BuildContext
+                                                            context) {
+                                                          return AlertDialog(
+                                                            title: Text('Error',
+                                                                style: TextStyle(
+                                                                    color: AppColors
+                                                                        .background,
+                                                                    fontFamily:
+                                                                        "Poppins")),
+                                                            content: Text(
+                                                                "Failed to remove group from watchlist: ${result['error']}",
+                                                                style: TextStyle(
+                                                                    color: Colors
+                                                                        .red,
+                                                                    fontFamily:
+                                                                        "Poppins")),
+                                                            actions: [
+                                                              TextButton(
+                                                                child:
+                                                                    Text('OK'),
+                                                                onPressed: () {
+                                                                  Navigator.of(
+                                                                          context)
+                                                                      .pop();
+                                                                },
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
                                                       );
-                                                    },
-                                                  );
-                                                }
-                                              }
-                                            : () async {
-                                                setState(() {
-                                                  isWatchListLoading = true;
-                                                });
-                                                Map<String, dynamic> result =
-                                                    await GroupsService
-                                                        .addToWatchList(
-                                                            userGroup!.groupId);
-                                                setState(() {
-                                                  isWatchListLoading = false;
-                                                });
-                                                if (result['success']) {
-                                                  setState(() {
-                                                    isInWatchList = true;
-                                                    AppVariables.update(
-                                                        'watchlist',
-                                                        watchlist
-                                                          ..add(userGroup!
-                                                              .groupId));
-                                                  });
-                                                  showDialog(
-                                                    context: context,
-                                                    builder:
-                                                        (BuildContext context) {
-                                                      return AlertDialog(
-                                                        title: Text('Success'),
-                                                        content: Text(
-                                                            "Group added to watchlist successfully"),
-                                                        actions: [
-                                                          TextButton(
-                                                            child: Text('OK'),
-                                                            onPressed: () {
-                                                              Navigator.of(
-                                                                      context)
-                                                                  .pop();
-                                                            },
-                                                          ),
-                                                        ],
+                                                    }
+                                                  }
+                                                : () async {
+                                                    setState(() {
+                                                      isWatchListLoading = true;
+                                                    });
+                                                    Map<String, dynamic>
+                                                        result =
+                                                        await GroupsService
+                                                            .addToWatchList(
+                                                                userGroup!
+                                                                    .groupId);
+                                                    setState(() {
+                                                      isWatchListLoading =
+                                                          false;
+                                                    });
+                                                    if (result['success']) {
+                                                      setState(() {
+                                                        isInWatchList = true;
+                                                        AppVariables.update(
+                                                            'watchlist',
+                                                            watchlist
+                                                              ..add(userGroup!
+                                                                  .groupId));
+                                                      });
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (BuildContext
+                                                            context) {
+                                                          return AlertDialog(
+                                                            title:
+                                                                Text('Success'),
+                                                            content: Text(
+                                                                "Group added to watchlist successfully"),
+                                                            actions: [
+                                                              TextButton(
+                                                                child:
+                                                                    Text('OK'),
+                                                                onPressed: () {
+                                                                  Navigator.of(
+                                                                          context)
+                                                                      .pop();
+                                                                },
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
                                                       );
-                                                    },
-                                                  );
-                                                } else {
-                                                  showDialog(
-                                                    context: context,
-                                                    builder:
-                                                        (BuildContext context) {
-                                                      return AlertDialog(
-                                                        title: Text('Error',
-                                                            style: TextStyle(
-                                                                color: AppColors
-                                                                    .background,
-                                                                fontFamily:
-                                                                    "Poppins")),
-                                                        content: Text(
-                                                            "Failed to add group to watchlist: ${result['error']}",
-                                                            style: TextStyle(
-                                                                color:
-                                                                    Colors.red,
-                                                                fontFamily:
-                                                                    "Poppins")),
-                                                        actions: [
-                                                          TextButton(
-                                                            child: Text('OK'),
-                                                            onPressed: () {
-                                                              Navigator.of(
-                                                                      context)
-                                                                  .pop();
-                                                            },
-                                                          ),
-                                                        ],
+                                                    } else {
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (BuildContext
+                                                            context) {
+                                                          return AlertDialog(
+                                                            title: Text('Error',
+                                                                style: TextStyle(
+                                                                    color: AppColors
+                                                                        .background,
+                                                                    fontFamily:
+                                                                        "Poppins")),
+                                                            content: Text(
+                                                                "Failed to add group to watchlist: ${result['error']}",
+                                                                style: TextStyle(
+                                                                    color: Colors
+                                                                        .red,
+                                                                    fontFamily:
+                                                                        "Poppins")),
+                                                            actions: [
+                                                              TextButton(
+                                                                child:
+                                                                    Text('OK'),
+                                                                onPressed: () {
+                                                                  Navigator.of(
+                                                                          context)
+                                                                      .pop();
+                                                                },
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
                                                       );
-                                                    },
-                                                  );
-                                                }
-                                              },
-                                        child: CircleAvatar(
-                                          radius: 26,
-                                          backgroundColor: Colors.transparent,
-                                          child: isWatchListLoading
-                                              ? CircularProgressIndicator()
-                                              : Icon(
-                                                  isInWatchList
-                                                      ? Icons
-                                                          .remove_red_eye_rounded
-                                                      : Icons
-                                                          .remove_red_eye_outlined,
-                                                  color: Colors.red,
-                                                  size: 30,
-                                                ),
-                                        ),
+                                                    }
+                                                  },
+                                            child: CircleAvatar(
+                                              radius: 15,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              child: isWatchListLoading
+                                                  ? CircularProgressIndicator()
+                                                  : Icon(
+                                                      isInWatchList
+                                                          ? Icons.visibility_off
+                                                          : Icons
+                                                              .visibility_outlined,
+                                                      color: Colors.red,
+                                                      size: 30,
+                                                    ),
+                                            ),
+                                          ),
+                                          Text(
+                                              isInWatchList
+                                                  ? 'not watch'
+                                                  : 'watch',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.black,
+                                              ))
+                                        ],
                                       ),
                                     ),
                                 ],

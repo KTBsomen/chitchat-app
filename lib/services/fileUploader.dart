@@ -99,7 +99,10 @@ class S3Uploader {
         final resolvedFile = await _resolveFile(file);
         final mimeType = lookupMimeType(resolvedFile.path);
 
-        if (showResizingProgress) {
+        if (showResizingProgress &&
+            (mimeType != null &&
+                mimeType.startsWith('image/') &&
+                compressionParams != null)) {
           progressNotifier.value = progressNotifier.value.copyWith(
             stage: UploadStage.resizing,
             currentFileIndex: i + 1,

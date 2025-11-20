@@ -550,6 +550,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openMore(Message message, bool isFromCurrentUser) {
+    if (message.messageType != MessageType.text) {
+      return;
+    }
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -562,7 +565,8 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (isFromCurrentUser)
+                if (isFromCurrentUser &&
+                    message.messageType == MessageType.text)
                   ListTile(
                     leading: Icon(Icons.edit, color: Colors.blue),
                     title: Text("Edit"),
@@ -571,14 +575,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       _showEditMessagePopup(message);
                     },
                   ),
-                ListTile(
-                  leading: Icon(Icons.push_pin, color: Colors.orange),
-                  title: Text("Pin"),
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Handle pin action
-                  },
-                ),
+                // ListTile(
+                //   leading: Icon(Icons.push_pin, color: Colors.orange),
+                //   title: Text("Pin"),
+                //   onTap: () {
+                //     Navigator.pop(context);
+                //     // Handle pin action
+                //   },
+                // ),
               ],
             ),
           ),
@@ -1245,7 +1249,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       // Implement sharing functionality here
                       // For example, using the 'share_plus' package:
 
-                      Share.share(imageUrl);
+                      //   Share.share(imageUrl);
                     },
                   ),
                 ),

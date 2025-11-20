@@ -242,7 +242,7 @@ class GroupsService {
             parts[1].endsWith('-->'))
         ? parts[1].replaceAll(RegExp(r'<!--u:|-->'), '')
         : '';
-
+    print('Parsed bio: $cleanBio, editedBy: $editedBy');
     return UserBio(
       bio: cleanBio,
       editedBy: editedBy,

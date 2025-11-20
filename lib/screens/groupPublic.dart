@@ -65,6 +65,7 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
   bool isInWatchList = false;
   bool isWatchListLoading = false;
   bool isJoinLoading = false;
+  List<dynamic> watchlist = [];
 
   Future _getGroupDetails() async {
     setState(() {
@@ -75,6 +76,13 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
     setState(() {
       isLoadingGroup = false;
     });
+    watchlist = AppVariables.get<List<dynamic>>('watchlist') ?? [];
+    print("watchlist:$watchlist");
+    if (watchlist != null) {
+      setState(() {
+        isInWatchList = watchlist.contains(widget.groupId);
+      });
+    }
   }
 
   @override
@@ -491,7 +499,8 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                               PageTransition(
                                 type: PageTransitionType.rightToLeft,
                                 child: PublicProfilePage(
-                                  dbIndex: member.additionalData['dbIndex'],
+                                  dbIndex: member.additionalData['dbIndex']
+                                      .toString(),
                                   uid: member.id,
                                 ),
                               ),
@@ -739,6 +748,189 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                           : "Join Group",
                                       style: const TextStyle(
                                           fontSize: 16, color: Colors.white)),
+                                ),
+                                Tooltip(
+                                  message: "Add to watchList",
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      InkWell(
+                                        onTap: isInWatchList
+                                            ? () async {
+                                                setState(() {
+                                                  isWatchListLoading = true;
+                                                });
+                                                Map<String, dynamic> result =
+                                                    await GroupsService
+                                                        .removeFromWatchList(
+                                                            widget.groupId);
+                                                setState(() {
+                                                  isWatchListLoading = false;
+                                                });
+                                                if (result['success']) {
+                                                  setState(() {
+                                                    isInWatchList = false;
+                                                    AppVariables.update(
+                                                        'watchlist',
+                                                        watchlist
+                                                          ..remove(
+                                                              widget.groupId));
+                                                  });
+                                                  showDialog(
+                                                    context: context,
+                                                    builder:
+                                                        (BuildContext context) {
+                                                      return AlertDialog(
+                                                        title: Text('Success'),
+                                                        content: Text(
+                                                            "Group removed from watchlist successfully"),
+                                                        actions: [
+                                                          TextButton(
+                                                            child: Text('OK'),
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                      context)
+                                                                  .pop();
+                                                            },
+                                                          ),
+                                                        ],
+                                                      );
+                                                    },
+                                                  );
+                                                } else {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder:
+                                                        (BuildContext context) {
+                                                      return AlertDialog(
+                                                        title: Text('Error',
+                                                            style: TextStyle(
+                                                                color: AppColors
+                                                                    .background,
+                                                                fontFamily:
+                                                                    "Poppins")),
+                                                        content: Text(
+                                                            "Failed to remove group from watchlist: ${result['error']}",
+                                                            style: TextStyle(
+                                                                color:
+                                                                    Colors.red,
+                                                                fontFamily:
+                                                                    "Poppins")),
+                                                        actions: [
+                                                          TextButton(
+                                                            child: Text('OK'),
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                      context)
+                                                                  .pop();
+                                                            },
+                                                          ),
+                                                        ],
+                                                      );
+                                                    },
+                                                  );
+                                                }
+                                              }
+                                            : () async {
+                                                setState(() {
+                                                  isWatchListLoading = true;
+                                                });
+                                                Map<String, dynamic> result =
+                                                    await GroupsService
+                                                        .addToWatchList(
+                                                            widget.groupId);
+                                                setState(() {
+                                                  isWatchListLoading = false;
+                                                });
+                                                if (result['success']) {
+                                                  setState(() {
+                                                    isInWatchList = true;
+                                                    AppVariables.update(
+                                                        'watchlist',
+                                                        watchlist
+                                                          ..add(
+                                                              widget.groupId));
+                                                  });
+                                                  showDialog(
+                                                    context: context,
+                                                    builder:
+                                                        (BuildContext context) {
+                                                      return AlertDialog(
+                                                        title: Text('Success'),
+                                                        content: Text(
+                                                            "Group added to watchlist successfully"),
+                                                        actions: [
+                                                          TextButton(
+                                                            child: Text('OK'),
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                      context)
+                                                                  .pop();
+                                                            },
+                                                          ),
+                                                        ],
+                                                      );
+                                                    },
+                                                  );
+                                                } else {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder:
+                                                        (BuildContext context) {
+                                                      return AlertDialog(
+                                                        title: Text('Error',
+                                                            style: TextStyle(
+                                                                color: AppColors
+                                                                    .background,
+                                                                fontFamily:
+                                                                    "Poppins")),
+                                                        content: Text(
+                                                            "Failed to add group to watchlist: ${result['error']}",
+                                                            style: TextStyle(
+                                                                color:
+                                                                    Colors.red,
+                                                                fontFamily:
+                                                                    "Poppins")),
+                                                        actions: [
+                                                          TextButton(
+                                                            child: Text('OK'),
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                      context)
+                                                                  .pop();
+                                                            },
+                                                          ),
+                                                        ],
+                                                      );
+                                                    },
+                                                  );
+                                                }
+                                              },
+                                        child: CircleAvatar(
+                                          radius: 15,
+                                          backgroundColor: Colors.transparent,
+                                          child: isWatchListLoading
+                                              ? CircularProgressIndicator()
+                                              : Icon(
+                                                  isInWatchList
+                                                      ? Icons.visibility_off
+                                                      : Icons
+                                                          .visibility_outlined,
+                                                  color: Colors.red,
+                                                  size: 30,
+                                                ),
+                                        ),
+                                      ),
+                                      Text(
+                                          isInWatchList ? 'not watch' : 'watch',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.black,
+                                          ))
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),

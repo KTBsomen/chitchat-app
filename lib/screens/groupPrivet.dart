@@ -739,7 +739,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               itemBuilder: (context, index) {
                 final member = groupDetails!.members[index];
                 print(
-                    'Member ${member.id}: ${member.avatarUrl} ${member.additionalData['memberName']}');
+                    'Member ${member.id}: ${member.avatarUrl} ${member.additionalData['memberName']} bio: ${member.additionalData['memberBio']} ');
                 return ListTile(
                   onTap: () {
                     if (member.id == profileDetails!['uid']) {
@@ -757,7 +757,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                       PageTransition(
                         type: PageTransitionType.rightToLeft,
                         child: PublicProfilePage(
-                          dbIndex: member.additionalData['dbIndex'],
+                          dbIndex: member.additionalData['dbIndex'].toString(),
                           uid: member.id,
                         ),
                       ),
@@ -833,6 +833,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                       maxLength: 80,
                                       maxLines: 2,
                                       decoration: InputDecoration(
+                                        labelText:
+                                            "#${profileDetails!['name']}",
                                         hintText: "E.g. Best teammate ever! 🎉",
                                         border: OutlineInputBorder(
                                           borderRadius:
@@ -937,14 +939,29 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   member.additionalData['memberBio'].isNotEmpty)
                                 TextSpan(
                                     text: GroupsService.parseBio(member
-                                            .additionalData['memberBio'][0])
+                                            .additionalData['memberBio'].last)
                                         .editedBy,
                                     style:
                                         const TextStyle(color: Colors.white)),
                               WidgetSpan(child: SizedBox(width: 5)),
                               TextSpan(
-                                text:
-                                    "${(member.additionalData['memberBio'] != null && member.additionalData['memberBio'] is List && member.additionalData['memberBio'].isNotEmpty) ? GroupsService.parseBio(member.additionalData['memberBio'].last).bio : ''}",
+                                text: (member.additionalData['memberBio'] !=
+                                            null &&
+                                        member.additionalData['memberBio']
+                                            is List &&
+                                        member.additionalData['memberBio']
+                                            .isNotEmpty)
+                                    ? GroupsService.parseBio(member
+                                                .additionalData['memberBio']
+                                                .last)
+                                            .bio!
+                                            .isEmpty
+                                        ? 'Add a bio'
+                                        : GroupsService.parseBio(member
+                                                .additionalData['memberBio']
+                                                .last)
+                                            .bio
+                                    : 'Add a bio',
                                 style: const TextStyle(color: Colors.grey),
                               ),
                               WidgetSpan(
@@ -955,10 +972,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                     children: [
                                       const Icon(Icons.edit,
                                           color: Colors.blue, size: 18),
-                                      if (member.additionalData['memberBio']
-                                              .length <
-                                          1)
-                                        const Text(
+                                      if (member
+                                          .additionalData['memberBio'].isEmpty)
+                                        Text(
                                           "Add a bio",
                                           style: TextStyle(color: Colors.grey),
                                         ),
