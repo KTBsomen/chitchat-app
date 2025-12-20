@@ -293,7 +293,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                       TextButton(
                         child: Text("Sign Out"),
                         onPressed: () async {
-                          Navigator.of(context).pop();
+                          //Navigator.of(context).pop();
                           await UserService.signOut((x) => {});
                           Navigator.pushAndRemoveUntil(
                             context,

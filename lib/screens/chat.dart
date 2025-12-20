@@ -41,6 +41,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final Map<String, dynamic>? profileDetails =
       AppVariables.get<Map<String, dynamic>>('profile');
   FriendCircleGroup? groupDetails;
+  late final MQTTService mqtt;
 
   AppTheme theme = DarkTheme();
   bool isDarkTheme = true;
@@ -64,9 +65,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String chatToken = '';
+  String? accessToken = '';
+
+  late final UploadService uploadService;
+
+  void _initializeUploadService() async {
+    uploadService = UploadService(
+        baseUrl: "https://chitzchat.com/api/storage/api/v1/upload-url",
+        apiKey: (await UserService.getAccessToken()) ?? '');
+  }
+
   void _getToken(d) async {
     mqtt = MQTTService(
       broker: '13.204.86.50',
+      // broker: '192.168.139.222',
       clientId: ((await UserService.getUserId()).toString().substring(0, 20)),
       onConnected: _onConnected,
       onDisconnected: _onDisconnected,
@@ -291,7 +303,6 @@ class _ChatScreenState extends State<ChatScreen> {
     ChatServices.resetMessageNotificationCount();
   }
 
-  late final MQTTService mqtt;
   bool isConnected = false;
   bool _dialogShown = false;
 
@@ -397,6 +408,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    _initializeUploadService();
     clearMessageNotification();
     print(profileDetails);
     PresenceManager().onChatPageOpened();
@@ -1299,9 +1311,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  final uploadService = UploadService(
-      baseUrl: "https://chitzchat.com/api/storage/api/v1/upload-url",
-      apiKey: "your-secret-api-key-here");
   void onRetryTap(Message message) {
     mqtt.publish(jsonEncode(message.toJson()));
     message.setStatus = MessageStatus.delivered;

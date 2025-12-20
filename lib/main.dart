@@ -20,6 +20,9 @@ import 'screens/home.dart';
 import 'screens/register.dart';
 import 'package:oktoast/oktoast.dart';
 import 'package:deep_link_router/deep_link_router.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/chat.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -73,9 +76,13 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       ),
     ]);
-
-    DeepLinkRouter.instance.initialize(context);
+    try {
+      DeepLinkRouter.instance.initialize(context);
+    } catch (e) {
+      print("DeepLinkRouter initialization error: $e");
+    }
     AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
+    // AppVariables.update('baseurl', 'https://5xlxdw5g-3000.inc1.devtunnels.ms');
 
     ///https://chitzchat.com/api/v1
     UserService.isLoggedIn().then((value) async {
@@ -90,20 +97,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 showLoaders: false, showMessage: false);
           }
           await PresenceManager().init();
+        } else {
+          await UserService.signOut((x) => {});
+          setState(() {
+            showSplashScreen = false;
+          });
+          return;
         }
         Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
         print("Pending Link: $pendingLink");
         if (pendingLink != null) {
           await DeepLinkRouter.completePendingNavigation(context);
         } else {
-          Future.delayed(Duration(seconds: 2), () {
-            Navigator.pushReplacement(
-                context,
-                PageTransition(
-                    isIos: true,
-                    type: PageTransitionType.leftToRight,
-                    child: HomePage()));
-          });
+          Navigator.pushReplacement(
+              context,
+              PageTransition(
+                  isIos: true,
+                  type: PageTransitionType.leftToRight,
+                  child: HomePage()));
         }
       } else {
         setState(() {
