@@ -372,6 +372,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       userStories = StoryService.sortStories(response);
     });
+    print(userStories);
   }
 
   Future<void> _getMyStories({bool? invalidate}) async {
@@ -858,6 +859,17 @@ class _StoryItem extends StatelessWidget {
         .toList();
   }
 
+  bool isEverythingViewed() {
+    for (var story in filterStories()) {
+      print(
+          "story ${story.id} user ${story.name} ${story.media} isviewd ${story.isViewed}");
+      if (!story.isViewed) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -897,7 +909,8 @@ class _StoryItem extends StatelessWidget {
                 //     Color.fromARGB(255, 96, 4, 194)
                 //   ],
                 // ),
-                color: userStory.isViewed ? Colors.grey : userStory.getColor(),
+                color:
+                    isEverythingViewed() ? Colors.grey : userStory.getColor(),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Stack(

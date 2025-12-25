@@ -37,6 +37,12 @@ class StoryPrefs {
     await _persist(prefs);
   }
 
+  static Future<void> unmarkAsViewed(String storyId) async {
+    final prefs = await SharedPreferences.getInstance();
+    _cache.remove(storyId);
+    await _persist(prefs);
+  }
+
   /// Check if a story is viewed (instant check from cache)
   static bool hasViewedSync(String storyId) {
     if (!_cache.containsKey(storyId)) return false;

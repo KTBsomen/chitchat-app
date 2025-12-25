@@ -41,7 +41,11 @@ class UserStory {
 
   set isViewed(bool value) {
     _isViewed = value;
-    if (value) StoryPrefs.markAsViewed(id);
+    if (value) {
+      StoryPrefs.markAsViewed(id);
+    } else {
+      StoryPrefs.unmarkAsViewed(id);
+    }
   }
 
   factory UserStory.fromJson(Map<String, dynamic> json) {
@@ -131,6 +135,7 @@ class StoryService {
           dbIndex: story.dbIndex,
         );
       }
+      // print(mergedMap[key]!.);
     }
 
     return mergedMap.values.toList();

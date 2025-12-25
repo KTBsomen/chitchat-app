@@ -25,11 +25,47 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
 
   int currentUserIndex = 0;
 
+  void updateViewOnStory(StoryItem item, int index) async {
+    print(
+        "Story shown: $item at index $index for user index $currentUserIndex");
+    if (currentUserIndex < widget.storyItems.length - 1) {
+      if (widget.storyItems[currentUserIndex].isViewed == false) {
+        if (widget.storyItems[currentUserIndex].myStory) {
+          return;
+        }
+        await StoryService.markStoryAsViewed(
+          widget.storyItems[currentUserIndex].id,
+          widget.storyItems[currentUserIndex].dbIndex,
+        );
+      }
+      widget.storyItems[currentUserIndex].isViewed = true;
+      AppVariables.update("story_viewed_index", widget.initialIndex);
+      print("this is called");
+    } else {
+      if (widget.storyItems[currentUserIndex].myStory) {
+        return;
+      }
+      if (widget.storyItems[currentUserIndex].isViewed == false) {
+        StoryService.markStoryAsViewed(
+          widget.storyItems[currentUserIndex].id,
+          widget.storyItems[currentUserIndex].dbIndex,
+        );
+      }
+      widget.storyItems[currentUserIndex].isViewed = true;
+      AppVariables.update("story_viewed_index", widget.initialIndex);
+    }
+  }
+
   void goToNextUser() async {
     if (currentUserIndex < widget.storyItems.length - 1) {
+      print(
+          "before user index $currentUserIndex ${widget.storyItems[currentUserIndex]}");
       setState(() {
         currentUserIndex++;
       });
+      print(
+          "after user index $currentUserIndex ${widget.storyItems[currentUserIndex]}");
+
       if (widget.storyItems[currentUserIndex].isViewed == false) {
         if (widget.storyItems[currentUserIndex].myStory) {
           return;
@@ -84,6 +120,8 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
         );
       }
     }
+    storyItems.sort((a, b) => (a.shown ? 1 : 0).compareTo(b.shown ? 1 : 0));
+
     return storyItems;
   }
 
@@ -145,6 +183,7 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
             onComplete: () {
               goToNextUser();
             },
+            onStoryShow: updateViewOnStory,
             onVerticalSwipeComplete: (direction) {
               if (direction == Direction.down) {
                 Navigator.pop(context);

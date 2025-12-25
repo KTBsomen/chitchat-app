@@ -31,31 +31,6 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
       setState(() {
         currentStoryIndex++;
       });
-
-      // Mark as viewed if not the user's own story
-      if (!widget.storyItems[currentStoryIndex].myStory &&
-          !widget.storyItems[currentStoryIndex].isViewed) {
-        await StoryService.markStoryAsViewed(
-          widget.storyItems[currentStoryIndex].id,
-          widget.storyItems[currentStoryIndex].dbIndex,
-        );
-        widget.storyItems[currentStoryIndex].isViewed = true;
-      }
-
-      AppVariables.update("story_viewed_index", widget.initialIndex);
-    } else {
-      // Mark last story as viewed
-      if (!widget.storyItems[currentStoryIndex].myStory &&
-          !widget.storyItems[currentStoryIndex].isViewed) {
-        await StoryService.markStoryAsViewed(
-          widget.storyItems[currentStoryIndex].id,
-          widget.storyItems[currentStoryIndex].dbIndex,
-        );
-        widget.storyItems[currentStoryIndex].isViewed = true;
-      }
-
-      AppVariables.update("story_viewed_index", widget.initialIndex);
-      Navigator.pop(context);
     }
   }
 
