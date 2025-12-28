@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatview/chatview.dart';
 import 'package:chitchat/appstate/variables.dart';
@@ -32,6 +33,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:vs_media_picker/vs_media_picker.dart';
 
+// Import the LikeButton widget
+import 'package:chitchat/components/like.dart';
+
 class GroupPrivateViewScreen extends StatefulWidget {
   @override
   _GroupPrivateViewScreenState createState() => _GroupPrivateViewScreenState();
@@ -41,12 +45,20 @@ class MemoryItem {
   final String url;
   final MessageType type;
   final bool isLocal;
+  bool _isPublic;
 
   MemoryItem({
     required this.url,
     required this.type,
     this.isLocal = false,
-  });
+    bool isPublic = false,
+  }) : _isPublic = isPublic;
+
+  bool get isPublic => _isPublic;
+  set isPublic(bool value) {
+    _isPublic = value;
+    AppVariables.setPersistent<bool>(url, value);
+  }
 }
 
 class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
@@ -61,6 +73,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   FriendCircleGroup? groupDetails;
 
   int selectedTab = 0;
+  String? expandedMemberId; // Track which member's bio is expanded
 
   late Collection chats;
   int windowSize = 20;
@@ -72,6 +85,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   Timer? _refreshTimer;
 
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _postsScrollController = ScrollController();
   String? next;
   bool isLoadingPost = false;
   bool hasMore = true;
@@ -80,8 +94,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   bool isInWatchList = false;
   bool isWatchListLoading = false;
   bool isJoinLoading = false;
-  List<MemoryItem> remoteMemories = []; // fetched from API
-  String? nextPageCursor; // API pagination cursor
+  List<MemoryItem> remoteMemories = [];
+  String? nextPageCursor;
   bool isLoading = false;
 
   final ScrollController _memoriesController = ScrollController();
@@ -101,10 +115,12 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       return _memories.map((e) {
         Message _temp = Message.fromJson(e);
         return MemoryItem(
-            url: _temp.message, type: _temp.messageType, isLocal: true);
+          url: _temp.message,
+          type: _temp.messageType,
+          isLocal: true,
+        );
       }).toList();
     } on Exception catch (e) {
-      // Handle the exception here
       print('Error initializing database: $e');
       return Future.value([]);
     }
@@ -120,16 +136,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
       if (data['success']) {
         final List<dynamic> fetched = data["data"]['_memories'];
-        // normalize
         List<MemoryItem> newRemoteMemories = fetched.map((item) {
           String url = item['media'][0]['url'];
           String type = item['media'][0]['type'];
-          // your API gives image/video URLs — detect type by extension
           final isVideo = type.contains("video");
           return MemoryItem(
             url: url.toString(),
             type: isVideo ? MessageType.video : MessageType.image,
             isLocal: false,
+            isPublic: item['public'] ?? false,
           );
         }).toList();
 
@@ -208,9 +223,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       });
     });
     _fetchPosts();
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 100 &&
+    _postsScrollController.addListener(() {
+      if (_postsScrollController.position.pixels >=
+              _postsScrollController.position.maxScrollExtent - 100 &&
           !isLoadingPost &&
           hasMore) {
         _fetchPosts();
@@ -224,7 +239,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         if (hasMore && !isLoading) {
           _fetchMemories();
         }
-        ;
       }
     });
     _fetchUserStatus();
@@ -268,21 +282,20 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   }
 
   void _startRandomRefreshTimer() {
-    _refreshTimer?.cancel(); // cancel old timer if any
+    _refreshTimer?.cancel();
 
     void scheduleNext() {
       final random = Random();
-      // Pick a random interval between 60–120 seconds
       final seconds = 60 + random.nextInt(61);
       print("Next presence refresh in $seconds seconds");
 
       _refreshTimer = Timer(Duration(seconds: seconds), () async {
         _fetchUserStatus();
-        scheduleNext(); // schedule again after completion
+        scheduleNext();
       });
     }
 
-    scheduleNext(); // start the loop
+    scheduleNext();
   }
 
   void _fetchPosts() async {
@@ -323,7 +336,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     List<String>? ids =
         groupDetails?.members.map((member) => member.id).toList();
     Map<String, dynamic> result =
-        await UserService.fetchUserLikes(ids: ids!, invalidate: false);
+        await UserService.fetchUserLikes(ids: ids!, invalidate: true);
     if (result['success']) {
       for (var user in result['data']) {
         likeCountForMember[user['_id']] = user['likes'];
@@ -341,7 +354,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       likeCountForMember[userid] = (user! + (likeStatus[userid]! ? 1 : -1)) < 0
           ? 0
           : (user! + (likeStatus[userid]! ? 1 : -1));
-      //+= likeStatus[userid]! ? 1 : -1;
     });
     AppVariables.setPersistent<Map<String, bool>>(
         'likeStatusForMember', likeStatus);
@@ -397,7 +409,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
       progressNotifier: _progressNotifier,
     );
-    // Add your create functionality here
     showDialog(
       barrierDismissible: false,
       context: context,
@@ -425,7 +436,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Group Name Input
                   Column(
                     mainAxisAlignment: MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,10 +466,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Logo Picker
                   isSubmitted
-                      // ignore: dead_code
                       ? Visibility(
                           visible: isSubmitted,
                           child: UploadProgressWidget(
@@ -513,7 +520,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             actionsPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             actions: [
-              // Cancel Button
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
@@ -523,7 +529,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
-              // Create Button
               ElevatedButton(
                 onPressed: isSubmitted
                     ? null
@@ -561,12 +566,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                             groupDetails = GroupsService.buildFriendCircleGroup(
                                 result['data']);
                             setState(() {});
-                            // Navigator.pushReplacement(
-                            //     context,
-                            //     PageTransition(
-                            //         type: PageTransitionType.leftToRight,
-                            //         child: GroupPrivateViewScreen(),
-                            //         duration: Duration(milliseconds: 400)));
                           } else {
                             _progressNotifier.value =
                                 _progressNotifier.value.copyWith(
@@ -603,10 +602,14 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   void dispose() {
     _tabController.dispose();
     _refreshTimer?.cancel();
+    _postsScrollController.dispose();
+    _memoriesController.dispose();
+    _scrollController.dispose();
 
     AppVariables.unregisterState(this);
     AppVariables.removeListener("profile", _handleProfileUpdate);
     AppVariables.removeListener("group_posts", _handlePostUpdate);
+    AppVariables.removeListener("memories", _handleMemoryUpdate);
     super.dispose();
   }
 
@@ -668,7 +671,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             onSelected: (value) async {
               switch (value) {
                 case 'share':
-                  // Add share functionality
                   SharePlus.instance.share(ShareParams(
                     title: "ChitChat Group Invitation",
                     text:
@@ -677,7 +679,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                   ));
                   break;
                 case 'leave':
-                  // Show confirmation dialog
                   showDialog(
                     context: context,
                     builder: (BuildContext context) {
@@ -693,12 +694,10 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                           TextButton(
                             child: const Text('Leave'),
                             onPressed: () async {
-                              // Add leave group functionality
                               await GroupsService.leaveGroup(
                                   groupDetails!.groupId);
-                              Navigator.pop(context); // Close dialog
-                              Navigator.pop(
-                                  context); // Return to previous screen
+                              Navigator.pop(context);
+                              Navigator.pop(context);
                             },
                           ),
                         ],
@@ -729,301 +728,271 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       ),
       body: Stack(
         children: [
-          // Top Container for Group Members
+          // Modern Members List
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             height: MediaQuery.of(context).size.height * 0.4,
             child: ListView.builder(
+              controller: _scrollController,
               itemCount: groupDetails!.members.length,
               itemBuilder: (context, index) {
                 final member = groupDetails!.members[index];
-                print(
-                    'Member ${member.id}: ${member.avatarUrl} ${member.additionalData['memberName']} bio: ${member.additionalData['memberBio']} ');
-                return ListTile(
-                  onTap: () {
-                    if (member.id == profileDetails!['uid']) {
-                      Navigator.push(
-                        context,
-                        PageTransition(
-                          type: PageTransitionType.rightToLeft,
-                          child: PrivetProfilePage(),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.push(
-                      context,
-                      PageTransition(
-                        type: PageTransitionType.rightToLeft,
-                        child: PublicProfilePage(
-                          dbIndex: member.additionalData['dbIndex'].toString(),
-                          uid: member.id,
-                        ),
-                      ),
-                    );
-                  },
-                  leading: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 25,
-                        backgroundImage: NetworkImage(member.avatarUrl),
-                      ),
-                      if (member.status != null)
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: member.status == 'online'
-                                  ? Colors.green
-                                  : member.status == 'offline'
-                                      ? Colors.grey
-                                      : Colors.orange,
-                              shape: BoxShape.circle,
+                final isExpanded = expandedMemberId == member.id;
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        if (member.id == profileDetails!['uid']) {
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: PrivetProfilePage(),
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          PageTransition(
+                            type: PageTransitionType.rightToLeft,
+                            child: PublicProfilePage(
+                              dbIndex:
+                                  member.additionalData['dbIndex'].toString(),
+                              uid: member.id,
                             ),
                           ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors
+                              .transparent, // const Color.fromARGB(255, 20, 20, 50),
+                          borderRadius: BorderRadius.circular(12),
+                          // border: Border.all(
+                          //   color: isExpanded
+                          //       ? Colors.blue.withOpacity(0.5)
+                          //       : Colors.transparent,
+                          //   width: 2,
+                          // ),
                         ),
-                    ],
-                  ),
-                  title: Text(
-                    member.additionalData['memberName'],
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  subtitle: GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          TextEditingController bioController =
-                              TextEditingController(
-                            text: member.additionalData['memberBio'] != null &&
-                                    member.additionalData['memberBio']
-                                        is List &&
-                                    member
-                                        .additionalData['memberBio'].isNotEmpty
-                                ? GroupsService.parseBio(
-                                        member.additionalData['memberBio'].last)
-                                    .bio
-                                : '',
-                          );
-                          bool isSubmitting = false;
-                          String? errorText;
-
-                          return StatefulBuilder(
-                            builder: (context, setState) {
-                              return AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                title: const Text(
-                                  "Add a bio for this friend",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                // Avatar with status
+                                Stack(
                                   children: [
-                                    const Text(
-                                      "Let them know how you feel about them! Write something nice or memorable.",
-                                      style: TextStyle(color: Colors.grey),
+                                    CircleAvatar(
+                                      radius: 25,
+                                      backgroundImage:
+                                          NetworkImage(member.avatarUrl),
                                     ),
-                                    const SizedBox(height: 16),
-                                    TextField(
-                                      controller: bioController,
-                                      maxLength: 80,
-                                      maxLines: 2,
-                                      decoration: InputDecoration(
-                                        labelText:
-                                            "#${profileDetails!['name']}",
-                                        hintText: "E.g. Best teammate ever! 🎉",
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
+                                    if (member.status != null)
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: member.status == 'online'
+                                                ? Colors.green
+                                                : member.status == 'offline'
+                                                    ? Colors.grey
+                                                    : Colors.orange,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: const Color.fromARGB(
+                                                  255, 20, 20, 50),
+                                              width: 2,
+                                            ),
+                                          ),
                                         ),
-                                        errorText: errorText,
                                       ),
-                                    ),
                                   ],
                                 ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: isSubmitting
-                                        ? null
-                                        : () => Navigator.pop(context),
-                                    child: const Text("Cancel"),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: isSubmitting
-                                        ? null
-                                        : () async {
-                                            if (bioController.text
-                                                .trim()
-                                                .isEmpty) {
-                                              setState(() {
-                                                errorText =
-                                                    "Bio cannot be empty";
-                                              });
-                                              return;
-                                            }
-                                            setState(() {
-                                              isSubmitting = true;
-                                              errorText = null;
-                                            });
-                                            // Call API to update bio
-                                            final result = await GroupsService
-                                                .updateMemberBio(
-                                              groupId: groupDetails!.groupId,
-                                              userId: member.id,
-                                              bio: bioController.text.trim(),
-                                            );
-                                            setState(() {
-                                              isSubmitting = false;
-                                            });
-                                            if (result['success'] == true) {
-                                              if (mounted) {
-                                                Navigator.pop(context);
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                      content:
-                                                          Text("Bio updated!")),
-                                                );
-                                              }
-                                              setState(() {
-                                                member.additionalData[
-                                                    'memberBio'] = [
-                                                  GroupsService.parseBio(
-                                                          bioController.text)
-                                                      .bio
-                                                ];
-                                              });
-                                            } else {
-                                              setState(() {
-                                                errorText = result['error'] ??
-                                                    "Failed to update bio";
-                                              });
-                                            }
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                const SizedBox(width: 12),
+
+                                // Name and bio toggle
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        member.additionalData['memberName'],
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                    child: isSubmitting
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white),
-                                          )
-                                        : const Text("Save",
-                                            style:
-                                                TextStyle(color: Colors.white)),
+                                      const SizedBox(height: 4),
+                                      InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            if (isExpanded) {
+                                              expandedMemberId = null;
+                                            } else {
+                                              expandedMemberId = member.id;
+                                            }
+                                          });
+                                        },
+                                        child: Row(
+                                          children: [
+                                            const Text(
+                                              'bio',
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Icon(
+                                              isExpanded
+                                                  ? Icons.keyboard_arrow_up
+                                                  : Icons.keyboard_arrow_down,
+                                              color: Colors.grey,
+                                              size: 20,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                    child: Wrap(
-                      children: [
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              if (member.additionalData['memberBio'] != null &&
-                                  member.additionalData['memberBio'] is List &&
-                                  member.additionalData['memberBio'].isNotEmpty)
-                                TextSpan(
-                                    text: GroupsService.parseBio(member
-                                            .additionalData['memberBio'].last)
-                                        .editedBy,
-                                    style:
-                                        const TextStyle(color: Colors.white)),
-                              WidgetSpan(child: SizedBox(width: 5)),
-                              TextSpan(
-                                text: (member.additionalData['memberBio'] !=
+                                ),
+
+                                // Like button
+                                LikeButton(
+                                  buttonType: ButtonType.user,
+                                  postId: member.id,
+                                  initialLikes:
+                                      likeCountForMember[member.id] ?? 0,
+                                  initiallyLiked:
+                                      likeStatus[member.id] ?? false,
+                                  showLikeCount: true,
+                                  onLikeChanged: (isLiked) async {
+                                    toggleLike(member.id);
+                                    return true;
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            // Expanded bio section
+                            AnimatedCrossFade(
+                              firstChild: const SizedBox.shrink(),
+                              secondChild: Container(
+                                width: double.infinity,
+                                margin: EdgeInsets.only(
+                                    top: 12,
+                                    left: MediaQuery.of(context).size.width *
+                                        0.15),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(255, 30, 30, 60),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (member
+                                                .additionalData['memberBio'] !=
                                             null &&
                                         member.additionalData['memberBio']
                                             is List &&
                                         member.additionalData['memberBio']
                                             .isNotEmpty)
-                                    ? GroupsService.parseBio(member
-                                                .additionalData['memberBio']
-                                                .last)
-                                            .bio!
-                                            .isEmpty
-                                        ? 'Add a bio'
-                                        : GroupsService.parseBio(member
-                                                .additionalData['memberBio']
-                                                .last)
-                                            .bio
-                                    : 'Add a bio',
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 8.0),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.edit,
-                                          color: Colors.blue, size: 18),
-                                      if (member
-                                          .additionalData['memberBio'].isEmpty)
-                                        Text(
-                                          "Add a bio",
-                                          style: TextStyle(color: Colors.grey),
+                                      ...member.additionalData['memberBio']
+                                          .map<Widget>((bioEntry) {
+                                        final parsedBio =
+                                            GroupsService.parseBio(bioEntry);
+                                        return Container(
+                                          margin:
+                                              const EdgeInsets.only(bottom: 8),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color.fromARGB(
+                                                255, 25, 25, 55),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          child: Wrap(
+                                            children: [
+                                              RichText(
+                                                  text: TextSpan(
+                                                children: [
+                                                  TextSpan(
+                                                    text: parsedBio.editedBy ??
+                                                        '',
+                                                    style: const TextStyle(
+                                                      color: Colors.blue,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  WidgetSpan(
+                                                      child:
+                                                          SizedBox(width: 6)),
+                                                  TextSpan(
+                                                    text: parsedBio.bio ?? '',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 14,
+                                                    ),
+                                                  )
+                                                ],
+                                              )),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList()
+                                    else
+                                      const Text(
+                                        'No bio yet',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 14,
+                                          fontStyle: FontStyle.italic,
                                         ),
-                                    ],
-                                  ),
+                                      ),
+                                    const SizedBox(height: 8),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton.icon(
+                                        onPressed: () {
+                                          _showAddBioDialog(member);
+                                        },
+                                        icon: const Icon(
+                                          Icons.edit,
+                                          size: 16,
+                                          color: Colors.blue,
+                                        ),
+                                        label: const Text(
+                                          'Add Bio',
+                                          style: TextStyle(color: Colors.blue),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
+                              crossFadeState: isExpanded
+                                  ? CrossFadeState.showSecond
+                                  : CrossFadeState.showFirst,
+                              duration: const Duration(milliseconds: 300),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  trailing: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => toggleLike(member.id),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          likeStatus[member.id] == true
-                              ? const Icon(Icons.favorite, color: Colors.red)
-                              : const Icon(Icons.favorite_border_outlined,
-                                  color: Colors.white),
-                          const SizedBox(width: 4),
-                          likeCountForMember[member.id] != null
-                              ? Text(
-                                  '${likeCountForMember[member.id] ?? 0}',
-                                  style: const TextStyle(color: Colors.white),
-                                )
-                              : SizedBox(
-                                  width: 20,
-                                  height: 10,
-                                  child: Shimmer.fromColors(
-                                    direction: ShimmerDirection.ttb,
-                                    baseColor: AppColors.background,
-                                    highlightColor: const Color.fromARGB(
-                                        255, 200, 200, 200)!,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(5),
-                                        color: AppColors.gradientStart,
-                                      ),
-                                      width: 20,
-                                      height: 10,
-                                    ),
-                                  ),
-                                )
-                        ],
                       ),
                     ),
                   ),
@@ -1031,8 +1000,10 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               },
             ),
           ),
+
           // DraggableScrollableSheet
           DraggableScrollableSheet(
+            key: ValueKey(selectedTab), // Reset sheet when tab changes
             initialChildSize: 0.5,
             minChildSize: 0.5,
             maxChildSize: 0.9,
@@ -1047,7 +1018,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                 ),
                 child: Column(
                   children: [
-                    // TabBar for Chat and Posts
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Row(
@@ -1055,7 +1025,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                         children: [
                           Container(
                             height: 50,
-                            width: MediaQuery.of(context).size.width * 0.6,
+                            width: MediaQuery.of(context).size.width * 0.8,
                             decoration: BoxDecoration(
                                 color: const Color.fromARGB(255, 255, 255, 255),
                                 border:
@@ -1081,7 +1051,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   },
                                   child: Container(
                                     width:
-                                        MediaQuery.of(context).size.width * 0.3,
+                                        MediaQuery.of(context).size.width * 0.4,
                                     height: 50,
                                     decoration: selectedTab == 0
                                         ? const BoxDecoration(
@@ -1122,7 +1092,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   },
                                   child: Container(
                                     width: MediaQuery.of(context).size.width *
-                                            0.3 -
+                                            0.4 -
                                         1,
                                     height: 50,
                                     decoration: selectedTab == 1
@@ -1159,43 +1129,28 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                             ),
                           ),
                           Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                CircleAvatar(
-                                  radius: 25,
-                                  backgroundColor:
-                                      const Color.fromARGB(255, 0, 46, 124),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.chat,
-                                        color: Colors.white),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const ChatScreen(),
-                                        ),
-                                      );
-                                    },
-                                  ),
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              CircleAvatar(
+                                radius: 25,
+                                backgroundColor:
+                                    const Color.fromARGB(255, 0, 46, 124),
+                                child: IconButton(
+                                  icon: const Icon(Icons.chat,
+                                      color: Colors.white),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const ChatScreen(),
+                                      ),
+                                    );
+                                  },
                                 ),
-                                const SizedBox(width: 10),
-                                CircleAvatar(
-                                  radius: 25,
-                                  backgroundColor:
-                                      const Color.fromARGB(255, 0, 46, 124),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.add_a_photo_sharp,
-                                        color: Colors.white),
-                                    onPressed: () {
-                                      CreatePost.show(context,
-                                          myGroupId: groupDetails!.groupId,
-                                          isGroupPost: true,
-                                          isPost: true);
-                                    },
-                                  ),
-                                ),
-                              ]),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -1206,63 +1161,63 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                         child: TabBarView(
                           controller: _tabController,
                           children: [
-                            // post View
+                            // Posts View
                             MasonryGridView.builder(
-                                controller: scrollController,
-                                gridDelegate:
-                                    const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                ),
-                                mainAxisSpacing: 8,
-                                crossAxisSpacing: 8,
-                                itemCount: posts.length,
-                                itemBuilder: (context, index) {
-                                  final post = posts[index];
-                                  if (post?['media'] == null)
-                                    return Container();
-                                  else if (post?['media'].runtimeType ==
-                                      String) {
-                                    post['media'] = jsonDecode(post['media']);
-                                  }
-                                  try {
-                                    return DynamicPostWidget(
-                                      content: post['content'],
-                                      media: List<Map<String, dynamic>>.from(
-                                          (post['media'] as List<dynamic>)
-                                              .map((m) => {
-                                                    'type': m['type'],
-                                                    'url': m['url'],
-                                                  })),
-                                      postId: post['_id'],
-                                      author: post['author'],
-                                      group: post['group'],
-                                      authorName: post['authorName'],
-                                      profilePic: post['profilePic'],
-                                      likes: post['likes'],
-                                      public: post['public'],
-                                    );
-                                  } on Exception catch (e) {
-                                    return Container();
-                                  }
-                                }),
+                              controller: selectedTab == 0
+                                  ? _postsScrollController
+                                  : null,
+                              gridDelegate:
+                                  const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                              ),
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              itemCount: posts.length,
+                              itemBuilder: (context, index) {
+                                final post = posts[index];
+                                if (post?['media'] == null)
+                                  return Container();
+                                else if (post?['media'].runtimeType == String) {
+                                  post['media'] = jsonDecode(post['media']);
+                                }
+                                try {
+                                  return DynamicPostWidget(
+                                    content: post['content'],
+                                    media: List<Map<String, dynamic>>.from(
+                                        (post['media'] as List<dynamic>)
+                                            .map((m) => {
+                                                  'type': m['type'],
+                                                  'url': m['url'],
+                                                })),
+                                    postId: post['_id'],
+                                    author: post['author'],
+                                    group: post['group'],
+                                    authorName: post['authorName'],
+                                    profilePic: post['profilePic'],
+                                    likes: post['likes'],
+                                    public: post['public'],
+                                  );
+                                } on Exception catch (e) {
+                                  return Container();
+                                }
+                              },
+                            ),
 
-                            // memories View (Masonry Grid)
+                            // Memories View
                             MasonryGridView.builder(
-                              controller: _memoriesController,
+                              controller:
+                                  selectedTab == 1 ? _memoriesController : null,
                               gridDelegate:
                                   const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 4,
                               ),
                               mainAxisSpacing: 8,
                               crossAxisSpacing: 8,
-                              // add +1 for one static item
                               itemCount: allMemories.length + 2,
                               itemBuilder: (context, index) {
-                                // First static item
                                 if (index == 0) {
                                   return GestureDetector(
                                     onTap: () {
-                                      // Upload action
                                       CreatePost.show(
                                         context,
                                         myGroupId: groupDetails!.groupId,
@@ -1300,13 +1255,12 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                 }
 
                                 if (index == allMemories.length + 1) {
-                                  // Loader
                                   return hasMore
                                       ? const Center(
                                           child: CircularProgressIndicator())
                                       : const SizedBox.shrink();
                                 }
-                                // Adjust index for memories list
+
                                 final memory = allMemories[index - 1];
 
                                 return GestureDetector(
@@ -1316,8 +1270,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                       MaterialPageRoute(
                                         builder: (_) => MemoryViewer(
                                           memories: allMemories,
-                                          initialIndex: index -
-                                              1, // adjust since first item is Upload
+                                          initialIndex: index - 1,
                                         ),
                                       ),
                                     );
@@ -1333,8 +1286,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                                 MaterialPageRoute(
                                                   builder: (_) => MemoryViewer(
                                                     memories: allMemories,
-                                                    initialIndex: index -
-                                                        1, // adjust since first item is Upload
+                                                    initialIndex: index - 1,
                                                   ),
                                                 ),
                                               );
@@ -1353,7 +1305,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   ),
                                 );
                               },
-                            )
+                            ),
                           ],
                         ),
                       ),
@@ -1367,19 +1319,121 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       ),
     );
   }
-}
 
-// Mockup of Group Edit Page
-class GroupEditPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Edit Group Details"),
-      ),
-      body: const Center(
-        child: Text("Group Edit Page"),
-      ),
+  void _showAddBioDialog(member) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        TextEditingController bioController = TextEditingController(
+          text: member.additionalData['memberBio'] != null &&
+                  member.additionalData['memberBio'] is List &&
+                  member.additionalData['memberBio'].isNotEmpty
+              ? GroupsService.parseBio(member.additionalData['memberBio'].last)
+                  .bio
+              : '',
+        );
+        bool isSubmitting = false;
+        String? errorText;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                "Add a bio for this friend",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Let them know how you feel about them! Write something nice or memorable.",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: bioController,
+                    maxLength: 80,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: "#${profileDetails!['name']}",
+                      hintText: "E.g. Best teammate ever! 🎉",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      errorText: errorText,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (bioController.text.trim().isEmpty) {
+                            setState(() {
+                              errorText = "Bio cannot be empty";
+                            });
+                            return;
+                          }
+                          setState(() {
+                            isSubmitting = true;
+                            errorText = null;
+                          });
+                          final result = await GroupsService.updateMemberBio(
+                            groupId: groupDetails!.groupId,
+                            userId: member.id,
+                            bio: bioController.text.trim(),
+                          );
+                          setState(() {
+                            isSubmitting = false;
+                          });
+                          if (result['success'] == true) {
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Bio updated!")),
+                              );
+                            }
+                            this.setState(() {
+                              member.additionalData['memberBio'] = [
+                                GroupsService.parseBio(bioController.text).bio
+                              ];
+                            });
+                          } else {
+                            setState(() {
+                              errorText =
+                                  result['error'] ?? "Failed to update bio";
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text("Save",
+                          style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

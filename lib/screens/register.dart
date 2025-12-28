@@ -36,7 +36,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   int _stepIndex = 0;
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
-  String? _name, _birthday, _username, _educationalBackground, _profilePicPath;
+  String? _name,
+      _gender,
+      _birthday,
+      _username,
+      _educationalBackground,
+      _profilePicPath;
   String? _school, _college, _university, _class, _semester, _year;
   bool _isUsernameValid = false;
   bool _isCheckingUsername = false;
@@ -206,6 +211,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       "year": _year,
       "profilePic": value[0] ?? googleUser?.photoUrl,
       "role": "appTest",
+      "gender": _gender,
       "fcmToken": await UserService.getFcmToken() ?? "",
     };
 
@@ -599,6 +605,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 });
                               },
                               onSaved: (newValue) => _username = newValue!,
+                            ),
+                            DropdownButtonFormField<String>(
+                              decoration:
+                                  const InputDecoration(labelText: "Gender"),
+                              items: ["Male", "Female", "Other"]
+                                  .map((e) => DropdownMenuItem(
+                                      value: e, child: Text(e)))
+                                  .toList(),
+                              validator: (value) =>
+                                  value == null ? "Gender is required" : null,
+                              onChanged: (value) =>
+                                  setState(() => _gender = value),
+                              onSaved: (value) => _gender = value,
                             ),
                           ],
                         ),

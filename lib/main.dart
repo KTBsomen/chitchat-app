@@ -5,6 +5,7 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/admin.dart';
 import 'package:chitchat/screens/createStory.dart';
 import 'package:chitchat/services/fcm.dart';
 import 'package:chitchat/services/notification.dart';
@@ -199,105 +200,133 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.justify,
                         ),
                       ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 50.0),
-                        child: ElevatedButton(
-                          onPressed: isLoading
-                              ? null
-                              : () {
-                                  UserService.signInWithGoogle(setLoading)
-                                      .then((_) {
-                                    UserService.isLoggedIn().then((value) {
-                                      if (value) {
-                                        setState(() {
-                                          showSplashScreen = true;
-                                        });
-                                        Future.delayed(Duration(seconds: 1),
-                                            () {
-                                          Navigator.pushReplacement(
+                      Column(
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 50.0),
+                            child: ElevatedButton(
+                              onPressed: isLoading
+                                  ? null
+                                  : () {
+                                      UserService.signInWithGoogle(setLoading)
+                                          .then((_) {
+                                        UserService.isLoggedIn().then((value) {
+                                          if (value) {
+                                            setState(() {
+                                              showSplashScreen = true;
+                                            });
+                                            Future.delayed(Duration(seconds: 1),
+                                                () {
+                                              Navigator.pushReplacement(
+                                                  context,
+                                                  PageTransition(
+                                                      isIos: true,
+                                                      type: PageTransitionType
+                                                          .leftToRight,
+                                                      child: HomePage()));
+                                            });
+                                          } else {
+                                            setState(() {
+                                              showSplashScreen = false;
+                                            });
+                                            Navigator.pushReplacement(
                                               context,
                                               PageTransition(
                                                   isIos: true,
                                                   type: PageTransitionType
                                                       .leftToRight,
-                                                  child: HomePage()));
+                                                  child: RegistrationScreen()),
+                                            );
+                                          }
                                         });
-                                      } else {
-                                        setState(() {
-                                          showSplashScreen = false;
-                                        });
-                                        Navigator.pushReplacement(
-                                          context,
-                                          PageTransition(
-                                              isIos: true,
-                                              type: PageTransitionType
-                                                  .leftToRight,
-                                              child: RegistrationScreen()),
-                                        );
-                                      }
-                                    });
-                                  }).catchError((error) {
-                                    // Handle sign-in errors
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: Text('Sign-In Error'),
-                                        content: Text(
-                                            'Failed to sign in with Google: $error'),
-                                        actions: <Widget>[
-                                          TextButton(
-                                            child: Text('OK'),
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                            },
+                                      }).catchError((error) {
+                                        // Handle sign-in errors
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: Text('Sign-In Error'),
+                                            content: Text(
+                                                'Failed to sign in with Google: $error'),
+                                            actions: <Widget>[
+                                              TextButton(
+                                                child: Text('OK'),
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    );
-                                  });
-                                },
-                          style: ButtonStyle(
-                            padding: WidgetStateProperty.all(EdgeInsets.zero),
-                            shape: WidgetStateProperty.all(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25),
+                                        );
+                                      });
+                                    },
+                              style: ButtonStyle(
+                                padding:
+                                    WidgetStateProperty.all(EdgeInsets.zero),
+                                shape: WidgetStateProperty.all(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(25),
+                                  ),
+                                ),
+                                shadowColor: WidgetStateProperty.all(
+                                    Color.fromARGB(38, 0, 0, 0)),
+                                elevation: WidgetStateProperty.all(5),
                               ),
-                            ),
-                            shadowColor: WidgetStateProperty.all(
-                                Color.fromARGB(38, 0, 0, 0)),
-                            elevation: WidgetStateProperty.all(5),
-                          ),
-                          child: Ink(
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              // gradient: const LinearGradient(
-                              //   colors: [
-                              //     Color(0xFFFF671F),
-                              //     Colors.white,
-                              //     Color(0xFF046A38)
-                              //   ],
-                              //   transform: GradientRotation(760 * 180 / 3.14),
-                              // ),
-                              borderRadius: BorderRadius.circular(35),
-                            ),
-                            child: Container(
-                              alignment: Alignment.center,
-                              constraints: const BoxConstraints(
-                                minWidth: 100,
-                                minHeight: 50,
-                              ),
-                              child: Text(
-                                'Login with Google',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Color(0xFFFFFFFF),
-                                  fontSize: 30,
-                                  fontFamily: 'PassionOne',
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  // gradient: const LinearGradient(
+                                  //   colors: [
+                                  //     Color(0xFFFF671F),
+                                  //     Colors.white,
+                                  //     Color(0xFF046A38)
+                                  //   ],
+                                  //   transform: GradientRotation(760 * 180 / 3.14),
+                                  // ),
+                                  borderRadius: BorderRadius.circular(35),
+                                ),
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 100,
+                                    minHeight: 50,
+                                  ),
+                                  child: Text(
+                                    'Login with Google',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFFFFFFFF),
+                                      fontSize: 30,
+                                      fontFamily: 'PassionOne',
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                          SizedBox(
+                            height: 30,
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                PageTransition(
+                                  isIos: true,
+                                  type: PageTransitionType.leftToRight,
+                                  child: AdminLoginPage(),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              'Admin Login',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

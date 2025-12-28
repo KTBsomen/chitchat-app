@@ -202,7 +202,7 @@ class _NotificationCardState extends State<NotificationCard> {
           PageTransition(
             type: PageTransitionType.fade,
             child: PublicProfilePage(
-              dbIndex: requestBody['dbIndex'],
+              dbIndex: requestBody['dbIndex'].toString(),
               uid: requestBody['memberId'],
             ),
           ),
@@ -433,7 +433,8 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with SingleTickerProviderStateMixin {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _scrollController = ScrollController();
   bool _isLoading = false;
@@ -448,6 +449,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _isLoadingMore = false;
   FriendCircleGroup? myGroup;
   Map<String, dynamic>? myProfile;
+  late TabController _tabController;
+
   _getMyprofile() async {
     setState(() {
       _isLoading = true;
@@ -458,11 +461,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       print('Profile fetched successfully:');
       print(result['data']);
       myProfile = result['data'];
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
 
       if (result['group'] != null) {
         myGroup = result['group'] as FriendCircleGroup;
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
         print('Group Name: ${myGroup?.groupData['name']}');
         print('Members:');
         for (var member in myGroup!.members) {
@@ -500,13 +507,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         .map((n) => UnifiedNotification.fromNotificationModel(n))
         .toList();
 
-    setState(() {
-      _unifiedNotifications
-          .removeWhere((n) => n.sourceType == NotificationSourceType.api);
-      _unifiedNotifications.addAll(unifiedApiNotifications);
-      _unifiedNotifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _unifiedNotifications
+            .removeWhere((n) => n.sourceType == NotificationSourceType.api);
+        _unifiedNotifications.addAll(unifiedApiNotifications);
+        _unifiedNotifications
+            .sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _isLoading = false;
+      });
+    }
   }
 
   void _getNotification() async {
@@ -519,12 +529,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         .map((n) => UnifiedNotification.fromAppNotification(n))
         .toList();
 
-    setState(() {
-      _unifiedNotifications
-          .removeWhere((n) => n.sourceType == NotificationSourceType.redis);
-      _unifiedNotifications.addAll(unifiedRedisNotifications);
-      _unifiedNotifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    });
+    if (mounted) {
+      setState(() {
+        _unifiedNotifications
+            .removeWhere((n) => n.sourceType == NotificationSourceType.redis);
+        _unifiedNotifications.addAll(unifiedRedisNotifications);
+        _unifiedNotifications
+            .sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      });
+    }
   }
 
   List _voted = [];
@@ -567,19 +580,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void dispose() {
     _notificationTimer?.cancel();
-    NotificationService.clearAllUnreadNotifications();
-
+    _scrollController.dispose();
+    _tabController.dispose();
     super.dispose();
+  }
+
+  _clearAllNotificationsfromServer() async {
+    await NotificationService.clearAllNotificationsfromServer(context);
   }
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     NotificationService.clearAllUnreadNotifications();
     _startNotificationTimer();
     _getMyprofile().then((_) {
       _getGroupJoinReqests();
       _getNotification();
+      _clearAllNotificationsfromServer();
     });
   }
 
@@ -601,97 +620,140 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         backgroundColor: AppColors.background,
         foregroundColor: Colors.white,
         title: const Text('Notifications'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Personal'),
+            Tab(text: 'Group'),
+          ],
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              color: Colors.white,
-              backgroundColor: AppColors.primary,
-              onRefresh: _refreshNotifications,
-              child: _unifiedNotifications.isEmpty
-                  ? const SingleChildScrollView(
-                      // required to allow pull-down gesture even when empty
-                      physics: AlwaysScrollableScrollPhysics(),
-                      child: SizedBox(
-                        height: 500, // give some height to allow pull
-                        child: Center(
-                          child: Text(
-                            'No notifications yet.',
-                            style: TextStyle(
-                              color: Colors.white,
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPersonalNotificationsList(),
+                _buildGroupNotificationsList(),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildPersonalNotificationsList() {
+    final personalNotifications = _unifiedNotifications
+        .where((n) => n.sourceType == NotificationSourceType.redis)
+        .toList();
+
+    return RefreshIndicator(
+      color: Colors.white,
+      backgroundColor: AppColors.primary,
+      onRefresh: _refreshNotifications,
+      child: personalNotifications.isEmpty
+          ? const SingleChildScrollView(
+              physics: AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: 500,
+                child: Center(
+                  child: Text(
+                    'No personal notifications yet.',
+                    style: TextStyle(
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: personalNotifications.length,
+              itemBuilder: (context, index) {
+                final n = personalNotifications[index];
+                final appNotif = n.source as AppNotification;
+                return ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: appNotif.icon != null
+                      ? GestureDetector(
+                          onTap: () {
+                            if (appNotif.type == "post_like") {
+                              Navigator.push(
+                                context,
+                                PageTransition(
+                                  type: PageTransitionType.fade,
+                                  child: PublicProfilePage(
+                                    dbIndex:
+                                        appNotif.data!['dbIndex'].toString() ??
+                                            "x",
+                                    uid: appNotif.data!['author'],
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: ClipOval(
+                            child: Image.network(
+                              appNotif.icon!,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
                             ),
                           ),
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _unifiedNotifications.length,
-                      itemBuilder: (context, index) {
-                        final n = _unifiedNotifications[index];
+                        )
+                      : const Icon(Icons.notifications),
+                  title: Text(
+                    appNotif.title ?? "Notification",
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    appNotif.body ?? "",
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  onTap: () {
+                    if (appNotif.link != null) {
+                      // Handle deep link or navigation
+                    }
+                  },
+                );
+              },
+            ),
+    );
+  }
 
-                        switch (n.sourceType) {
-                          case NotificationSourceType.api:
-                            return NotificationCard(
-                              notification: n.source as NotificationModel,
-                              onVote: _onVote,
-                            );
+  Widget _buildGroupNotificationsList() {
+    final groupNotifications = _unifiedNotifications
+        .where((n) => n.sourceType == NotificationSourceType.api)
+        .toList();
 
-                          case NotificationSourceType.redis:
-                            final appNotif = n.source as AppNotification;
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              leading: appNotif.icon != null
-                                  ? GestureDetector(
-                                      onTap: () {
-                                        if (appNotif.type == "post_like") {
-                                          Navigator.push(
-                                            context,
-                                            PageTransition(
-                                              type: PageTransitionType.fade,
-                                              child: PublicProfilePage(
-                                                dbIndex: appNotif
-                                                        .data!['dbIndex']
-                                                        .toString() ??
-                                                    "x",
-                                                uid: appNotif.data!['author'],
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      child: ClipOval(
-                                        child: Image.network(
-                                          appNotif.icon!,
-                                          width: 40,
-                                          height: 40,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    )
-                                  : const Icon(Icons.notifications),
-                              title: Text(
-                                appNotif.title ?? "Notification",
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              subtitle: Text(
-                                appNotif.body ?? "",
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              onTap: () {
-                                if (appNotif.link != null) {
-                                  // Handle deep link or navigation
-                                }
-                              },
-                            );
-
-                          default:
-                            return const SizedBox.shrink();
-                        }
-                      },
+    return RefreshIndicator(
+      color: Colors.white,
+      backgroundColor: AppColors.primary,
+      onRefresh: _refreshNotifications,
+      child: groupNotifications.isEmpty
+          ? const SingleChildScrollView(
+              physics: AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: 500,
+                child: Center(
+                  child: Text(
+                    'No group notifications yet.',
+                    style: TextStyle(
+                      color: Colors.white,
                     ),
+                  ),
+                ),
+              ),
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: groupNotifications.length,
+              itemBuilder: (context, index) {
+                final n = groupNotifications[index];
+                return NotificationCard(
+                  notification: n.source as NotificationModel,
+                  onVote: _onVote,
+                );
+              },
             ),
     );
   }

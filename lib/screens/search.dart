@@ -798,7 +798,7 @@ class _SearchPageState extends State<SearchPage> {
                   PageTransition(
                     type: PageTransitionType.rightToLeft,
                     child: PublicProfilePage(
-                        dbIndex: user['dbIndex'], uid: user['id']),
+                        dbIndex: user['dbIndex'].toString(), uid: user['id']),
                   ),
                 );
               },

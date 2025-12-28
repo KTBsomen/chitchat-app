@@ -311,6 +311,35 @@ class NotificationService {
     }
   }
 
+// clear all notifications
+  static Future<bool> clearAllNotificationsfromServer(
+      BuildContext context) async {
+    try {
+      String? accessToken = await UserService.getAccessToken();
+      final response = await http.delete(
+        Uri.parse(
+            "$baseurl/notifications/clear?id=${await UserService.getUserId()}"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode != 200) {
+        throw Exception("Failed to clear notifications");
+      }
+
+      print(data["message"] ?? "Notifications cleared");
+      await clearAllUnreadNotifications();
+      return true;
+    } catch (error) {
+      print(error.toString());
+      return false;
+    }
+  }
+
 // Fetch join requests and update unread notifications
   static Future<List<Map<String, dynamic>>?> getGroupJoinRequests(
       BuildContext context, String groupId,
