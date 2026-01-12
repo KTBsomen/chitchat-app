@@ -589,12 +589,12 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: _buildBottomNav(),
+        bottomNavigationBar: buildBottomNav(),
       ),
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.background,

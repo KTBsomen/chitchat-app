@@ -364,7 +364,8 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                                             await uploader!.uploadFiles(files: [
                                           logoFile!
                                         ], compressionParams: {
-                                          "width": 100,
+                                          "width": 600,
+                                          "height": 600,
                                           "quality": 100,
                                         });
                                         print(url);

@@ -17,6 +17,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
 
 class Recomandedgroups extends StatefulWidget {
+  final double? height;
+  const Recomandedgroups({super.key, this.height});
   @override
   State<Recomandedgroups> createState() => _RecomandedgroupsState();
 }
@@ -110,7 +112,8 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
               ),
               Container(
                 width: double.infinity,
-                height: MediaQuery.of(context).size.height * 0.55,
+                height:
+                    widget.height ?? MediaQuery.of(context).size.height * 0.55,
                 margin: EdgeInsets.only(left: 25, right: 25),
                 child: isLoading
                     ? Center(

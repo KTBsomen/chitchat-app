@@ -38,6 +38,21 @@ class _LikeButtonState extends State<LikeButton> {
     loadLike();
   }
 
+  @override
+  void didUpdateWidget(covariant LikeButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialLikes != widget.initialLikes) {
+      setState(() {
+        likes = widget.initialLikes;
+      });
+    }
+    if (oldWidget.initiallyLiked != widget.initiallyLiked) {
+      setState(() {
+        isLiked = widget.initiallyLiked;
+      });
+    }
+  }
+
   String formatLikes(int number) {
     if (number >= 1000000000) {
       return (number / 1000000000).toStringAsFixed(1) + 'B';

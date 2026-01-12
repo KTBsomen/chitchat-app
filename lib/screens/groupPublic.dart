@@ -190,225 +190,225 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
     return false;
   }
 
-  _editgroup(BuildContext context) async {
-    String groupName = groupDetails!.groupData['name'];
-    File? logoFile;
-    bool isNameEmpty = false;
-    bool isSubmitted = false;
-    S3Uploader? uploader;
-    TextEditingController groupNameController = TextEditingController();
-    groupNameController.text = groupName;
-    String baseurl =
-        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
-    ValueNotifier<FileUploadProgress> _progressNotifier =
-        ValueNotifier<FileUploadProgress>(
-      FileUploadProgress(fileName: 'Uploading...'),
-    );
-    uploader = S3Uploader(
-      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
-      progressNotifier: _progressNotifier,
-    );
-    // Add your create functionality here
-    showDialog(
-      barrierDismissible: false,
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(builder: (BuildContext context, setState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Row(
-              children: [
-                Icon(Icons.group_add, color: Colors.blue),
-                SizedBox(width: 8),
-                Text(
-                  'Edit Group',
-                  style: TextStyle(
-                      fontSize: 18,
-                      color: AppColors.background,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Poppins'),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Group Name Input
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: groupNameController,
-                        decoration: InputDecoration(
-                          labelText: 'New Group Name',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: const Icon(Icons.group),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            groupName = value;
-                            isNameEmpty = false;
-                          });
-                        },
-                      ),
-                      Visibility(
-                        visible: isNameEmpty,
-                        child: const Text(
-                          "Group Name must be filled",
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
+  // _editgroup(BuildContext context) async {
+  //   String groupName = groupDetails!.groupData['name'];
+  //   File? logoFile;
+  //   bool isNameEmpty = false;
+  //   bool isSubmitted = false;
+  //   S3Uploader? uploader;
+  //   TextEditingController groupNameController = TextEditingController();
+  //   groupNameController.text = groupName;
+  //   String baseurl =
+  //       AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
+  //   ValueNotifier<FileUploadProgress> _progressNotifier =
+  //       ValueNotifier<FileUploadProgress>(
+  //     FileUploadProgress(fileName: 'Uploading...'),
+  //   );
+  //   uploader = S3Uploader(
+  //     presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+  //     progressNotifier: _progressNotifier,
+  //   );
+  //   // Add your create functionality here
+  //   showDialog(
+  //     barrierDismissible: false,
+  //     context: context,
+  //     builder: (BuildContext context) {
+  //       return StatefulBuilder(builder: (BuildContext context, setState) {
+  //         return AlertDialog(
+  //           shape: RoundedRectangleBorder(
+  //             borderRadius: BorderRadius.circular(16),
+  //           ),
+  //           title: const Row(
+  //             children: [
+  //               Icon(Icons.group_add, color: Colors.blue),
+  //               SizedBox(width: 8),
+  //               Text(
+  //                 'Edit Group',
+  //                 style: TextStyle(
+  //                     fontSize: 18,
+  //                     color: AppColors.background,
+  //                     fontWeight: FontWeight.bold,
+  //                     fontFamily: 'Poppins'),
+  //               ),
+  //             ],
+  //           ),
+  //           content: SingleChildScrollView(
+  //             child: Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               children: [
+  //                 // Group Name Input
+  //                 Column(
+  //                   mainAxisAlignment: MainAxisAlignment.start,
+  //                   crossAxisAlignment: CrossAxisAlignment.start,
+  //                   children: [
+  //                     TextField(
+  //                       controller: groupNameController,
+  //                       decoration: InputDecoration(
+  //                         labelText: 'New Group Name',
+  //                         border: OutlineInputBorder(
+  //                           borderRadius: BorderRadius.circular(12),
+  //                         ),
+  //                         prefixIcon: const Icon(Icons.group),
+  //                       ),
+  //                       onChanged: (value) {
+  //                         setState(() {
+  //                           groupName = value;
+  //                           isNameEmpty = false;
+  //                         });
+  //                       },
+  //                     ),
+  //                     Visibility(
+  //                       visible: isNameEmpty,
+  //                       child: const Text(
+  //                         "Group Name must be filled",
+  //                         style: TextStyle(color: Colors.red),
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(height: 20),
 
-                  // Logo Picker
-                  isSubmitted
-                      // ignore: dead_code
-                      ? Visibility(
-                          visible: isSubmitted,
-                          child: UploadProgressWidget(
-                              progressNotifier: _progressNotifier))
-                      : InkWell(
-                          onTap: () async {
-                            final ImagePicker _picker = ImagePicker();
-                            final XFile? image = await _picker.pickImage(
-                              source: ImageSource.gallery,
-                            );
-                            if (image != null) {
-                              logoFile = File(image.path);
-                              setState(() {});
-                            }
-                          },
-                          child: Container(
-                            height: 100,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.blue,
-                              ),
-                            ),
-                            child: logoFile == null
-                                ? const Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.add_photo_alternate,
-                                            size: 40, color: Colors.grey),
-                                        SizedBox(height: 8),
-                                        Text('Choose new Logo'),
-                                      ],
-                                    ),
-                                  )
-                                : ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.file(
-                                      logoFile!,
-                                      fit: BoxFit.fitHeight,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                ],
-              ),
-            ),
-            actionsPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            actions: [
-              // Cancel Button
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-              // Create Button
-              ElevatedButton(
-                onPressed: isSubmitted
-                    ? null
-                    : () async {
-                        if (groupName.length > 0) {
-                          print(groupName);
-                          setState(() {
-                            isNameEmpty = false;
-                            isSubmitted = true;
-                          });
-                          List<String> url = [
-                            groupDetails!.groupData['GroupProfilePic']
-                          ];
-                          if (logoFile != null) {
-                            url = await uploader!.uploadFiles(files: [
-                              logoFile!
-                            ], compressionParams: {
-                              "width": 400,
-                              "quality": 100,
-                            });
-                          }
-                          print(url);
-                          Map<String, dynamic> result =
-                              await GroupsService.updateGroup(
-                                  groupId: groupDetails!.groupId,
-                                  dbIndex: groupDetails!.groupData['dbIndex'],
-                                  groupNames: groupName,
-                                  groupPics: url[0]);
-                          print(result);
-                          if (result['success'] == true) {
-                            if (mounted) {
-                              Navigator.pop(context);
-                              Navigator.pop(context);
-                            }
-                            groupDetails = GroupsService.buildFriendCircleGroup(
-                                result['data']);
-                            setState(() {});
-                            // Navigator.pushReplacement(
-                            //     context,
-                            //     PageTransition(
-                            //         type: PageTransitionType.leftToRight,
-                            //         child: GroupPublicViewScreen(),
-                            //         duration: Duration(milliseconds: 400)));
-                          } else {
-                            _progressNotifier.value =
-                                _progressNotifier.value.copyWith(
-                              stage: UploadStage.failed,
-                              customStageText: "Error Editing Group",
-                              customStageTextDetail:
-                                  "Only one group can be created at a time",
-                              errorMessage: result['error'],
-                            );
-                          }
-                        } else {
-                          setState(() {
-                            isNameEmpty = true;
-                          });
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Save Edits',
-                    style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          );
-        });
-      },
-    );
-  }
+  //                 // Logo Picker
+  //                 isSubmitted
+  //                     // ignore: dead_code
+  //                     ? Visibility(
+  //                         visible: isSubmitted,
+  //                         child: UploadProgressWidget(
+  //                             progressNotifier: _progressNotifier))
+  //                     : InkWell(
+  //                         onTap: () async {
+  //                           final ImagePicker _picker = ImagePicker();
+  //                           final XFile? image = await _picker.pickImage(
+  //                             source: ImageSource.gallery,
+  //                           );
+  //                           if (image != null) {
+  //                             logoFile = File(image.path);
+  //                             setState(() {});
+  //                           }
+  //                         },
+  //                         child: Container(
+  //                           height: 100,
+  //                           width: double.infinity,
+  //                           decoration: BoxDecoration(
+  //                             color: Colors.grey[200],
+  //                             borderRadius: BorderRadius.circular(12),
+  //                             border: Border.all(
+  //                               color: Colors.blue,
+  //                             ),
+  //                           ),
+  //                           child: logoFile == null
+  //                               ? const Center(
+  //                                   child: Column(
+  //                                     mainAxisAlignment:
+  //                                         MainAxisAlignment.center,
+  //                                     children: [
+  //                                       Icon(Icons.add_photo_alternate,
+  //                                           size: 40, color: Colors.grey),
+  //                                       SizedBox(height: 8),
+  //                                       Text('Choose new Logo'),
+  //                                     ],
+  //                                   ),
+  //                                 )
+  //                               : ClipRRect(
+  //                                   borderRadius: BorderRadius.circular(12),
+  //                                   child: Image.file(
+  //                                     logoFile!,
+  //                                     fit: BoxFit.fitHeight,
+  //                                   ),
+  //                                 ),
+  //                         ),
+  //                       ),
+  //               ],
+  //             ),
+  //           ),
+  //           actionsPadding:
+  //               const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  //           actions: [
+  //             // Cancel Button
+  //             TextButton(
+  //               onPressed: () {
+  //                 Navigator.of(context).pop();
+  //               },
+  //               child: const Text(
+  //                 'Cancel',
+  //                 style: TextStyle(color: Colors.grey),
+  //               ),
+  //             ),
+  //             // Create Button
+  //             ElevatedButton(
+  //               onPressed: isSubmitted
+  //                   ? null
+  //                   : () async {
+  //                       if (groupName.length > 0) {
+  //                         print(groupName);
+  //                         setState(() {
+  //                           isNameEmpty = false;
+  //                           isSubmitted = true;
+  //                         });
+  //                         List<String> url = [
+  //                           groupDetails!.groupData['GroupProfilePic']
+  //                         ];
+  //                         if (logoFile != null) {
+  //                           url = await uploader!.uploadFiles(files: [
+  //                             logoFile!
+  //                           ], compressionParams: {
+  //                             "width": 400,
+  //                             "quality": 100,
+  //                           });
+  //                         }
+  //                         print(url);
+  //                         Map<String, dynamic> result =
+  //                             await GroupsService.updateGroup(
+  //                                 groupId: groupDetails!.groupId,
+  //                                 dbIndex: groupDetails!.groupData['dbIndex'],
+  //                                 groupNames: groupName,
+  //                                 groupPics: url[0]);
+  //                         print(result);
+  //                         if (result['success'] == true) {
+  //                           if (mounted) {
+  //                             Navigator.pop(context);
+  //                             Navigator.pop(context);
+  //                           }
+  //                           groupDetails = GroupsService.buildFriendCircleGroup(
+  //                               result['data']);
+  //                           setState(() {});
+  //                           // Navigator.pushReplacement(
+  //                           //     context,
+  //                           //     PageTransition(
+  //                           //         type: PageTransitionType.leftToRight,
+  //                           //         child: GroupPublicViewScreen(),
+  //                           //         duration: Duration(milliseconds: 400)));
+  //                         } else {
+  //                           _progressNotifier.value =
+  //                               _progressNotifier.value.copyWith(
+  //                             stage: UploadStage.failed,
+  //                             customStageText: "Error Editing Group",
+  //                             customStageTextDetail:
+  //                                 "Only one group can be created at a time",
+  //                             errorMessage: result['error'],
+  //                           );
+  //                         }
+  //                       } else {
+  //                         setState(() {
+  //                           isNameEmpty = true;
+  //                         });
+  //                       }
+  //                     },
+  //               style: ElevatedButton.styleFrom(
+  //                 backgroundColor: Colors.blue,
+  //                 shape: RoundedRectangleBorder(
+  //                   borderRadius: BorderRadius.circular(12),
+  //                 ),
+  //               ),
+  //               child: const Text('Save Edits',
+  //                   style: TextStyle(color: Colors.white)),
+  //             ),
+  //           ],
+  //         );
+  //       });
+  //     },
+  //   );
+  // }
 
   @override
   void dispose() {
@@ -638,16 +638,16 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                     children: [
                                       Text(
                                         textAlign: TextAlign.center,
-                                        "Pics",
+                                        "Memories",
                                         style: TextStyle(
                                           color: Colors.black,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 20,
+                                          fontSize: 18,
                                         ),
                                       ),
                                       Container(
                                         height: 6,
-                                        width: 50,
+                                        width: 80,
                                         decoration: BoxDecoration(
                                           borderRadius:
                                               BorderRadius.circular(3),
@@ -949,12 +949,13 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                         )
                                       : posts.isEmpty
                                           ? const Center(
-                                              child: const Text(
-                                                "No Posts Yet 😔",
+                                              child: Text(
+                                                "No shared memories yet 😔",
                                                 style: TextStyle(
-                                                  fontSize: 20,
+                                                  fontSize: 18,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Colors.black,
+                                                  color: Color.fromARGB(
+                                                      255, 66, 65, 65),
                                                 ),
                                               ),
                                             )

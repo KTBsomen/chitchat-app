@@ -26,7 +26,7 @@ import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/userOnline.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:flutterdb/flutterdb.dart';
+
 import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:share_plus/share_plus.dart';
@@ -37,33 +37,47 @@ import 'package:vs_media_picker/vs_media_picker.dart';
 import 'package:chitchat/components/like.dart';
 
 class GroupPrivateViewScreen extends StatefulWidget {
+  final bool? fromRegister;
+  const GroupPrivateViewScreen({super.key, this.fromRegister});
   @override
   _GroupPrivateViewScreenState createState() => _GroupPrivateViewScreenState();
 }
 
 class MemoryItem {
+  final String id;
   final String url;
   final MessageType type;
-  final bool isLocal;
+  final String author;
+  final String group;
+  final int dbIndex;
+  final String authorName;
+  final String profilePic;
+  final DateTime createdAt;
   bool _isPublic;
 
   MemoryItem({
+    required this.id,
     required this.url,
     required this.type,
-    this.isLocal = false,
+    required this.author,
+    required this.group,
+    required this.dbIndex,
+    required this.authorName,
+    required this.profilePic,
+    required this.createdAt,
     bool isPublic = false,
   }) : _isPublic = isPublic;
 
   bool get isPublic => _isPublic;
   set isPublic(bool value) {
     _isPublic = value;
-    AppVariables.setPersistent<bool>(url, value);
   }
 }
 
 class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  ScrollController? _sheetScrollController;
 
   final List<dynamic> posts = [];
   final Map<String, bool> likeStatus = {};
@@ -75,17 +89,14 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   int selectedTab = 0;
   String? expandedMemberId; // Track which member's bio is expanded
 
-  late Collection chats;
   int windowSize = 20;
   int pageinmemories = 2;
-  List<MemoryItem> memories = [];
   FriendCircleGroup? userGroup;
   Map<String, dynamic>? userProfile;
   Map<String, dynamic>? myProfile;
   Timer? _refreshTimer;
 
   final ScrollController _scrollController = ScrollController();
-  final ScrollController _postsScrollController = ScrollController();
   String? next;
   bool isLoadingPost = false;
   bool hasMore = true;
@@ -97,34 +108,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   List<MemoryItem> remoteMemories = [];
   String? nextPageCursor;
   bool isLoading = false;
-
-  final ScrollController _memoriesController = ScrollController();
-
-  Future<List<MemoryItem>> initDB() async {
-    final db = FlutterDB();
-
-    try {
-      chats = await db.collection('chats');
-      final _memories = await chats.find({
-        "\$or": [
-          {"message_type": "voice"},
-          {"message_type": "image"},
-          {"message_type": "video"}
-        ]
-      });
-      return _memories.map((e) {
-        Message _temp = Message.fromJson(e);
-        return MemoryItem(
-          url: _temp.message,
-          type: _temp.messageType,
-          isLocal: true,
-        );
-      }).toList();
-    } on Exception catch (e) {
-      print('Error initializing database: $e');
-      return Future.value([]);
-    }
-  }
 
   Future<void> _fetchMemories({bool refresh = false}) async {
     if (isLoading) return;
@@ -141,12 +124,25 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
           String type = item['media'][0]['type'];
           final isVideo = type.contains("video");
           return MemoryItem(
+            id: item['_id'] ?? '',
             url: url.toString(),
             type: isVideo ? MessageType.video : MessageType.image,
-            isLocal: false,
+            author: item['author'] ?? '',
+            group: item['group'] ?? '',
+            dbIndex: item['dbIndex'] ?? 0,
+            authorName: item['authorName'] ?? '',
+            profilePic: item['profilePic'] ?? '',
+            createdAt:
+                DateTime.tryParse(item['createdAt'] ?? '') ?? DateTime.now(),
             isPublic: item['public'] ?? false,
           );
         }).toList();
+
+        // Deduplicate by id
+        final existingIds = remoteMemories.map((m) => m.id).toSet();
+        newRemoteMemories = newRemoteMemories
+            .where((m) => !existingIds.contains(m.id))
+            .toList();
 
         setState(() {
           if (refresh) remoteMemories.clear();
@@ -163,7 +159,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   }
 
   List<MemoryItem> get allMemories {
-    return [...memories, ...remoteMemories];
+    return remoteMemories;
   }
 
   void _handleProfileUpdate(Map<String, dynamic>? data) {
@@ -190,25 +186,46 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         remoteMemories.insert(
             0,
             MemoryItem(
+              id: value['_id'] ?? '',
               url: value['media'][0]['url'],
               type: value['media'][0]['type'].contains("video")
                   ? MessageType.video
                   : MessageType.image,
-              isLocal: false,
+              author: value['author'] ?? '',
+              group: value['group'] ?? '',
+              dbIndex: value['dbIndex'] ?? 0,
+              authorName: value['authorName'] ?? '',
+              profilePic: value['profilePic'] ?? '',
+              createdAt:
+                  DateTime.tryParse(value['createdAt'] ?? '') ?? DateTime.now(),
+              isPublic: value['public'] ?? false,
             ));
       });
     }
   }
 
+  void shareGroupInvitation() {
+    SharePlus.instance.share(ShareParams(
+      title: "ChitChat Group Invitation",
+      text:
+          'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}',
+      subject: 'Join my group on ChitChat!',
+    ));
+  }
+
   @override
   void initState() {
     super.initState();
+    try {
+      if (widget.fromRegister != null && widget.fromRegister == true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          shareGroupInvitation();
+        });
+      }
+    } catch (e) {
+      print("Error in shareing group invitation : $e");
+    }
     print(profileDetails);
-    initDB().then((value) {
-      setState(() {
-        memories = value;
-      });
-    });
     groupDetails =
         GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
     _getUserLikes();
@@ -223,24 +240,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       });
     });
     _fetchPosts();
-    _postsScrollController.addListener(() {
-      if (_postsScrollController.position.pixels >=
-              _postsScrollController.position.maxScrollExtent - 100 &&
-          !isLoadingPost &&
-          hasMore) {
-        _fetchPosts();
-      }
-    });
     _fetchMemories();
-
-    _memoriesController.addListener(() {
-      if (_memoriesController.position.pixels >=
-          _memoriesController.position.maxScrollExtent - 200) {
-        if (hasMore && !isLoading) {
-          _fetchMemories();
-        }
-      }
-    });
     _fetchUserStatus();
     _startRandomRefreshTimer();
   }
@@ -298,6 +298,21 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     scheduleNext();
   }
 
+  void _sheetScrollListener() {
+    if (_sheetScrollController!.position.pixels >=
+        _sheetScrollController!.position.maxScrollExtent - 200) {
+      if (selectedTab == 0) {
+        if (!isLoadingPost && hasMore) {
+          _fetchPosts();
+        }
+      } else {
+        if (hasMore && !isLoading) {
+          _fetchMemories();
+        }
+      }
+    }
+  }
+
   void _fetchPosts() async {
     if (isLoadingPost) return;
     setState(() {
@@ -312,7 +327,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       print(result);
 
       next = result['data']['next'];
-      posts.addAll(result['data']['posts']);
+      final newPosts = result['data']['posts'] as List;
+      final existingIds = posts.map((p) => p['_id']).toSet();
+      posts.addAll(newPosts.where((p) => !existingIds.contains(p['_id'])));
       setState(() {
         isLoadingPost = false;
         hasMore = next != null;
@@ -602,8 +619,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   void dispose() {
     _tabController.dispose();
     _refreshTimer?.cancel();
-    _postsScrollController.dispose();
-    _memoriesController.dispose();
     _scrollController.dispose();
 
     AppVariables.unregisterState(this);
@@ -1003,11 +1018,24 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
           // DraggableScrollableSheet
           DraggableScrollableSheet(
-            key: ValueKey(selectedTab), // Reset sheet when tab changes
             initialChildSize: 0.5,
             minChildSize: 0.5,
             maxChildSize: 0.9,
             builder: (context, scrollController) {
+              scrollController.addListener(() {
+                if (scrollController.position.pixels >=
+                    scrollController.position.maxScrollExtent - 200) {
+                  if (selectedTab == 0) {
+                    if (!isLoadingPost && hasMore) {
+                      _fetchPosts();
+                    }
+                  } else {
+                    if (hasMore && !isLoading) {
+                      _fetchMemories();
+                    }
+                  }
+                }
+              });
               return Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -1163,9 +1191,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                           children: [
                             // Posts View
                             MasonryGridView.builder(
-                              controller: selectedTab == 0
-                                  ? _postsScrollController
-                                  : null,
+                              controller: scrollController,
                               gridDelegate:
                                   const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
@@ -1205,8 +1231,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
                             // Memories View
                             MasonryGridView.builder(
-                              controller:
-                                  selectedTab == 1 ? _memoriesController : null,
+                              controller: scrollController,
                               gridDelegate:
                                   const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 4,
@@ -1271,6 +1296,12 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                         builder: (_) => MemoryViewer(
                                           memories: allMemories,
                                           initialIndex: index - 1,
+                                          onMemoryDeleted: (memoryId) {
+                                            setState(() {
+                                              remoteMemories.removeWhere(
+                                                  (m) => m.id == memoryId);
+                                            });
+                                          },
                                         ),
                                       ),
                                     );
@@ -1287,6 +1318,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                                   builder: (_) => MemoryViewer(
                                                     memories: allMemories,
                                                     initialIndex: index - 1,
+                                                    onMemoryDeleted:
+                                                        (memoryId) {
+                                                      setState(() {
+                                                        remoteMemories
+                                                            .removeWhere((m) =>
+                                                                m.id ==
+                                                                memoryId);
+                                                      });
+                                                    },
                                                   ),
                                                 ),
                                               );

@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
@@ -218,6 +219,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 12, 12, 38),
+      bottomNavigationBar: AppBottomNav(),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 1,
@@ -245,6 +247,15 @@ class _PublicProfilePageState extends State<PublicProfilePage>
       ),
       body: Stack(
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  color: const Color.fromARGB(255, 12, 12, 38),
+                ),
+              ),
+            ],
+          ),
           // Top Container for Friend Circle
           Container(
             height: MediaQuery.of(context).size.height *
@@ -279,7 +290,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                   nodeSize: (userGroup!.members.length > 5
                                       ? userGroup!.members.length *
                                           currentUpperContainerHeightMultiplier *
-                                          15
+                                          25
                                       : 90.0),
                                   nodeBorderColor: Colors.white24,
                                   maxVisibleMembers: currentMaxVisible,

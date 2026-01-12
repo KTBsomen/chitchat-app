@@ -326,6 +326,108 @@ class PostService {
     }
   }
 
+  /// Delete a memory by its ID
+  /// DELETE /memories/:memoryId
+  static Future<Map<String, dynamic>> deleteMemory(
+      {required String memoryId}) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      if (token == null) {
+        return {
+          "success": false,
+          "error": "User not authenticated",
+        };
+      }
+      final response = await http.delete(
+        Uri.parse('$baseurl/memories/$memoryId'),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "message": "Memory deleted successfully",
+        };
+      } else if (response.statusCode == 403) {
+        return {
+          "success": false,
+          "error": "Unauthorized - you can only delete your own memories",
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          "success": false,
+          "error": "Memory not found",
+        };
+      } else {
+        return {
+          "success": false,
+          "error": "Failed to delete memory",
+        };
+      }
+    } catch (e) {
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
+    }
+  }
+
+  /// Toggle the public visibility of a memory
+  /// PUT /memories/public/:memoryId
+  static Future<Map<String, dynamic>> toggleMemoryPublic({
+    required String memoryId,
+    required bool isPublic,
+  }) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      if (token == null) {
+        return {
+          "success": false,
+          "error": "User not authenticated",
+        };
+      }
+      final response = await http.put(
+        Uri.parse('$baseurl/memories/public/$memoryId'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "public": isPublic,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "data": jsonDecode(response.body),
+        };
+      } else if (response.statusCode == 403) {
+        return {
+          "success": false,
+          "error": "Unauthorized - you can only edit your own memories",
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          "success": false,
+          "error": "Memory not found",
+        };
+      } else {
+        return {
+          "success": false,
+          "error": "Failed to update memory visibility",
+        };
+      }
+    } catch (e) {
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
+    }
+  }
+
   static Future<Map<String, dynamic>?> fetchRelatedPosts({
     required String postId,
     int limit = 10,
