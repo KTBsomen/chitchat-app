@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class UserStory {
-  final String id;
+  final String id; // Primary story ID (first in group)
   final String user;
   final String name;
   final String username;
@@ -18,6 +18,15 @@ class UserStory {
   bool myStory = false;
   final List views;
   final int dbIndex;
+
+  // NEW: Track all individual story IDs in this merged group
+  final List<String> allStoryIds;
+  // NEW: Track all dbIndices for each story
+  final List<int> allStoryDbIndices;
+  // NEW: Latest story timestamp for "new story" detection
+  final DateTime latestStoryDate;
+  // NEW: Map individual story IDs to their respective views
+  final Map<String, List<dynamic>> storyViewsMap;
 
   UserStory({
     required this.id,
@@ -32,9 +41,63 @@ class UserStory {
     required this.date,
     this.myStory = false,
     required this.dbIndex,
-  }) {
-    // Initialize from cache instantly
-    _isViewed = isViewed || StoryPrefs.hasViewedSync(id);
+    List<String>? allStoryIds,
+    List<int>? allStoryDbIndices,
+    DateTime? latestStoryDate,
+    Map<String, List<dynamic>>? storyViewsMap,
+  })  : allStoryIds = allStoryIds ?? [id],
+        allStoryDbIndices = allStoryDbIndices ?? [dbIndex],
+        latestStoryDate = latestStoryDate ?? date,
+        storyViewsMap = storyViewsMap ?? {id: views} {
+    // Initialize viewed state - check if ALL stories in the group are viewed
+    _isViewed = isViewed || _areAllStoriesViewed();
+  }
+
+  /// Check if ALL individual stories in this group have been viewed
+  bool _areAllStoriesViewed() {
+    for (final storyId in allStoryIds) {
+      if (!StoryPrefs.hasViewedSync(storyId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Check if there are any unviewed stories in this group
+  bool hasUnviewedStories() {
+    for (final storyId in allStoryIds) {
+      if (!StoryPrefs.hasViewedSync(storyId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Get total view count across all stories in the group
+  int get totalViewCount {
+    final Set<String> uniqueViewers = {};
+    for (final viewsList in storyViewsMap.values) {
+      for (final view in viewsList) {
+        if (view['userId'] != null) {
+          uniqueViewers.add(view['userId'].toString());
+        }
+      }
+    }
+    return uniqueViewers.length;
+  }
+
+  /// Get all unique views across all stories (deduplicated by userId)
+  List<dynamic> get allUniqueViews {
+    final Map<String, dynamic> uniqueViewsMap = {};
+    for (final viewsList in storyViewsMap.values) {
+      for (final view in viewsList) {
+        final viewerId = view['userId']?.toString() ?? view['_id']?.toString();
+        if (viewerId != null && !uniqueViewsMap.containsKey(viewerId)) {
+          uniqueViewsMap[viewerId] = view;
+        }
+      }
+    }
+    return uniqueViewsMap.values.toList();
   }
 
   bool get isViewed => _isViewed;
@@ -42,26 +105,74 @@ class UserStory {
   set isViewed(bool value) {
     _isViewed = value;
     if (value) {
-      StoryPrefs.markAsViewed(id);
+      // Mark ALL stories in this group as viewed
+      for (final storyId in allStoryIds) {
+        StoryPrefs.markAsViewed(storyId);
+      }
     } else {
-      StoryPrefs.unmarkAsViewed(id);
+      // Unmark ALL stories in this group
+      for (final storyId in allStoryIds) {
+        StoryPrefs.unmarkAsViewed(storyId);
+      }
     }
   }
 
+  /// Mark all stories in this group as viewed on the server
+  Future<void> markAllAsViewedOnServer() async {
+    for (int i = 0; i < allStoryIds.length; i++) {
+      final storyId = allStoryIds[i];
+      final dbIdx =
+          i < allStoryDbIndices.length ? allStoryDbIndices[i] : dbIndex;
+      if (!StoryPrefs.hasViewedSync(storyId)) {
+        await StoryService.markStoryAsViewed(storyId, dbIdx);
+      }
+    }
+    isViewed = true;
+  }
+
+  /// Get the index of the first media item that belongs to an unviewed story
+  /// Returns 0 if all stories are viewed or no unviewed media found
+  int getFirstUnviewedMediaIndex() {
+    for (int i = 0; i < media.length; i++) {
+      final mediaItem = media[i];
+      // Check if this media's parent story is unviewed
+      if (mediaItem.storyId != null &&
+          !StoryPrefs.hasViewedSync(mediaItem.storyId!)) {
+        return i;
+      }
+    }
+    // If no media has storyId or all are viewed, try checking allStoryIds
+    for (int i = 0; i < allStoryIds.length; i++) {
+      if (!StoryPrefs.hasViewedSync(allStoryIds[i])) {
+        // Return the index of first media that might be from this story
+        // Since media is ordered, we can estimate based on story position
+        int mediaPerStory = media.length ~/ allStoryIds.length;
+        return (i * mediaPerStory).clamp(0, media.length - 1);
+      }
+    }
+    return 0; // Default to first media
+  }
+
   factory UserStory.fromJson(Map<String, dynamic> json) {
+    final storyId = json['_id'];
+    final storyViews = json['views'] ?? [];
     return UserStory(
-      id: json['_id'],
+      id: storyId,
       user: json['user'],
       name: json['name'],
       profilePic: json['profilePic'] ?? "https://picsum.photos/200/300",
       username: json['username'],
       visibleTo: json['visibleTo'],
-      views: json['views'] ?? [],
+      views: storyViews,
       date: DateTime.parse(json['createdAt']),
       media: (json['media'] as List)
           .map((item) => MediaItem.fromJson(item))
           .toList(),
       dbIndex: json['dbIndex'] ?? 0,
+      allStoryIds: [storyId],
+      allStoryDbIndices: [json['dbIndex'] ?? 0],
+      latestStoryDate: DateTime.parse(json['createdAt']),
+      storyViewsMap: {storyId: storyViews},
     );
   }
 
@@ -76,13 +187,15 @@ class UserStory {
 class MediaItem {
   final String type;
   final String url;
+  final String? storyId; // Track which story this media belongs to
 
-  MediaItem({required this.type, required this.url});
+  MediaItem({required this.type, required this.url, this.storyId});
 
-  factory MediaItem.fromJson(Map<String, dynamic> json) {
+  factory MediaItem.fromJson(Map<String, dynamic> json, {String? storyId}) {
     return MediaItem(
       type: json['type'],
       url: json['url'],
+      storyId: storyId,
     );
   }
   // To help remove duplicates
@@ -114,13 +227,43 @@ class StoryService {
       String key = '${story.user}-${story.visibleTo}';
 
       if (mergedMap.containsKey(key)) {
-        // Merge media, avoiding duplicates
-        var existingMedia = mergedMap[key]!.media.toSet();
-        var newMedia = story.media.toSet();
-        mergedMap[key]!.media
+        final existing = mergedMap[key]!;
+
+        // Merge media with storyId tracking, avoiding duplicates
+        var existingMedia = existing.media.toSet();
+        var newMedia = story.media
+            .map((m) => MediaItem(
+                  type: m.type,
+                  url: m.url,
+                  storyId: story.id,
+                ))
+            .toSet();
+        existing.media
           ..clear()
           ..addAll([...existingMedia.union(newMedia)]);
+
+        // Add this story's ID to the list of all IDs
+        if (!existing.allStoryIds.contains(story.id)) {
+          existing.allStoryIds.add(story.id);
+          existing.allStoryDbIndices.add(story.dbIndex);
+        }
+
+        // Merge views into the storyViewsMap
+        existing.storyViewsMap[story.id] = story.views;
+
+        // Update latestStoryDate if this story is newer
+        // Note: We need to recreate with updated latestStoryDate
+        // Since latestStoryDate is final, we track it separately
       } else {
+        // Create media items with storyId tracking
+        final mediaWithIds = story.media
+            .map((m) => MediaItem(
+                  type: m.type,
+                  url: m.url,
+                  storyId: story.id,
+                ))
+            .toList();
+
         mergedMap[key] = UserStory(
           id: story.id,
           user: story.user,
@@ -128,17 +271,32 @@ class StoryService {
           name: story.name,
           username: story.username,
           profilePic: story.profilePic,
-          media: [...story.media],
+          media: mediaWithIds,
           date: story.date,
           views: [...story.views],
-          isViewed: story.isViewed,
+          isViewed: false, // Will be recalculated based on allStoryIds
           dbIndex: story.dbIndex,
+          allStoryIds: [story.id],
+          allStoryDbIndices: [story.dbIndex],
+          latestStoryDate: story.date,
+          storyViewsMap: {story.id: story.views},
         );
       }
-      // print(mergedMap[key]!.);
     }
 
-    return mergedMap.values.toList();
+    // After merging, recalculate viewed state for each merged story
+    final result = mergedMap.values.toList();
+
+    // Sort by latest story date (newest first within each group)
+    result.sort((a, b) {
+      // Unviewed stories should come first
+      if (a.hasUnviewedStories() && !b.hasUnviewedStories()) return -1;
+      if (!a.hasUnviewedStories() && b.hasUnviewedStories()) return 1;
+      // Then sort by date (newest first)
+      return b.latestStoryDate.compareTo(a.latestStoryDate);
+    });
+
+    return result;
   }
 
   static Future<List<UserStory>> getMyStories(

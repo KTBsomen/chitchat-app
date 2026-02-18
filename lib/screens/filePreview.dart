@@ -1501,8 +1501,15 @@ class _OptionSelectorState extends State<_OptionSelector> {
     super.initState();
     // _controller.initialize();
     // _fetchMembers();
-    groupDetails =
-        GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
+    try {
+      if (profileDetails!['myGroup'] != null) {
+        groupDetails =
+            GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
+      }
+    } catch (e, s) {
+      print(e);
+      print(s);
+    }
   }
 
   @override

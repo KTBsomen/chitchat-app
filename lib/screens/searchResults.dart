@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/components/recomandedgroups.dart';
@@ -91,6 +92,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      extendBody: true,
+      bottomNavigationBar: AppBottomNav(),
       body: SafeArea(
         child: Column(
           children: [
@@ -99,9 +102,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 20),
                   GestureDetector(
                     onTap: () => setState(() => selectedTab = 0),
                     child: Container(

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 class ImprovedSearchBar extends StatefulWidget {
   final Duration debounceDuration;
+  String selectedType;
   final Function(bool) onLoading;
   final Function(String) onSelectedType;
 
@@ -14,15 +15,18 @@ class ImprovedSearchBar extends StatefulWidget {
   final Function(List<Map<String, dynamic>>) onUserSearchResult;
   final Function(List<Map<String, dynamic>>) onCollegeSearchResult;
   final Function(List<Map<String, dynamic>>) onUniversitySearchResult;
+  final Function(List<Map<String, dynamic>>) onSchoolSearchResult;
 
-  const ImprovedSearchBar({
+  ImprovedSearchBar({
     super.key,
+    required this.selectedType,
     required this.onLoading,
     required this.onSelectedType,
     required this.onGroupSearchResult,
     required this.onUserSearchResult,
     required this.onCollegeSearchResult,
     required this.onUniversitySearchResult,
+    required this.onSchoolSearchResult,
     this.debounceDuration = const Duration(milliseconds: 500),
   });
 
@@ -31,7 +35,6 @@ class ImprovedSearchBar extends StatefulWidget {
 }
 
 class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
-  String selectedType = 'University';
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounceTimer;
@@ -54,7 +57,7 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
     _debounceTimer = Timer(widget.debounceDuration, () async {
       try {
         // Perform the search here
-        if (selectedType == "Groups") {
+        if (widget.selectedType == "Groups") {
           print('Searching for: $query');
           widget.onLoading(true);
           searchResultGroups = await SearchService.searchByGroup(query);
@@ -65,7 +68,7 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
 
           // Call the callback function with the search results
           widget.onGroupSearchResult(searchResultGroups);
-        } else if (selectedType == "Name") {
+        } else if (widget.selectedType == "Name") {
           print('Searching for: $query');
           widget.onLoading(true);
           var searchResultGroups = await SearchService.searchByUser(query);
@@ -76,7 +79,7 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
 
           // Call the callback function with the search results
           widget.onUserSearchResult(searchResultGroups);
-        } else if (selectedType == "College") {
+        } else if (widget.selectedType == "College") {
           print('Searching for: $query');
           widget.onLoading(true);
           var searchResultGroups = await SearchService.searchByCollege(query);
@@ -87,7 +90,7 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
 
           // Call the callback function with the search results
           widget.onCollegeSearchResult(searchResultGroups);
-        } else if (selectedType == "University") {
+        } else if (widget.selectedType == "University") {
           print('Searching for: $query');
           widget.onLoading(true);
           var searchResultGroups =
@@ -99,6 +102,22 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
 
           // Call the callback function with the search results
           widget.onUniversitySearchResult(searchResultGroups);
+        } else if (widget.selectedType == "School") {
+          print('Searching for: $query');
+          widget.onLoading(true);
+          var searchResultGroups = await SearchService.searchBySchool(query);
+          setState(() {});
+          print(searchResultGroups);
+          widget.onLoading(false);
+          widget.onSchoolSearchResult(searchResultGroups);
+        } else if (widget.selectedType == "Passout") {
+          print('Searching passout groups for: $query');
+          widget.onLoading(true);
+          searchResultGroups = await SearchService.searchByGroup(query);
+          setState(() {});
+          print(searchResultGroups);
+          widget.onLoading(false);
+          widget.onGroupSearchResult(searchResultGroups);
         }
       } catch (e) {
         print("Error during search: $e");
@@ -107,6 +126,7 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
         widget.onUserSearchResult([]);
         widget.onCollegeSearchResult([]);
         widget.onUniversitySearchResult([]);
+        widget.onSchoolSearchResult([]);
       }
     });
   }
@@ -166,6 +186,7 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
                 widget.onUserSearchResult([]);
                 widget.onCollegeSearchResult([]);
                 widget.onUniversitySearchResult([]);
+                widget.onSchoolSearchResult([]);
                 setState(() {});
               },
             ),
@@ -180,13 +201,13 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
 
           // Dropdown for search type
           PopupMenuButton<String>(
-            initialValue: selectedType,
+            initialValue: widget.selectedType,
             tooltip: 'Select search type',
             icon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  selectedType,
+                  widget.selectedType,
                   style: TextStyle(
                     color: Theme.of(context).primaryColor,
                     fontWeight: FontWeight.w500,
@@ -201,7 +222,7 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
             ),
             onSelected: (String value) {
               setState(() {
-                selectedType = value;
+                widget.selectedType = value;
                 // Clear text when switching search type
                 _searchController.clear();
                 widget.onSelectedType(value);
@@ -210,8 +231,14 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
               _searchFocusNode.requestFocus();
             },
             itemBuilder: (BuildContext context) {
-              return <String>['Name', 'Groups', 'College', 'University']
-                  .map<PopupMenuItem<String>>((String value) {
+              return <String>[
+                'Name',
+                'Groups',
+                'School',
+                'College',
+                'University',
+                'Passout'
+              ].map<PopupMenuItem<String>>((String value) {
                 return PopupMenuItem<String>(
                   value: value,
                   child: Row(
@@ -232,15 +259,19 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
   }
 
   String _getHintText() {
-    switch (selectedType) {
+    switch (widget.selectedType) {
       case 'Name':
         return 'Search by name...';
       case 'Groups':
         return 'Search friend groups...';
+      case 'School':
+        return 'Search by school...';
       case 'College':
         return 'Search by college...';
       case 'University':
         return 'Search by university...';
+      case 'Passout':
+        return 'Search passout groups...';
       default:
         return 'Search...';
     }
@@ -252,10 +283,14 @@ class _ImprovedSearchBarState extends State<ImprovedSearchBar> {
         return const Icon(Icons.person_outline, size: 20);
       case 'Groups':
         return const Icon(Icons.group_outlined, size: 20);
+      case 'School':
+        return const Icon(Icons.menu_book_outlined, size: 20);
       case 'College':
         return const Icon(Icons.school_outlined, size: 20);
       case 'University':
         return const Icon(Icons.account_balance_outlined, size: 20);
+      case 'Passout':
+        return const Icon(Icons.card_membership_outlined, size: 20);
       default:
         return const Icon(Icons.search, size: 20);
     }

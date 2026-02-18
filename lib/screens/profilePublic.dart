@@ -315,11 +315,11 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 12, 12, 38),
+      extendBody: true,
       bottomNavigationBar: AppBottomNav(),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 1,
+        backgroundColor: AppColors.background,
+        elevation: 3,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

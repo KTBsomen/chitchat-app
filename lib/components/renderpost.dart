@@ -10,6 +10,7 @@ import 'package:chitchat/components/like.dart';
 import 'package:chitchat/components/relatedpost.dart';
 import 'package:chitchat/components/simpleaudioplayer.dart';
 import 'package:chitchat/components/videoWidget.dart';
+import 'package:chitchat/components/feedVideoPlayer.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/notifications.dart';
@@ -1311,7 +1312,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
           children: [
             if (widget.media.first['type'] == 'video')
               FittedBox(
-                child: VideoMessageView(
+                child: FeedVideoPlayer(
                   url: widget.media[0]['url'] ?? '',
                   onTap: () => _openBottomSheet(context),
                 ),

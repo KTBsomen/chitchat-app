@@ -254,11 +254,11 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
 
         setState(() {
           _members = uniqueMembers.values.toList();
-          myGroupId =
-              (jsonData['usersOwnGroupMembers']?['myGroup']?["_id"]) ?? '';
-          if (myGroupId.isEmpty) {
-            throw Exception('You dont have a group so you cannot post a chit.');
-          }
+          // myGroupId =
+          //     (jsonData['usersOwnGroupMembers']?['myGroup']?["_id"]) ?? '';
+          // if (myGroupId.isEmpty) {
+          //   throw Exception('You dont have a group so you cannot post a chit.');
+          // }
 
           _isLoading = false;
         });

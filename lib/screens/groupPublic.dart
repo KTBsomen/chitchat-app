@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatview/chatview.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/createPost.dart';
 import 'package:chitchat/components/friendcircle.dart';
@@ -16,6 +17,7 @@ import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/profilePublic.dart';
+import 'package:chitchat/screens/watchlist.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/posts.dart';
@@ -424,11 +426,13 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
             child: CircularProgressIndicator(),
           )
         : Scaffold(
+            extendBody: true,
             backgroundColor: const Color.fromARGB(255, 12, 12, 38),
+            bottomNavigationBar: AppBottomNav(),
             appBar: AppBar(
               leading: null,
               automaticallyImplyLeading: false,
-              backgroundColor: Colors.transparent,
+              backgroundColor: AppColors.transparent,
               elevation: 3,
               titleSpacing: 0,
               title: GestureDetector(
@@ -974,6 +978,13 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                                               Navigator.of(
                                                                       context)
                                                                   .pop();
+                                                              Navigator.pushReplacement(
+                                                                  context,
+                                                                  PageTransition(
+                                                                      type: PageTransitionType
+                                                                          .leftToRight,
+                                                                      child:
+                                                                          WatchlistPage()));
                                                             },
                                                           ),
                                                         ],

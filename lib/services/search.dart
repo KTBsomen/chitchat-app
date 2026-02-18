@@ -118,4 +118,89 @@ class SearchService {
       throw Exception('Failed to load APIs: ${response.statusCode}');
     }
   }
+
+  static Future<List<Map<String, dynamic>>> searchBySchool(String q) async {
+    String? token = await UserService.getAccessToken();
+    if (token == null) {
+      throw Exception('User is not authenticated. Please log in.');
+    }
+    final response = await http.get(
+      Uri.parse('$baseurl/autocomplete/school?q=$q'),
+      headers: {
+        "content-type": "application/json",
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      throw Exception('Failed to load schools: ${response.statusCode}');
+    }
+  }
+
+  static String _getAutocompletePath(String level) {
+    switch (level) {
+      case 'School':
+        return '/autocomplete';
+      case 'College':
+        return '/autocomplete/college';
+      case 'University':
+        return '/autocomplete/university';
+      default:
+        return '/autocomplete/university';
+    }
+  }
+
+  static Future<Map<String, dynamic>?> fetchInstitutionById(
+      String id, String level) async {
+    String? token = await UserService.getAccessToken();
+    if (token == null) {
+      throw Exception('User is not authenticated. Please log in.');
+    }
+    final prefix = _getAutocompletePath(level);
+    final response = await http.get(
+      Uri.parse('$baseurl$prefix/institution/$id'),
+      headers: {
+        "content-type": "application/json",
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      return null;
+    } else {
+      print('Failed to fetch institution: ${response.statusCode}');
+      return null;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchRecommendedInstitutions(
+      String level) async {
+    String? token = await UserService.getAccessToken();
+    if (token == null) {
+      throw Exception('User is not authenticated. Please log in.');
+    }
+    final prefix = _getAutocompletePath(level);
+    final response = await http.get(
+      Uri.parse('$baseurl$prefix/recommended'),
+      headers: {
+        "content-type": "application/json",
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      print('Failed to load recommended institutions: ${response.statusCode}');
+      return [];
+    }
+  }
 }

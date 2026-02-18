@@ -17,6 +17,8 @@ import 'package:page_transition/page_transition.dart';
 import 'package:deep_link_router/deep_link_router.dart';
 
 import '../components/AdvancedTextFormField.dart';
+import '../components/SelectionBottomSheet.dart';
+import '../services/location_data.dart';
 
 import 'profilePrivet.dart';
 import 'profilePublic.dart';
@@ -41,8 +43,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _birthday,
       _username,
       _educationalBackground,
+      _instituteId,
       _profilePicPath;
   String? _school, _college, _university, _class, _semester, _year;
+  String? _state, _district, _courseName, _institutionName;
   bool _isUsernameValid = false;
   bool _isCheckingUsername = false;
   Timer? _debounce; // Simulate API call for username validation
@@ -203,12 +207,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       "birthday": _birthday,
       "username": _username,
       "educationLevel": _educationalBackground,
+      "instituteId": _instituteId,
       "school": _school,
       "college": _college,
       "university": _university,
       "userClass": _class,
       "semester": _semester,
       "year": _year,
+      "state": _state,
+      "district": _district,
+      "courseName": _courseName,
+      "institutionName": _institutionName,
       "profilePic": value[0] ?? googleUser?.photoUrl,
       "role": "appTest",
       "gender": _gender,
@@ -400,6 +409,272 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       onSelected: (value, controller) {
         controller.text = value["Name of the University"];
         _university = value["Name of the University"];
+      },
+    );
+  }
+
+  /// Builds the State and District selection row with tappable fields
+  Widget _buildStateDistrictSelectors() {
+    return Column(
+      children: [
+        // State Selector with validation
+        FormField<String>(
+          initialValue: _state,
+          validator: (value) {
+            if (_state == null || _state!.isEmpty) {
+              return 'State is required';
+            }
+            return null;
+          },
+          builder: (FormFieldState<String> field) {
+            return InkWell(
+              onTap: () async {
+                final states = await LocationDataService.getStates();
+                if (!mounted) return;
+
+                final selected = await SelectionBottomSheet.show<String>(
+                  context: context,
+                  title: 'Select State',
+                  items: states,
+                  itemLabel: (item) => item,
+                );
+
+                if (selected != null) {
+                  setState(() {
+                    _state = selected;
+                    _district = null; // Reset district when state changes
+                    _institutionName = null; // Reset institution too
+                  });
+                  field.didChange(selected);
+                }
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'State of your $_educationalBackground *',
+                  suffixIcon: const Icon(Icons.arrow_drop_down),
+                  errorText: field.errorText,
+                ),
+                child: Text(
+                  _state ?? 'Tap to select state',
+                  style: TextStyle(
+                    color: _state != null ? Colors.white : Colors.grey,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+
+        // District Selector with validation
+        FormField<String>(
+          initialValue: _district,
+          validator: (value) {
+            if (_district == null || _district!.isEmpty) {
+              return 'District is required';
+            }
+            return null;
+          },
+          builder: (FormFieldState<String> field) {
+            return InkWell(
+              onTap: _state == null
+                  ? null
+                  : () async {
+                      final districts =
+                          await LocationDataService.getDistricts(_state!);
+                      if (!mounted) return;
+
+                      final selected = await SelectionBottomSheet.show<String>(
+                        context: context,
+                        title: 'Select District',
+                        items: districts,
+                        itemLabel: (item) => item,
+                      );
+
+                      if (selected != null) {
+                        setState(() => _district = selected);
+                        field.didChange(selected);
+                      }
+                    },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'District of your $_educationalBackground *',
+                  suffixIcon: const Icon(Icons.arrow_drop_down),
+                  enabled: _state != null,
+                  errorText: field.errorText,
+                ),
+                child: Text(
+                  _district ??
+                      (_state != null
+                          ? 'Tap to select district'
+                          : 'Select state first'),
+                  style: TextStyle(
+                    color: _district != null
+                        ? Colors.white
+                        : (_state != null ? Colors.grey : Colors.grey[600]),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Builds the School Name selector with async API search and validation
+  Widget _buildSchoolNameSelector() {
+    return FormField<String>(
+      initialValue: _institutionName,
+      validator: (value) {
+        if (_institutionName == null || _institutionName!.isEmpty) {
+          return 'School name is required';
+        }
+        return null;
+      },
+      builder: (FormFieldState<String> field) {
+        return InkWell(
+          onTap: () async {
+            final selected =
+                await AsyncSelectionBottomSheet.show<Map<String, dynamic>>(
+              context: context,
+              title: 'Search School',
+              fetchItems: (query) => autocompleteSchool(query, state: _state),
+              itemLabel: (item) => item['school_name'] ?? '',
+              itemBuilder: (item) => ListTile(
+                title: Text(
+                  item['school_name'] ?? '',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  "${item['village'] ?? ''}, ${item['block'] ?? ''}, ${item['district'] ?? ''}, ${item['state'] ?? ''}",
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            );
+
+            if (selected != null) {
+              setState(() {
+                _institutionName = selected['school_name'];
+                _instituteId = selected["_id"];
+                _school = selected['school_name'];
+              });
+              field.didChange(selected['school_name']);
+            }
+          },
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: 'School Name *',
+              suffixIcon: const Icon(Icons.search),
+              errorText: field.errorText,
+            ),
+            child: Text(
+              _institutionName ?? 'Tap to search school',
+              style: TextStyle(
+                color: _institutionName != null ? Colors.white : Colors.grey,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Builds the College/University Name selector with merged API search and validation
+  Widget _buildCollegeUniversityNameSelector() {
+    return FormField<String>(
+      initialValue: _institutionName,
+      validator: (value) {
+        if (_institutionName == null || _institutionName!.isEmpty) {
+          return 'College/University name is required';
+        }
+        return null;
+      },
+      builder: (FormFieldState<String> field) {
+        return InkWell(
+          onTap: () async {
+            final selected =
+                await AsyncSelectionBottomSheet.show<Map<String, dynamic>>(
+              context: context,
+              title: 'Search College / University',
+              fetchItems: (query) =>
+                  autocompleteCollegeAndUniversity(query, state: _state),
+              itemLabel: (item) => item['Name of the college'] ?? '',
+              itemBuilder: (item) => ListTile(
+                isThreeLine: true,
+                title: Text(
+                  item['Name of the college'] ?? '',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item['Affiliated To University'] != null)
+                      Text(
+                        item['Affiliated To University'],
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    Text(
+                      "${item['College address'] ?? ''}, ${item['State'] ?? ''}",
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+
+            if (selected != null) {
+              setState(() {
+                _institutionName = selected['Name of the college'];
+                _instituteId = selected["_id"];
+                // Store in appropriate field based on type
+                if (selected['type'] == 'university') {
+                  _university = selected['Name of the college'];
+                } else {
+                  _college = selected['Name of the college'];
+                }
+              });
+              field.didChange(selected['Name of the college']);
+            }
+          },
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: 'College / University Name *',
+              suffixIcon: const Icon(Icons.search),
+              errorText: field.errorText,
+            ),
+            child: Text(
+              _institutionName ?? 'Tap to search',
+              style: TextStyle(
+                color: _institutionName != null ? Colors.white : Colors.grey,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ),
+        );
       },
     );
   }
@@ -640,6 +915,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                             DropdownButtonFormField<String>(
                               decoration: const InputDecoration(
                                   labelText: "Educational Background"),
+                              value: _educationalBackground,
                               items: [
                                 "School",
                                 "College",
@@ -649,66 +925,88 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                   .map((e) => DropdownMenuItem(
                                       value: e, child: Text(e)))
                                   .toList(),
-                              onChanged: (value) => setState(
-                                  () => _educationalBackground = value),
+                              onChanged: (value) {
+                                setState(() {
+                                  _educationalBackground = value;
+                                  // Reset dependent fields when background changes
+                                  _state = null;
+                                  _district = null;
+                                  _institutionName = null;
+                                });
+                              },
                               onSaved: (value) =>
                                   _educationalBackground = value,
                             ),
-                            if (_educationalBackground == "School")
-                              Column(
-                                children: [
-                                  TextFormField(
-                                    decoration: const InputDecoration(
-                                        labelText: "Class"),
-                                    onChanged: (value) => _class = value,
-                                    onSaved: (value) => _class = value,
-                                  ),
-                                  schoolNameWidget(context)
-                                ],
+
+                            // School-specific fields
+                            if (_educationalBackground == "School") ...[
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                keyboardType: TextInputType.numberWithOptions(
+                                    decimal: true),
+                                decoration: const InputDecoration(
+                                    labelText: "Grade / Class"),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return "Grade/Class is required";
+                                  }
+
+                                  final number = int.tryParse(value);
+
+                                  if (number == null) {
+                                    return "Enter a valid integer";
+                                  }
+
+                                  if (number < 4 || number > 12) {
+                                    return "Should be between 4 and 12";
+                                  }
+
+                                  return null;
+                                },
+                                onChanged: (value) => _class = value,
+                                onSaved: (value) => _class = value,
                               ),
-                            if (_educationalBackground == "University" ||
-                                _educationalBackground == "College")
-                              Column(
-                                children: [
-                                  TextFormField(
-                                    keyboardType: TextInputType.number,
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return "Please enter your Semester";
-                                      }
-                                      return null;
-                                    },
-                                    decoration: const InputDecoration(
-                                        labelText: "Semester"),
-                                    onChanged: (value) => _semester = value,
-                                  ),
-                                  if (_educationalBackground == "University")
-                                    universityNameWidget(context),
-                                  collegeNameWidget(context),
-                                  schoolNameWidget(context)
-                                ],
+                              const SizedBox(height: 12),
+                              _buildStateDistrictSelectors(),
+                              const SizedBox(height: 12),
+                              _buildSchoolNameSelector(),
+                            ],
+
+                            // College or University fields (same UI for both)
+                            if (_educationalBackground == "College" ||
+                                _educationalBackground == "University") ...[
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                decoration: const InputDecoration(
+                                    labelText: "Course Name"),
+                                validator: (value) => value?.isEmpty ?? true
+                                    ? "Course name is required"
+                                    : null,
+                                onChanged: (value) => _courseName = value,
+                                onSaved: (value) => _courseName = value,
                               ),
-                            if (_educationalBackground == "Passout")
-                              Column(
-                                children: [
-                                  TextFormField(
-                                    keyboardType: TextInputType.number,
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return "Please enter Year";
-                                      }
-                                      return null;
-                                    },
-                                    decoration: const InputDecoration(
-                                        labelText: "Year"),
-                                    onChanged: (value) => _year = value,
-                                    onSaved: (value) => _year = value,
-                                  ),
-                                  universityNameWidget(context),
-                                  collegeNameWidget(context),
-                                  schoolNameWidget(context)
-                                ],
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                    labelText: "Semester"),
+                                validator: (value) => value?.isEmpty ?? true
+                                    ? "Semester is required"
+                                    : null,
+                                onChanged: (value) => _semester = value,
+                                onSaved: (value) => _semester = value,
                               ),
+                              const SizedBox(height: 12),
+                              _buildStateDistrictSelectors(),
+                              const SizedBox(height: 12),
+                              _buildCollegeUniversityNameSelector(),
+                            ],
+
+                            // Passout fields - only state and district
+                            if (_educationalBackground == "Passout") ...[
+                              const SizedBox(height: 16),
+                              _buildStateDistrictSelectors(),
+                            ],
                           ],
                         ),
                       ),

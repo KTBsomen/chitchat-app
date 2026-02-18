@@ -33,7 +33,14 @@ class MQTTService {
   String get getClientId => clientId;
   String get getBroker => broker;
   get getClient => _client!;
+  bool _isDisposed = false;
   Future<void> connect(String topc) async {
+    // Don't try to connect if disposed
+    if (_isDisposed) {
+      print('⚠️ MQTT service disposed, skipping connection');
+      return;
+    }
+
     if (_client != null &&
         (_client!.connectionStatus?.state == MqttConnectionState.connected ||
             _client!.connectionStatus?.state ==
@@ -52,8 +59,8 @@ class MQTTService {
       ..onConnected = onConnected
       ..onSubscribed = onSubscribed
       ..onUnsubscribed = onUnSubscribed
-      ..autoReconnect = true
-      ..onAutoReconnect = () => print('🔁 Auto reconnecting...');
+      ..autoReconnect =
+          false; // Disabled - we handle reconnection manually via timer
 
     final connMessage = MqttConnectMessage()
         .authenticateAs('user', token)
@@ -104,15 +111,16 @@ class MQTTService {
   }
 
   void disconnect() {
-    if (_client! != null) {
+    _isDisposed = true;
+    if (_client != null) {
       _client!.disconnect();
       _client = null;
     }
   }
 
   bool get isConnected =>
-      _client! != null &&
-      _client!.connectionStatus!.state == MqttConnectionState.connected;
+      _client != null &&
+      _client!.connectionStatus?.state == MqttConnectionState.connected;
 
   void publish(String message) {
     final builder = MqttClientPayloadBuilder()..addUTF8String(message);

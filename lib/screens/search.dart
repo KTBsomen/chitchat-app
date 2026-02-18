@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/components/searchBar.dart';
 import 'package:chitchat/constants/colors.dart';
@@ -29,97 +30,119 @@ class _SearchPageState extends State<SearchPage> {
   List<Map<String, dynamic>> searchResultUsers = [];
   List<Map<String, dynamic>> searchResultColleges = [];
   List<Map<String, dynamic>> searchResultUniversities = [];
-  List<Map<String, dynamic>> topUniversities = [
-    {
-      "_id": "674dc00e8cefe7ce6e00c3d4",
-      "Name of the University": "COER University, Roorkee",
-      "Address": "7KM. on Roorkee -Haridwar Road, Vardhmanpuram, Roorkee",
-      "Zip": "247667",
-      "State": "Uttarakhand"
-    },
-    {
-      "_id": "674dc00e8cefe7ce6e00c64e",
-      "Name of the University":
-          "Rani Rashmoni Green University(formerly West Bengal Green University.)",
-      "Address":
-          "At the premises of Singur General Degree College, Singur, Hooghly, West Bengal",
-      "Zip": "712409",
-      "state": "West Bengal"
-    },
-    {
-      "_id": "674dc00e8cefe7ce6e00c31f",
-      "Name of the University": "Amity University",
-      "Address": "Rajarhat,  New Town,  Dist. North 24 Parganas",
-      "Zip": "700135",
-      "State": "West Bengal"
-    },
-    {
-      "_id": "674dc00f8cefe7ce6e00c792",
-      "Name of the University": "Woxsen University",
-      "Address": "Woxsen Campus, Kamkole, Sadasivpet, Medak District",
-      "State": "Telangana"
-    },
-    {
-      "_id": "674dc00e8cefe7ce6e00c430",
-      "Name of the University": "Flame University",
-      "Address": "GAT No. 1270Village LavaleTaluka Mulshi, Pune",
-      "Zip": "411042",
-      "state": "Maharashtra"
-    },
-    {
-      "_id": "674dc00e8cefe7ce6e00c397",
-      "Name of the University": "Calcutta University",
-      "Address": "Calcutta University, College Square, Kolkata",
-      "Zip": "700073",
-      "state": "West Bengal"
-    },
-    {
-      "_id": "674dc00f8cefe7ce6e00c70b",
-      "Name of the University": "Symbiosis International University",
-      "Address": "Gram: Lavale, Taluka: Mulshi, District: Pune",
-      "Zip": "412115",
-      "state": "Maharashtra"
-    }
-  ];
+  List<Map<String, dynamic>> searchResultSchools = [];
+  List<Map<String, dynamic>> recommendedInstitutions = [];
+  Map<String, dynamic>? myInstitutionDetails;
+  String? myInstitutionName;
+  bool hasInstitutionId = false;
   double scale = 0.0;
   bool isLoading = true;
   bool isLoadingError = false;
-  void _getMyuniversity() async {
-    var searchResultGroups = await SearchService.searchByUniversity(
-      AppVariables.get<Map<String, dynamic>>("profile")?["university"],
-    );
+  Map<String, dynamic> myUniversity = {};
+  String get _educationLevel {
+    return AppVariables.get<Map<String, dynamic>>(
+            "profile")?["educationLevel"] ??
+        "University";
+  }
 
-    topUniversities =
-        {for (var e in topUniversities) e['_id']: e}.values.toList();
+  String selectedType = "School";
 
-    final myUniversityId = searchResultGroups[0]['_id'];
-
-    for (var uni in topUniversities) {
-      if (uni['_id'] == myUniversityId) {
-        uni['myUniversity'] = true;
-        break;
-      }
+  /// Get the institution name field from profile based on education level
+  String? _getInstitutionNameFromProfile() {
+    final profile = AppVariables.get<Map<String, dynamic>>("profile");
+    if (profile == null) return null;
+    final level = profile['educationLevel'] as String?;
+    switch (level) {
+      case 'School':
+        return profile['school'] as String?;
+      case 'College':
+        return profile['college'] as String?;
+      case 'University':
+        return profile['university'] as String?;
+      default:
+        return null;
     }
-    topUniversities.sort((a, b) {
-      if (a['myUniversity'] == true) return -1;
-      if (b['myUniversity'] == true) return 1;
-      return 0;
-    });
+  }
 
+  /// Fetch institution details by ID if available, otherwise use profile name
+  void _fetchMyInstitution() async {
+    final profile = AppVariables.get<Map<String, dynamic>>("profile");
+    if (profile == null) return;
+
+    final institutionId = profile['instituteId'] as String?;
+    final level = _educationLevel;
+
+    if (institutionId != null &&
+        institutionId != "None" &&
+        institutionId.isNotEmpty) {
+      hasInstitutionId = true;
+      try {
+        final details =
+            await SearchService.fetchInstitutionById(institutionId, level);
+        if (details != null && mounted) {
+          setState(() {
+            myInstitutionDetails = details;
+            // Try common name fields
+            myInstitutionName = details['Name of the University'] ??
+                details['Name of the college'] ??
+                details['school_name'] ??
+                details['name'] ??
+                _getInstitutionNameFromProfile();
+          });
+        }
+      } catch (e) {
+        print('Error fetching institution: $e');
+        if (mounted) {
+          setState(() {
+            myInstitutionName = _getInstitutionNameFromProfile();
+            hasInstitutionId = false;
+          });
+        }
+      }
+    } else {
+      hasInstitutionId = false;
+      setState(() {
+        myInstitutionName = _getInstitutionNameFromProfile();
+      });
+    }
+  }
+
+  /// Fetch recommended institutions for the user's education level from server
+  void _fetchRecommendedInstitutions({String? searchLevel}) async {
     setState(() {
-      isLoading = false;
+      isLoading = true;
     });
+    final level = searchLevel ?? _educationLevel;
+    if (level == 'Passout') {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+    try {
+      final results = await SearchService.fetchRecommendedInstitutions(level);
+      if (mounted) {
+        setState(() {
+          recommendedInstitutions = results;
+        });
+      }
+    } catch (e) {
+      print('Error fetching recommended institutions: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    if (AppVariables.get<Map<String, dynamic>>("profile")?["university"] !=
-        null) {
-      _getMyuniversity();
-    }
+    _fetchMyInstitution();
+    _fetchRecommendedInstitutions();
     _getGroups();
+    selectedType = _educationLevel;
+    setState(() {});
   }
 
   _getGroups() async {
@@ -156,10 +179,11 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
-  String selectedType = "University";
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
+      bottomNavigationBar: AppBottomNav(),
       body: Container(
         decoration: BoxDecoration(
           color: AppColors.background,
@@ -197,12 +221,14 @@ class _SearchPageState extends State<SearchPage> {
               height: 20,
             ),
             ImprovedSearchBar(
+              selectedType: selectedType,
               onLoading: (p0) {
                 setState(() {
                   isLoading = p0;
                 });
               },
               onSelectedType: (p0) {
+                _fetchRecommendedInstitutions(searchLevel: p0);
                 setState(() {
                   selectedType = p0;
                 });
@@ -220,6 +246,11 @@ class _SearchPageState extends State<SearchPage> {
               onUniversitySearchResult: (p0) {
                 setState(() {
                   searchResultUniversities = p0;
+                });
+              },
+              onSchoolSearchResult: (p0) {
+                setState(() {
+                  searchResultSchools = p0;
                 });
               },
               onUserSearchResult: (p0) {
@@ -260,7 +291,11 @@ class _SearchPageState extends State<SearchPage> {
                                     ? _searchUniversities()
                                     : selectedType == "College"
                                         ? _searchColleges()
-                                        : _recomandedFC(),
+                                        : selectedType == "School"
+                                            ? _searchSchools()
+                                            : selectedType == "Passout"
+                                                ? _searchPassouts()
+                                                : _recomandedFC(),
                           ),
               ),
             ),
@@ -715,75 +750,80 @@ class _SearchPageState extends State<SearchPage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 10),
                       child: GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              final bioList = user?['bio'] ?? [];
-                              return AlertDialog(
-                                backgroundColor: AppColors.background,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20)),
-                                title: Row(
-                                  children: [
-                                    Icon(Icons.info_outline,
-                                        color: AppColors.textSecondary),
-                                    SizedBox(width: 8),
-                                    Text('Bio History',
-                                        style: TextStyle(
-                                            fontFamily: "Poppins",
-                                            color: AppColors.primary)),
-                                  ],
-                                ),
-                                content: bioList.isEmpty
-                                    ? Text("No bio available.",
-                                        style: TextStyle(
-                                            fontFamily: "Poppins",
-                                            color: AppColors.success))
-                                    : SizedBox(
-                                        width: double.maxFinite,
-                                        child: ListView.separated(
-                                          shrinkWrap: true,
-                                          itemCount: bioList.length,
-                                          separatorBuilder: (_, __) =>
-                                              Divider(),
-                                          itemBuilder: (context, idx) {
-                                            final bioObj =
-                                                GroupsService.parseBio(
-                                                    bioList[idx]);
-                                            return ListTile(
-                                              title: Text(
-                                                bioObj.bio ?? "No bio",
-                                                style: TextStyle(
-                                                    fontFamily: "Poppins",
-                                                    color: Colors.white),
-                                              ),
-                                              subtitle: Text(
-                                                "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[700],
+                        onTap: user?['bio'].length > 0 &&
+                                !(user?['bio'] as List).contains(null)
+                            ? () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    final bioList = user?['bio'] ?? [];
+                                    return AlertDialog(
+                                      backgroundColor: AppColors.background,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(20)),
+                                      title: Row(
+                                        children: [
+                                          Icon(Icons.info_outline,
+                                              color: AppColors.textSecondary),
+                                          SizedBox(width: 8),
+                                          Text('Bio History',
+                                              style: TextStyle(
                                                   fontFamily: "Poppins",
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
+                                                  color: AppColors.primary)),
+                                        ],
                                       ),
-                                actions: [
-                                  TextButton(
-                                    child: Text('Close',
-                                        style: TextStyle(
-                                            fontFamily: "Poppins",
-                                            color: AppColors.primary)),
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
+                                      content: bioList.isEmpty ||
+                                              bioList == null
+                                          ? Text("No bio available.",
+                                              style: TextStyle(
+                                                  fontFamily: "Poppins",
+                                                  color: AppColors.success))
+                                          : SizedBox(
+                                              width: double.maxFinite,
+                                              child: ListView.separated(
+                                                shrinkWrap: true,
+                                                itemCount: bioList.length,
+                                                separatorBuilder: (_, __) =>
+                                                    Divider(),
+                                                itemBuilder: (context, idx) {
+                                                  final bioObj =
+                                                      GroupsService.parseBio(
+                                                          bioList[idx]);
+                                                  return ListTile(
+                                                    title: Text(
+                                                      bioObj.bio ?? "No bio",
+                                                      style: TextStyle(
+                                                          fontFamily: "Poppins",
+                                                          color: Colors.white),
+                                                    ),
+                                                    subtitle: Text(
+                                                      "Edited by: ${bioObj.editedBy ?? 'Unknown'}",
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[700],
+                                                        fontFamily: "Poppins",
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                      actions: [
+                                        TextButton(
+                                          child: Text('Close',
+                                              style: TextStyle(
+                                                  fontFamily: "Poppins",
+                                                  color: AppColors.primary)),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              }
+                            : null,
                         child: Text(
                           user?['bio'].length > 0 &&
                                   !(user?['bio'] as List).contains(null)
@@ -840,72 +880,139 @@ class _SearchPageState extends State<SearchPage> {
     ];
   }
 
+  /// Builds the "Your domain" card showing the user's institution
+  Widget _buildMyDomainCard() {
+    final level = _educationLevel;
+    final displayName = myInstitutionName ?? 'Unknown';
+
+    // Determine the address to show — only when institutionId was found and details fetched
+    String? address;
+    if (hasInstitutionId && myInstitutionDetails != null) {
+      address = myInstitutionDetails!['Address'] ??
+          myInstitutionDetails!['College address'] ??
+          myInstitutionDetails!['address'];
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 10),
+        Text(
+          "Your $level domain",
+          textAlign: TextAlign.left,
+          style: TextStyle(
+              fontSize: 15,
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.bold,
+              color: Colors.white),
+        ),
+        SizedBox(height: 10, child: Divider()),
+        Card(
+          color: Color.fromRGBO(33, 25, 55, 1),
+          margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListTile(
+            title: Text(
+              displayName,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                  color: Colors.white),
+            ),
+            subtitle: address != null
+                ? Text(
+                    'Address: $address',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Poppins',
+                        color: Colors.white70),
+                  )
+                : null,
+            onTap: () {
+              if (displayName != 'Unknown') {
+                Navigator.push(
+                  context,
+                  PageTransition(
+                    type: PageTransitionType.rightToLeft,
+                    child: SearchResultsPage(
+                      name: displayName,
+                      type: level,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds the recommended institutions list (fetched from server)
+  Widget _buildRecommendedList(String label, String nameKey, String type) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 10),
+        Text(
+          "Recommended $label",
+          textAlign: TextAlign.left,
+          style: TextStyle(
+              fontSize: 15,
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.bold,
+              color: Colors.white),
+        ),
+        SizedBox(height: 10, child: Divider()),
+      ],
+    );
+  }
+
   List<Widget> _searchUniversities() {
     return searchResultUniversities.isEmpty
         ? [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  height: 10,
-                ),
-                Text(
-                  "Recommended Universities",
-                  textAlign: TextAlign.left,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
-                ),
-                SizedBox(
-                  height: 10,
-                  child: Divider(),
-                ),
-              ],
-            ),
+            _buildMyDomainCard(),
+            _buildRecommendedList(
+                'Universities', 'Name of the University', 'University'),
             Expanded(
                 child: ListView.builder(
-              itemCount: topUniversities.length,
+              itemCount: recommendedInstitutions.length,
               itemBuilder: (context, index) {
-                final user = topUniversities[index];
+                final inst = recommendedInstitutions[index];
+                final name =
+                    inst['Name of the University'] ?? inst['name'] ?? 'Unknown';
                 return Card(
-                  color: user['myUniversity'] != null &&
-                          user['myUniversity'] == true
-                      ? Color.fromRGBO(33, 25, 55, 1)
-                      : Colors.transparent,
+                  color: Colors.transparent,
                   margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ListTile(
                     title: Text(
-                      user['Name of the University'] ?? 'Unknown',
+                      name,
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontFamily: 'Poppins',
                           color: Colors.white),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (user['Address'] != null)
-                          Text(
-                            'Address: ${user['Address']}',
+                    subtitle: inst['Address'] != null
+                        ? Text(
+                            'Address: ${inst['Address']}',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontFamily: 'Poppins',
                                 color: Colors.white70),
-                          ),
-                      ],
-                    ),
+                          )
+                        : null,
                     onTap: () {
                       Navigator.push(
                         context,
                         PageTransition(
                           type: PageTransitionType.rightToLeft,
                           child: SearchResultsPage(
-                            name: user['Name of the University'],
+                            name: name,
                             type: "University",
                           ),
                         ),
@@ -920,9 +1027,7 @@ class _SearchPageState extends State<SearchPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  height: 10,
-                ),
+                SizedBox(height: 10),
                 Text(
                   "${searchResultUniversities.length} Universities Found",
                   textAlign: TextAlign.left,
@@ -932,10 +1037,7 @@ class _SearchPageState extends State<SearchPage> {
                       fontWeight: FontWeight.bold,
                       color: Colors.white),
                 ),
-                SizedBox(
-                  height: 10,
-                  child: Divider(),
-                ),
+                SizedBox(height: 10, child: Divider()),
               ],
             ),
             Expanded(
@@ -957,19 +1059,15 @@ class _SearchPageState extends State<SearchPage> {
                           fontFamily: 'Poppins',
                           color: Colors.white),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (user['Address'] != null)
-                          Text(
+                    subtitle: user['Address'] != null
+                        ? Text(
                             'Address: ${user['Address']}',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontFamily: 'Poppins',
                                 color: Colors.white70),
-                          ),
-                      ],
-                    ),
+                          )
+                        : null,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -990,15 +1088,278 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   List<Widget> _searchColleges() {
+    return searchResultColleges.isEmpty
+        ? [
+            _buildMyDomainCard(),
+            _buildRecommendedList('Colleges', 'Name of the college', 'College'),
+            Expanded(
+                child: ListView.builder(
+              itemCount: recommendedInstitutions.length,
+              itemBuilder: (context, index) {
+                final inst = recommendedInstitutions[index];
+                final name =
+                    inst['Name of the college'] ?? inst['name'] ?? 'Unknown';
+                return Card(
+                  color: Colors.transparent,
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      name,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                          color: Colors.white),
+                    ),
+                    subtitle: inst['College address'] != null
+                        ? Text(
+                            'Address: ${inst['College address']}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Poppins',
+                                color: Colors.white70),
+                          )
+                        : null,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.rightToLeft,
+                          child: SearchResultsPage(
+                            name: name,
+                            type: "College",
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            )),
+          ]
+        : [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 10),
+                Text(
+                  "${searchResultColleges.length} Colleges Found",
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                ),
+                SizedBox(height: 10, child: Divider()),
+              ],
+            ),
+            Expanded(
+                child: ListView.builder(
+              itemCount: searchResultColleges.length,
+              itemBuilder: (context, index) {
+                final user = searchResultColleges[index];
+                return Card(
+                  color: Colors.transparent,
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      user['Name of the college'] ?? 'Unknown',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                          color: Colors.white),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (user['Affiliated To University'] != null)
+                          Text(
+                            'Affiliated To University: ${user['Affiliated To University']}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Poppins',
+                                color: Colors.white70),
+                          ),
+                        if (user['College address'] != null)
+                          Text(
+                            'College address: ${user['College address']}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Poppins',
+                                color: Colors.white70),
+                          ),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.rightToLeft,
+                          child: SearchResultsPage(
+                            name: user['Name of the college'],
+                            type: "College",
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            )),
+          ];
+  }
+
+  /// Search results for schools — same pattern as colleges/universities
+  List<Widget> _searchSchools() {
+    return searchResultSchools.isEmpty
+        ? [
+            _buildMyDomainCard(),
+            _buildRecommendedList('Schools', 'school_name', 'School'),
+            Expanded(
+                child: ListView.builder(
+              itemCount: recommendedInstitutions.length,
+              itemBuilder: (context, index) {
+                final inst = recommendedInstitutions[index];
+                final name = inst['school_name'] ?? inst['name'] ?? 'Unknown';
+                return Card(
+                  color: Colors.transparent,
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      name,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                          color: Colors.white),
+                    ),
+                    subtitle: (() {
+                      final location = [
+                        inst['village'],
+                        inst['district'],
+                        inst['state'],
+                      ]
+                          .where((v) =>
+                              v != null && v.toString().trim().isNotEmpty)
+                          .join(', ');
+                      return location.isNotEmpty
+                          ? Text(
+                              location,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'Poppins',
+                                  color: Colors.white70),
+                            )
+                          : null;
+                    })(),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.rightToLeft,
+                          child: SearchResultsPage(
+                            name: name,
+                            type: "School",
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            )),
+          ]
+        : [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 10),
+                Text(
+                  "${searchResultSchools.length} Schools Found",
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                ),
+                SizedBox(height: 10, child: Divider()),
+              ],
+            ),
+            Expanded(
+                child: ListView.builder(
+              itemCount: searchResultSchools.length,
+              itemBuilder: (context, index) {
+                final school = searchResultSchools[index];
+                return Card(
+                  color: Colors.transparent,
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      school['school_name'] ?? school['name'] ?? 'Unknown',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                          color: Colors.white),
+                    ),
+                    subtitle: (() {
+                      final location = [
+                        school['village'],
+                        school['district'],
+                        school['state'],
+                      ]
+                          .where((v) =>
+                              v != null && v.toString().trim().isNotEmpty)
+                          .join(', ');
+                      return location.isNotEmpty
+                          ? Text(
+                              location,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'Poppins',
+                                  color: Colors.white70),
+                            )
+                          : null;
+                    })(),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        PageTransition(
+                          type: PageTransitionType.rightToLeft,
+                          child: SearchResultsPage(
+                            name: school['school_name'] ?? school['name'],
+                            type: "School",
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            )),
+          ];
+  }
+
+  /// Passout tab — shows group rings just like the Groups/FC tab
+  List<Widget> _searchPassouts() {
     return [
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 10,
-          ),
+        children: const [
+          SizedBox(height: 10),
           Text(
-            "${searchResultColleges.length} Colleges Found",
+            "Passout Groups",
             textAlign: TextAlign.left,
             style: TextStyle(
                 fontSize: 15,
@@ -1006,68 +1367,62 @@ class _SearchPageState extends State<SearchPage> {
                 fontWeight: FontWeight.bold,
                 color: Colors.white),
           ),
-          SizedBox(
-            height: 10,
-            child: Divider(),
-          ),
+          SizedBox(height: 10, child: Divider()),
         ],
       ),
       Expanded(
-          child: ListView.builder(
-        itemCount: searchResultColleges.length,
-        itemBuilder: (context, index) {
-          final user = searchResultColleges[index];
-          return Card(
-            color: Colors.transparent,
-            margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ListTile(
-              title: Text(
-                user['Name of the college'] ?? 'Unknown',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                    color: Colors.white),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (user['Affiliated To University'] != null)
-                    Text(
-                      'Affiliated To University: ${user['Affiliated To University']}',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'Poppins',
-                          color: Colors.white70),
-                    ),
-                  if (user['College address'] != null)
-                    Text(
-                      'College address: ${user['College address']}',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'Poppins',
-                          color: Colors.white70),
-                    ),
-                ],
-              ),
-              onTap: () {
+        child: InteractiveViewer(
+          onInteractionUpdate: (details) {
+            setState(() {
+              scale = details.scale;
+            });
+          },
+          maxScale: 10.0,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: FriendCircleLayout(
+              groups: groups,
+              spacing: 10 * scale,
+              crossAxisCount: 2,
+              defaultEdgeStyle: EdgeStyle(
+                  color: const Color.fromARGB(255, 189, 190, 190),
+                  width: 6,
+                  outerGlow: 3.0,
+                  outerGlowColor: Colors.blue.withOpacity(0.3),
+                  cornerRadius: 100.0,
+                  gradientColors: [
+                    Colors.blue,
+                    Colors.pink,
+                    Colors.orange,
+                  ]),
+              onGroupTap: (groupId, groupData) {
+                print('Group $groupId tapped with data: $groupData');
                 Navigator.push(
                   context,
                   PageTransition(
                     type: PageTransitionType.rightToLeft,
-                    child: SearchResultsPage(
-                      name: user['Name of the college'],
-                      type: "College",
+                    child: GroupPublicViewScreen(
+                      groupId: groupId,
                     ),
                   ),
                 );
               },
+              onMemberTap: (groupId, memberId, memberData) {
+                print(
+                    'Member $memberId in group $groupId tapped with data: $memberData');
+                Navigator.push(
+                  context,
+                  PageTransition(
+                    type: PageTransitionType.rightToLeft,
+                    child: PublicProfilePage(
+                        dbIndex: memberData['dbIndex'], uid: memberId),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      )),
+          ),
+        ),
+      ),
     ];
   }
 }

@@ -28,31 +28,18 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
   void updateViewOnStory(StoryItem item, int index) async {
     print(
         "Story shown: $item at index $index for user index $currentUserIndex");
-    if (currentUserIndex < widget.storyItems.length - 1) {
-      if (widget.storyItems[currentUserIndex].isViewed == false) {
-        if (widget.storyItems[currentUserIndex].myStory) {
-          return;
-        }
-        await StoryService.markStoryAsViewed(
-          widget.storyItems[currentUserIndex].id,
-          widget.storyItems[currentUserIndex].dbIndex,
-        );
-      }
-      widget.storyItems[currentUserIndex].isViewed = true;
+    final currentStory = widget.storyItems[currentUserIndex];
+
+    // Skip if this is my own story
+    if (currentStory.myStory) {
+      return;
+    }
+
+    // Mark ALL stories in this merged group as viewed
+    if (currentStory.hasUnviewedStories()) {
+      await currentStory.markAllAsViewedOnServer();
       AppVariables.update("story_viewed_index", widget.initialIndex);
-      print("this is called");
-    } else {
-      if (widget.storyItems[currentUserIndex].myStory) {
-        return;
-      }
-      if (widget.storyItems[currentUserIndex].isViewed == false) {
-        StoryService.markStoryAsViewed(
-          widget.storyItems[currentUserIndex].id,
-          widget.storyItems[currentUserIndex].dbIndex,
-        );
-      }
-      widget.storyItems[currentUserIndex].isViewed = true;
-      AppVariables.update("story_viewed_index", widget.initialIndex);
+      print("All stories in group marked as viewed");
     }
   }
 
@@ -66,29 +53,25 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
       print(
           "after user index $currentUserIndex ${widget.storyItems[currentUserIndex]}");
 
-      if (widget.storyItems[currentUserIndex].isViewed == false) {
-        if (widget.storyItems[currentUserIndex].myStory) {
-          return;
-        }
-        await StoryService.markStoryAsViewed(
-          widget.storyItems[currentUserIndex].id,
-          widget.storyItems[currentUserIndex].dbIndex,
-        );
-      }
-      widget.storyItems[currentUserIndex].isViewed = true;
-      AppVariables.update("story_viewed_index", widget.initialIndex);
-    } else {
-      if (widget.storyItems[currentUserIndex].myStory) {
+      final currentStory = widget.storyItems[currentUserIndex];
+
+      // Skip marking if this is my own story
+      if (currentStory.myStory) {
         return;
       }
-      if (widget.storyItems[currentUserIndex].isViewed == false) {
-        StoryService.markStoryAsViewed(
-          widget.storyItems[currentUserIndex].id,
-          widget.storyItems[currentUserIndex].dbIndex,
-        );
+
+      // Mark ALL stories in this merged group as viewed
+      if (currentStory.hasUnviewedStories()) {
+        await currentStory.markAllAsViewedOnServer();
+        AppVariables.update("story_viewed_index", widget.initialIndex);
       }
-      widget.storyItems[currentUserIndex].isViewed = true;
-      AppVariables.update("story_viewed_index", widget.initialIndex);
+    } else {
+      final currentStory = widget.storyItems[currentUserIndex];
+
+      if (!currentStory.myStory && currentStory.hasUnviewedStories()) {
+        await currentStory.markAllAsViewedOnServer();
+        AppVariables.update("story_viewed_index", widget.initialIndex);
+      }
 
       Navigator.pop(context); // Close when all stories are done
     }
@@ -103,24 +86,38 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
   List<StoryItem> _loadStories(int index) {
     UserStory story = widget.storyItems[index];
     List<StoryItem> storyItems = [];
-    for (var item in story.media) {
+
+    // Get the first unviewed media index
+    int firstUnviewedIndex = story.getFirstUnviewedMediaIndex();
+
+    // Build story items for each media
+    for (int i = 0; i < story.media.length; i++) {
+      final item = story.media[i];
+      StoryItem storyItem;
+
       if (item.type == 'video') {
-        storyItems.add(
-          StoryItem.pageVideo(
-            item.url,
-            controller: controller,
-          ),
+        storyItem = StoryItem.pageVideo(
+          item.url,
+          controller: controller,
         );
       } else {
-        storyItems.add(
-          StoryItem.pageImage(
-            url: item.url,
-            controller: controller,
-          ),
+        storyItem = StoryItem.pageImage(
+          url: item.url,
+          controller: controller,
         );
       }
+
+      storyItems.add(storyItem);
     }
-    storyItems.sort((a, b) => (a.shown ? 1 : 0).compareTo(b.shown ? 1 : 0));
+
+    // Reorder: put items from firstUnviewedIndex at the start, then wrap around
+    if (firstUnviewedIndex > 0 && storyItems.isNotEmpty) {
+      final unviewedFirst = [
+        ...storyItems.sublist(firstUnviewedIndex),
+        ...storyItems.sublist(0, firstUnviewedIndex),
+      ];
+      return unviewedFirst;
+    }
 
     return storyItems;
   }
@@ -273,7 +270,9 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
               maxChildSize: 0.5,
               expand: true,
               builder: (context, scrollController) {
-                final views = widget.storyItems[currentUserIndex].views;
+                // Use aggregated views from ALL stories in this group
+                final currentStory = widget.storyItems[currentUserIndex];
+                final views = currentStory.allUniqueViews;
                 return Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.92),
@@ -324,8 +323,7 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
                             return ListTile(
                               trailing: Icon(
                                 Icons.circle,
-                                color: widget.storyItems[currentUserIndex]
-                                    .getColor(),
+                                color: currentStory.getColor(),
                               ),
                               leading: CircleAvatar(
                                 backgroundImage:

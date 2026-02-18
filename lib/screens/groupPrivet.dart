@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatview/chatview.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/createPost.dart';
 import 'package:chitchat/components/friendcircle.dart';
@@ -662,6 +663,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 12, 12, 38),
+      extendBody: true,
+      bottomNavigationBar: AppBottomNav(),
       appBar: AppBar(
         leading: null,
         automaticallyImplyLeading: false,

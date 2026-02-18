@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/profilePrivet.dart';
 import 'package:chitchat/screens/search.dart';
@@ -6,10 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
 
 class AppBottomNav extends StatefulWidget {
-  /// Optional callbacks for pages that need refresh logic
   final VoidCallback? onHomeRefresh;
-
-  /// Default selected index (optional)
   final int initialIndex;
 
   const AppBottomNav({
@@ -33,7 +31,6 @@ class _AppBottomNavState extends State<AppBottomNav> {
 
   void _onItemTapped(int index) {
     if (_activeIndex == index) {
-      // Re-tap logic (Home refresh etc.)
       if (index == 0 && widget.onHomeRefresh != null) {
         widget.onHomeRefresh!();
       }
@@ -46,15 +43,12 @@ class _AppBottomNavState extends State<AppBottomNav> {
       case 0:
         widget.onHomeRefresh?.call();
         break;
-
       case 1:
         _navigate(SearchPage());
         break;
-
       case 2:
         _navigate(WatchlistPage());
         break;
-
       case 3:
         _navigate(PrivetProfilePage());
         break;
@@ -76,36 +70,40 @@ class _AppBottomNavState extends State<AppBottomNav> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(
-        left: 10,
-        right: 10,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(50),
-          topRight: Radius.circular(50),
-        ),
-      ),
-      child: BottomAppBar(
-        height: 60,
-        notchMargin: 0,
-        color: AppColors.Secondarybackground,
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(100),
-            topRight: Radius.circular(100),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(Icons.home_rounded, 0),
-              _navItem(Icons.search_rounded, 1),
-              // const SizedBox(width: 30), // FAB gap
-              _navItem(Icons.favorite_rounded, 2),
-              _navItem(Icons.groups, 3),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(50),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: 65,
+            decoration: BoxDecoration(
+              // color: Colors.white.withOpacity(0.08),
+              color: AppColors.background.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(50),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 30,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _navItem(Icons.home_rounded, 0),
+                _navItem(Icons.search_rounded, 1),
+                _navItem(Icons.favorite_rounded, 2),
+                _navItem(Icons.groups, 3),
+              ],
+            ),
           ),
         ),
       ),
@@ -115,10 +113,24 @@ class _AppBottomNavState extends State<AppBottomNav> {
   Widget _navItem(IconData icon, int index) {
     final isSelected = _activeIndex == index;
 
-    return IconButton(
-      icon: Icon(icon, size: 30),
-      color: isSelected ? AppColors.warning : Colors.white,
-      onPressed: () => _onItemTapped(index),
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.warning.withOpacity(0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Icon(
+          icon,
+          size: 26,
+          color: isSelected ? AppColors.warning : Colors.white.withOpacity(0.5),
+        ),
+      ),
     );
   }
 }

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/createPost.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
@@ -75,14 +77,17 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     _fetchPosts();
     AppVariables.registerState(this);
     AppVariables.addListener<Map<String, dynamic>>("posts", _handlePostUpdate);
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 100 &&
-          !isLoadingPost &&
-          hasMore) {
-        _fetchPosts();
-      }
-    });
+    AppVariables.addListener("deleted_posts", _handlePostDelete);
+  }
+
+  void _handlePostDelete(value) {
+    print("Post deleted from AppVariables listener: $value");
+    if (mounted) {
+      Navigator.canPop(context) ? Navigator.pop(context) : null;
+      setState(() {
+        posts.removeWhere((post) => post['_id'] == value);
+      });
+    }
   }
 
   @override
@@ -92,6 +97,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     _scrollController.dispose();
     super.dispose();
   }
+
+  Completer<void> profileReady = Completer();
 
   _getMyprofile() async {
     final result = await UserService.fetchMyProfile();
@@ -103,7 +110,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
       if (mounted) {
         setState(() {});
       }
-
+      profileReady.complete();
       if (result['group'] != null) {
         myGroup = result['group'] as FriendCircleGroup;
         if (mounted) {
@@ -141,6 +148,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     setState(() {
       isLoadingPost = true;
     });
+
+    await profileReady.future;
     Map<String, dynamic> result = await PostService.fetchMyPosts(
       userid: myProfile?['_id'] ?? "673f607d6fbb68a8c5368967",
       limit: 10,
@@ -151,7 +160,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
 
       next = result['data']['next'];
       posts.addAll(result['data']['posts']);
-      AppVariables.update("posts", posts);
+      // AppVariables.update("posts", posts);
       setState(() {
         isLoadingPost = false;
         hasMore = next != null;
@@ -423,6 +432,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 12, 12, 38),
+      extendBody: true,
+      bottomNavigationBar: AppBottomNav(),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 1,
@@ -836,7 +847,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                 crossAxisSpacing: 8,
                                 itemCount: posts.length,
                                 itemBuilder: (context, index) {
-                                  final post = posts.reversed.toList()[index];
+                                  final post = posts[index];
                                   if (post?['media'] == null)
                                     return Container();
                                   else if (post?['media'].runtimeType ==

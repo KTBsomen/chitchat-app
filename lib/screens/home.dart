@@ -16,6 +16,8 @@ import 'package:event_handeler/event_handeler.dart';
 import 'package:shimmer/shimmer.dart';
 import "package:story_view/story_view.dart";
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/appstate/storyPrefs.dart';
+
 import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/constants/colors.dart';
@@ -358,9 +360,10 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print("Error: $e");
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+        });
     }
   }
 
@@ -368,11 +371,37 @@ class _HomePageState extends State<HomePage> {
   List<UserStory> myStories = [];
 
   Future<void> _getStories({bool? invalidate}) async {
-    final response = await StoryService.getStories(invalidate: invalidate);
-    setState(() {
-      userStories = StoryService.sortStories(response);
-    });
-    print(userStories);
+    // Ensure StoryPrefs is initialized for the current user before fetching
+    try {
+      await StoryPrefs.init();
+      final response = await StoryService.getStories(invalidate: invalidate);
+      setState(() {
+        userStories = StoryService.sortStories(response);
+      });
+      print(userStories);
+    } on Exception catch (e) {
+      if (e.toString().contains("User is not authenticated")) {
+        showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+                  title: Text("Session Expired"),
+                  content:
+                      Text("Your session has expired. Please login again."),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => LoginScreen(),
+                            ));
+                      },
+                      child: Text("Login"),
+                    ),
+                  ],
+                ));
+      }
+    }
   }
 
   Future<void> _getMyStories({bool? invalidate}) async {
@@ -392,204 +421,210 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: AppColors.background,
-        cardColor: const Color(0xFF1E1E1E),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: AppColors.background,
-          selectedItemColor: Color.fromARGB(255, 85, 0, 150),
-          unselectedItemColor: Colors.grey,
-        ),
-      ),
-      child: Scaffold(
-        body: RefreshIndicator(
-          onRefresh: () async {
-            _refreshItems(invalidate: "true");
-            _getStories();
-            _getMyStories(invalidate: true);
-          },
-          child: CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              _buildAppBar(),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 170,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    itemCount: userStories.length + 1, // +1 for "Me"
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        // --- My Story ---
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: _StoryItem(
-                            clicked_index: 0,
-                            onTap: () {
-                              if (myStories.isNotEmpty) {
-                                Navigator.push(
-                                  context,
-                                  PageTransition(
-                                    isIos: true,
-                                    type: PageTransitionType.rightToLeft,
-                                    child: StoryListScreen(
-                                      storyItems: myStories,
-                                      initialIndex: "Me",
-                                    ),
-                                    curve: Curves.fastEaseInToSlowEaseOut,
-                                    duration: const Duration(milliseconds: 500),
-                                  ),
-                                );
-                              } else {
-                                show(context);
-                              }
-                            },
-                            userStory: UserStory(
-                              dbIndex: 0,
-                              id: "__",
-                              username: "Me",
-                              name: "Me",
-                              user: profileDetails?["_id"] ?? "__",
-                              media: [],
-                              views: [],
-                              visibleTo: "me",
-                              date: DateTime.now(),
-                              profilePic: profileDetails?["profilePic"] ??
-                                  "https://unsplash.it/200/300",
-                            ),
-                            stories: myStories,
-                          ),
-                        );
-                      } else {
-                        // --- Other users' stories ---
-                        final userStory = userStories[index - 1];
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: _StoryItem(
-                            clicked_index: index - 1,
-                            // onTap: () => openStory(userStory),
-                            userStory: userStory,
-                            stories: userStories, //all stories,
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ),
-              _buildFeed(),
-              if (_isLoading)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
-            ],
+    return PopScope(
+      child: Theme(
+        data: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: AppColors.background,
+          cardColor: const Color(0xFF1E1E1E),
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            backgroundColor: AppColors.background,
+            selectedItemColor: Color.fromARGB(255, 85, 0, 150),
+            unselectedItemColor: Colors.grey,
           ),
         ),
-        floatingActionButton: Container(
-          height: 65,
-          width: 65,
-          margin: const EdgeInsets.only(top: 0),
-          child: FloatingActionButton(
-            backgroundColor: Colors.blue,
-            elevation: 8,
-
-            // onPressed: () async {
-            //   Navigator.push(
-            //     context,
-            //     MaterialPageRoute(
-            //         builder: (context) => FlutterStoryEditor(
-            //             controller: controller,
-            //             captionController: _captionController,
-            //             selectedFiles: [],
-            //             onSaveClickListener: (files) {
-            //               // Navigator.push(
-            //               //   context,
-            //               //   MaterialPageRoute(
-            //               //     builder: (context) => ImagesPage(files: files),
-            //               //   ),
-            //               // );
-            //             })),
-            //   );
-            //   // .then((whatsappStoryEditorResult) {
-            //   //   if (whatsappStoryEditorResult != null) {
-            //   //     print(
-            //   //         "whatsappStoryEditorResult: $whatsappStoryEditorResult");
-            //   //   }
-            //   // });
-            // },
-
-            onPressed: () {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => const CameraPage()));
-
-              // VSStoryDesigner(
-              //       centerText: "Start Creating Your chit",
-              //       // fontFamilyList: const [
-              //       //   FontType.abrilFatface,
-              //       //   FontType.alegreya,
-              //       //   FontType.typewriter
-              //       // ],
-              //       middleBottomWidget: IconButton(
-              //         icon: Icon(
-              //           Icons.camera_alt,
-              //           color: Colors.white,
-              //           size: 35,
-              //         ),
-              //         onPressed: () {
-              //           Navigator.push(
-              //             context,
-              //             MaterialPageRoute(
-              //               builder: (context) => CameraPage(),
-              //             ),
-              //           );
-              //         },
-              //       ),
-              //       themeType: ThemeType
-              //           .light, // OPTIONAL, Default ThemeType.dark
-              //       galleryThumbnailQuality: 250,
-              //       onDone: (uri) {
-              //         debugPrint(uri);
-              //         //Share.shareUri(Uri.file(uri));
-              //       },
-              //       onDoneButtonStyle: Container(
-              //           padding: EdgeInsets.all(10),
-              //           decoration: BoxDecoration(
-              //               color: Colors.blue,
-              //               borderRadius: BorderRadius.circular(10)),
-              //           child: const Text(
-              //             'Done',
-              //             style: TextStyle(color: Colors.white),
-              //           )),
-              //     )
-              // UserService.signOut(
-              //   (p0) {},
-              // ).then(
-              //   (value) {
-              //     Navigator.pushAndRemoveUntil(
-              //       context,
-              //       PageTransition(
-              //         child: LoginScreen(),
-              //         type: PageTransitionType.fade,
-              //       ),
-              //       (route) => false,
-              //     );
-              //   },
-              // );
+        child: Scaffold(
+          body: RefreshIndicator(
+            onRefresh: () async {
+              _refreshItems(invalidate: "true");
+              _getStories();
+              _getMyStories(invalidate: true);
             },
-            child: const Icon(
-              Icons.camera_alt_rounded,
-              size: 35,
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                _buildAppBar(),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 170,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      itemCount: userStories.length + 1, // +1 for "Me"
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          // --- My Story ---
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: _StoryItem(
+                              clicked_index: 0,
+                              onTap: () {
+                                if (myStories.isNotEmpty) {
+                                  Navigator.push(
+                                    context,
+                                    PageTransition(
+                                      isIos: true,
+                                      type: PageTransitionType.rightToLeft,
+                                      child: StoryListScreen(
+                                        storyItems: myStories,
+                                        initialIndex: "Me",
+                                      ),
+                                      curve: Curves.fastEaseInToSlowEaseOut,
+                                      duration:
+                                          const Duration(milliseconds: 500),
+                                    ),
+                                  );
+                                } else {
+                                  show(context);
+                                }
+                              },
+                              userStory: UserStory(
+                                dbIndex: 0,
+                                id: "__",
+                                username: "Me",
+                                name: "Me",
+                                user: profileDetails?["_id"] ?? "__",
+                                media: [],
+                                views: [],
+                                visibleTo: "me",
+                                date: DateTime.now(),
+                                profilePic: profileDetails?["profilePic"] ??
+                                    "https://unsplash.it/200/300",
+                              ),
+                              stories: myStories,
+                            ),
+                          );
+                        } else {
+                          // --- Other users' stories ---
+                          final userStory = userStories[index - 1];
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: _StoryItem(
+                              clicked_index: index - 1,
+                              // onTap: () => openStory(userStory),
+                              userStory: userStory,
+                              stories: userStories, //all stories,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                _buildFeed(),
+                if (_isLoading)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+              ],
             ),
-            shape: const CircleBorder(),
           ),
+          floatingActionButton: Container(
+            height: 65,
+            width: 65,
+            margin: const EdgeInsets.only(top: 0),
+            child: FloatingActionButton(
+              backgroundColor: Colors.blue,
+              elevation: 8,
+
+              // onPressed: () async {
+              //   Navigator.push(
+              //     context,
+              //     MaterialPageRoute(
+              //         builder: (context) => FlutterStoryEditor(
+              //             controller: controller,
+              //             captionController: _captionController,
+              //             selectedFiles: [],
+              //             onSaveClickListener: (files) {
+              //               // Navigator.push(
+              //               //   context,
+              //               //   MaterialPageRoute(
+              //               //     builder: (context) => ImagesPage(files: files),
+              //               //   ),
+              //               // );
+              //             })),
+              //   );
+              //   // .then((whatsappStoryEditorResult) {
+              //   //   if (whatsappStoryEditorResult != null) {
+              //   //     print(
+              //   //         "whatsappStoryEditorResult: $whatsappStoryEditorResult");
+              //   //   }
+              //   // });
+              // },
+
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const CameraPage()));
+
+                // VSStoryDesigner(
+                //       centerText: "Start Creating Your chit",
+                //       // fontFamilyList: const [
+                //       //   FontType.abrilFatface,
+                //       //   FontType.alegreya,
+                //       //   FontType.typewriter
+                //       // ],
+                //       middleBottomWidget: IconButton(
+                //         icon: Icon(
+                //           Icons.camera_alt,
+                //           color: Colors.white,
+                //           size: 35,
+                //         ),
+                //         onPressed: () {
+                //           Navigator.push(
+                //             context,
+                //             MaterialPageRoute(
+                //               builder: (context) => CameraPage(),
+                //             ),
+                //           );
+                //         },
+                //       ),
+                //       themeType: ThemeType
+                //           .light, // OPTIONAL, Default ThemeType.dark
+                //       galleryThumbnailQuality: 250,
+                //       onDone: (uri) {
+                //         debugPrint(uri);
+                //         //Share.shareUri(Uri.file(uri));
+                //       },
+                //       onDoneButtonStyle: Container(
+                //           padding: EdgeInsets.all(10),
+                //           decoration: BoxDecoration(
+                //               color: Colors.blue,
+                //               borderRadius: BorderRadius.circular(10)),
+                //           child: const Text(
+                //             'Done',
+                //             style: TextStyle(color: Colors.white),
+                //           )),
+                //     )
+                // UserService.signOut(
+                //   (p0) {},
+                // ).then(
+                //   (value) {
+                //     Navigator.pushAndRemoveUntil(
+                //       context,
+                //       PageTransition(
+                //         child: LoginScreen(),
+                //         type: PageTransitionType.fade,
+                //       ),
+                //       (route) => false,
+                //     );
+                //   },
+                // );
+              },
+              child: const Icon(
+                Icons.camera_alt_rounded,
+                size: 35,
+              ),
+              shape: const CircleBorder(),
+            ),
+          ),
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerDocked,
+          bottomNavigationBar: buildBottomNav(),
         ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: buildBottomNav(),
       ),
     );
   }
@@ -862,10 +897,10 @@ class _StoryItem extends StatelessWidget {
   }
 
   bool isEverythingViewed() {
+    // Use the new method that checks ALL story IDs in each merged group
     for (var story in filterStories()) {
-      print(
-          "story ${story.id} user ${story.name} ${story.media} isviewd ${story.isViewed}");
-      if (!story.isViewed) {
+      // If any story in the filtered list has unviewed stories, return false
+      if (story.hasUnviewedStories()) {
         return false;
       }
     }
@@ -962,7 +997,7 @@ class _StoryItem extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            // Small bars at bottom (status indicators)
+            // Small bars at bottom (status indicators - always show type color)
             ...[
               Column(
                 children: [
@@ -970,9 +1005,8 @@ class _StoryItem extends StatelessWidget {
                     width: 34,
                     height: 3,
                     decoration: BoxDecoration(
-                      color: userStory.isViewed
-                          ? Colors.grey
-                          : userStory.getColor(),
+                      // Always show type color - these indicate story type, not viewed state
+                      color: userStory.getColor(),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -981,9 +1015,8 @@ class _StoryItem extends StatelessWidget {
                     width: 15,
                     height: 3,
                     decoration: BoxDecoration(
-                      color: userStory.isViewed
-                          ? Colors.grey
-                          : userStory.getColor(),
+                      // Always show type color - these indicate story type, not viewed state
+                      color: userStory.getColor(),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

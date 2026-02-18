@@ -42,6 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
       AppVariables.get<Map<String, dynamic>>('profile');
   FriendCircleGroup? groupDetails;
   late final MQTTService mqtt;
+  bool _mqttInitialized = false;
 
   AppTheme theme = DarkTheme();
   bool isDarkTheme = true;
@@ -76,6 +77,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _getToken(d) async {
+    // Prevent duplicate MQTT initialization
+    if (_mqttInitialized) {
+      print('⚠️ MQTT already initialized, skipping');
+      return;
+    }
+    _mqttInitialized = true;
+
     mqtt = MQTTService(
       broker: '13.204.86.50',
       // broker: '192.168.139.222',
@@ -97,8 +105,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Timer? timer;
   void runMqttCheck(d) {
-    timer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    // Cancel existing timer before creating new one
+    timer?.cancel();
+
+    timer = Timer.periodic(const Duration(seconds: 10), (t) {
+      // Check if widget is still mounted before doing anything
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+
       if (!mqtt.isConnected) {
+        print('🔁 Auto reconnecting...');
         mqtt.connect("$d/+");
       } else {
         print("elements of messageQueue: ${messageQueue}");
@@ -507,17 +525,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    // TODO: implement dispose
-    super.dispose();
-    PresenceManager().onChatPageClosed();
-
-    try {
-      mqtt.disconnect();
-    } catch (e) {
-      print(e);
-    }
+    // Cancel timer first to stop reconnection attempts
     timer?.cancel();
+    timer = null;
+
+    // Disconnect MQTT
+    try {
+      if (_mqttInitialized) {
+        mqtt.disconnect();
+      }
+    } catch (e) {
+      print('Error disconnecting MQTT: $e');
+    }
+
+    PresenceManager().onChatPageClosed();
     clearMessageNotification();
+
+    // Call super.dispose() LAST
+    super.dispose();
   }
 
   void _showHideTypingIndicator() {
