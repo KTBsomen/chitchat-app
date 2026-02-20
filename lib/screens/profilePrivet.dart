@@ -71,7 +71,6 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     _getMyprofile();
     _fetchPosts();
@@ -433,7 +432,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 12, 12, 38),
       extendBody: true,
-      bottomNavigationBar: AppBottomNav(),
+      bottomNavigationBar: AppBottomNav(highlightIndex: 3),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 1,

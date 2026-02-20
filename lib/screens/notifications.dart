@@ -1,14 +1,21 @@
 import 'dart:async';
 
+import 'package:chitchat/appstate/joinRequestPrefs.dart';
+import 'package:chitchat/appstate/notification_store.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/screens/groupPublic.dart';
 import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/notification.dart';
+import 'package:chitchat/services/notification_manager.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NotificationModel — for group join/post voting requests
+// ─────────────────────────────────────────────────────────────────────────────
 class NotificationModel {
   final String id;
   final String type;
@@ -38,9 +45,12 @@ class NotificationModel {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NotificationCard — renders a single group join/post request card
+// ─────────────────────────────────────────────────────────────────────────────
 class NotificationCard extends StatefulWidget {
   final NotificationModel notification;
-  final Function(String) onVote; // Callback for voting
+  final Function(String) onVote;
 
   const NotificationCard({
     Key? key,
@@ -99,14 +109,11 @@ class _NotificationCardState extends State<NotificationCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return widget.notification.type != 'joinGroup'
         ? const SizedBox.shrink()
         : Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            elevation: isDarkMode ? 8 : 2,
+            elevation: 2,
             shadowColor: Colors.black.withOpacity(0.1),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -115,25 +122,15 @@ class _NotificationCardState extends State<NotificationCard> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 color: AppColors.Secondarybackground,
-                // gradient: LinearGradient(
-                //   begin: Alignment.topLeft,
-                //   end: Alignment.bottomRight,
-                //   colors: [Colors.black, Colors.grey[900]!],
-                // ),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header with title and type indicator
                     _buildHeader(),
                     const SizedBox(height: 16),
-
-                    // Main content area
                     _buildMainContent(),
-
-                    // Voting section
                     _buildVotingSection(),
                   ],
                 ),
@@ -210,7 +207,6 @@ class _NotificationCardState extends State<NotificationCard> {
       },
       child: Row(
         children: [
-          // Profile image with online indicator
           Stack(
             children: [
               Container(
@@ -247,8 +243,6 @@ class _NotificationCardState extends State<NotificationCard> {
             ],
           ),
           const SizedBox(width: 16),
-
-          // User details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,9 +256,6 @@ class _NotificationCardState extends State<NotificationCard> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // _buildEducationInfo('School', requestBody['school']),
-                // _buildEducationInfo('College', requestBody['college']),
-                // _buildEducationInfo('University', requestBody['university']),
                 _buildEducationInfo(
                     'Education Level', requestBody['educationLevel']),
               ],
@@ -345,36 +336,10 @@ class _NotificationCardState extends State<NotificationCard> {
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        // border: Border.all(color: Colors.grey[200]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // "Progress" text row
-          // Row(
-          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          //   children: [
-          //     Text(
-          //       'Progress',
-          //       style: TextStyle(
-          //         fontSize: 14,
-          //         color: Colors.grey[600],
-          //         fontWeight: FontWeight.w500,
-          //       ),
-          //     ),
-          //     Text(
-          //       '${(_voteProgress * 100).toInt()}%',
-          //       style: TextStyle(
-          //         fontSize: 14,
-          //         color: Colors.grey[600],
-          //         fontWeight: FontWeight.w600,
-          //       ),
-          //     ),
-          //   ],
-          // ),
-          // const SizedBox(height: 8),
-
-          // Progress bar styled like a button
           GestureDetector(
             onTap: _handleVote,
             child: Stack(
@@ -391,7 +356,6 @@ class _NotificationCardState extends State<NotificationCard> {
                     ),
                   ),
                 ),
-                // Centered text on top of progress bar
                 Text(
                   'Tapin ($votes)',
                   style: const TextStyle(
@@ -410,10 +374,7 @@ class _NotificationCardState extends State<NotificationCard> {
               ],
             ),
           ),
-
           const SizedBox(height: 8),
-
-          // "x out of y members voted" text
           Text(
             '$votes out of $totalMembers members voted',
             textAlign: TextAlign.center,
@@ -428,6 +389,136 @@ class _NotificationCardState extends State<NotificationCard> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// JoinRequestStatusCard — shows the user's own outgoing request status
+// ─────────────────────────────────────────────────────────────────────────────
+class JoinRequestStatusCard extends StatelessWidget {
+  final Map<String, dynamic> request;
+
+  const JoinRequestStatusCard({Key? key, required this.request})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final groupName = request['groupName'] ?? 'Unknown Group';
+    final votes = request['votes'] ?? 0;
+    final totalMembers = request['totalMembers'] ?? 1;
+    final status = request['status'] ?? 'pending';
+    final progress =
+        totalMembers > 0 ? (votes / totalMembers).clamp(0.0, 1.0) : 0.0;
+
+    // Parse expiry
+    String expiryText = '';
+    final expiresAt = request['expiresAt'] as String?;
+    if (expiresAt != null) {
+      try {
+        final expiry = DateTime.parse(expiresAt);
+        final remaining = expiry.difference(DateTime.now());
+        if (remaining.isNegative) {
+          expiryText = 'Expired';
+        } else if (remaining.inHours > 0) {
+          expiryText = '${remaining.inHours}h remaining';
+        } else {
+          expiryText = '${remaining.inMinutes}m remaining';
+        }
+      } catch (_) {}
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: AppColors.Secondarybackground,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.send, size: 14, color: Colors.blue),
+                      SizedBox(width: 4),
+                      Text('My Request',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                if (expiryText.isNotEmpty)
+                  Text(expiryText,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: expiryText == 'Expired'
+                              ? Colors.red
+                              : Colors.grey[500])),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Group name
+            Text(
+              groupName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Vote progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: progress.toDouble(),
+                minHeight: 28,
+                backgroundColor: AppColors.background,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  status == 'approved'
+                      ? Colors.green
+                      : progress > 0.5
+                          ? Colors.green
+                          : Colors.orange,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Vote count text
+            Text(
+              status == 'approved'
+                  ? '✅ Approved! You\'re in!'
+                  : '$votes / $totalMembers votes',
+              style: TextStyle(
+                fontSize: 12,
+                color: status == 'approved' ? Colors.green : Colors.grey[500],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NotificationsScreen — main screen with Personal / Group tabs
+// ─────────────────────────────────────────────────────────────────────────────
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
 
@@ -437,48 +528,76 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen>
     with SingleTickerProviderStateMixin {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
-  final _scrollController = ScrollController();
   bool _isLoading = false;
-  List<NotificationModel> _notifications = [];
-  List<UnifiedNotification> _unifiedNotifications = [];
+  List<NotificationModel> _groupNotifications = [];
+  List<Map<String, dynamic>> _personalNotifications = [];
+  List<Map<String, dynamic>> _myJoinRequests = [];
 
-  int _page = 1;
-  int _limit = 10;
-  int _total = 0;
-  int _totalPages = 0;
-  bool _hasMore = true;
-  bool _isLoadingMore = false;
   FriendCircleGroup? myGroup;
   Map<String, dynamic>? myProfile;
   late TabController _tabController;
 
-  _getMyprofile() async {
-    setState(() {
-      _isLoading = true;
+  // Unread counts per tab
+  int _personalUnread = 0;
+  int _groupUnread = 0;
+
+  /// Auto-poll interval (configurable).
+  static const Duration _pollInterval = Duration(seconds: 60);
+  Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
     });
+
+    _loadData();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      if (mounted) _loadData(silent: true);
+    });
+  }
+
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
+
+    await NotificationStore.init();
+    await JoinRequestPrefs.init();
+
+    // Fetch profile + group
+    await _getMyprofile();
+
+    // Fetch new notifications from server (stores locally)
+    await NotificationService.getNotifications(context, showLoaders: false);
+
+    // Fetch group join requests if user has a group
+    if (myGroup != null && myGroup!.groupId != 'defaultGroup') {
+      await _fetchGroupJoinRequests();
+    }
+
+    // Fetch my outgoing join request statuses
+    await _fetchMyJoinRequestStatuses();
+
+    // Load stored notifications for display
+    _loadFromStore();
+
+    setState(() => _isLoading = false);
+  }
+
+  _getMyprofile() async {
     final result = await UserService.fetchMyProfile();
 
     if (result['success']) {
-      print('Profile fetched successfully:');
-      print(result['data']);
       myProfile = result['data'];
-      if (mounted) {
-        setState(() {});
-      }
-
       if (result['group'] != null) {
         myGroup = result['group'] as FriendCircleGroup;
-        if (mounted) {
-          setState(() {});
-        }
-        print('Group Name: ${myGroup?.groupData['name']}');
-        print('Members:');
-        for (var member in myGroup!.members) {
-          print('  - ${member.additionalData['memberName']}');
-        }
       } else {
-        print('No group found for this user.');
         myGroup = FriendCircleGroup(
           groupId: 'defaultGroup',
           groupData: {'name': 'Default Group'},
@@ -491,117 +610,78 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         groupData: {'name': 'Default Group'},
         members: [],
       );
-      print('Error fetching profile: ${result['error']}');
-    }
-    setState(() {});
-  }
-
-  void _getGroupJoinReqests() async {
-    List<Map<String, dynamic>> jsonData =
-        (await NotificationService.getGroupJoinRequests(
-            context, myGroup!.groupId,
-            showLoaders: false))!;
-
-    final apiNotifications =
-        jsonData.map((data) => NotificationModel.fromJson(data)).toList();
-
-    final unifiedApiNotifications = apiNotifications
-        .map((n) => UnifiedNotification.fromNotificationModel(n))
-        .toList();
-
-    if (mounted) {
-      setState(() {
-        _unifiedNotifications
-            .removeWhere((n) => n.sourceType == NotificationSourceType.api);
-        _unifiedNotifications.addAll(unifiedApiNotifications);
-        _unifiedNotifications
-            .sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        _isLoading = false;
-      });
     }
   }
 
-  void _getNotification() async {
-    List<AppNotification>? jsonData =
-        await NotificationService.getNotifications(context, showLoaders: false);
-
-    if (jsonData == null) return;
-
-    final unifiedRedisNotifications = jsonData
-        .map((n) => UnifiedNotification.fromAppNotification(n))
-        .toList();
-
-    if (mounted) {
-      setState(() {
-        _unifiedNotifications
-            .removeWhere((n) => n.sourceType == NotificationSourceType.redis);
-        _unifiedNotifications.addAll(unifiedRedisNotifications);
-        _unifiedNotifications
-            .sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      });
+  Future<void> _fetchGroupJoinRequests() async {
+    final jsonData = await NotificationService.getGroupJoinRequests(
+        context, myGroup!.groupId,
+        showLoaders: false);
+    if (jsonData != null && mounted) {
+      _groupNotifications =
+          jsonData.map((data) => NotificationModel.fromJson(data)).toList();
     }
+  }
+
+  Future<void> _fetchMyJoinRequestStatuses() async {
+    final requestIds = JoinRequestPrefs.getAllRequestIds();
+    if (requestIds.isEmpty) {
+      _myJoinRequests = [];
+      return;
+    }
+
+    final results =
+        await NotificationService.checkJoinRequestStatuses(requestIds);
+
+    // Update prefs with server data (removes expired/missing)
+    await JoinRequestPrefs.updateStatuses(results, requestIds);
+
+    // Get updated pending list
+    _myJoinRequests = JoinRequestPrefs.getAllPending();
+  }
+
+  void _loadFromStore() {
+    final allStored = NotificationStore.getAll();
+
+    // Personal = source type 'redis'
+    _personalNotifications =
+        allStored.where((n) => n['sourceType'] == 'redis').toList();
+
+    // Count unreads per tab
+    _personalUnread =
+        _personalNotifications.where((n) => n['isRead'] == false).length;
+    _groupUnread = allStored
+        .where((n) => n['sourceType'] == 'api' && n['isRead'] == false)
+        .length;
   }
 
   List _voted = [];
   void _onVote(String id) async {
-    if (_voted.contains(id)) {
-      return;
-    }
+    if (_voted.contains(id)) return;
+
     bool res = await NotificationService.vote(context, id, onRefresh: () {
-      _getGroupJoinReqests();
-      _getNotification();
+      _loadData();
     });
-    setState(() {
-      _notifications = _notifications.map((n) {
-        if (n.id == id && res) {
-          return NotificationModel(
-            id: n.id,
-            type: n.type,
-            requestBody: n.requestBody,
-            votes: n.votes + 1,
-            totalMembers: n.totalMembers,
-            userId: n.userId,
-          );
-        }
-        return n;
-      }).toList();
-    });
-    _voted.add(id);
-  }
-
-  // Timer removed - centralized NotificationManager handles polling
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  _clearAllNotificationsfromServer() async {
-    await NotificationService.clearAllNotificationsfromServer(context);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    NotificationService.clearAllUnreadNotifications();
-    _getMyprofile().then((_) {
-      _getGroupJoinReqests();
-      _getNotification();
-      _clearAllNotificationsfromServer();
-    });
+    if (res) {
+      _voted.add(id);
+      // Mark as read in store
+      await NotificationStore.markAsRead(id);
+      if (mounted) {
+        _loadFromStore();
+        setState(() {});
+      }
+    }
   }
 
   Future<void> _refreshNotifications() async {
-    setState(() => _isLoading = true);
-    try {
-      _getGroupJoinReqests();
-      _getNotification();
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    await _loadData();
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -614,9 +694,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         title: const Text('Notifications'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Personal'),
-            Tab(text: 'Group'),
+          tabs: [
+            _buildTab('Personal', _personalUnread),
+            _buildTab('Group', _groupUnread),
           ],
         ),
       ),
@@ -625,178 +705,260 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildPersonalNotificationsList(),
-                _buildGroupNotificationsList(),
+                _buildPersonalTab(),
+                _buildGroupTab(),
               ],
             ),
     );
   }
 
-  Widget _buildPersonalNotificationsList() {
-    final personalNotifications = _unifiedNotifications
-        .where((n) => n.sourceType == NotificationSourceType.redis)
-        .toList();
+  /// Tab with optional red badge dot
+  Widget _buildTab(String label, int unreadCount) {
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (unreadCount > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                unreadCount > 99 ? '99+' : '$unreadCount',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Personal Tab ─────────────────────────────────────────────────────
+
+  Widget _buildPersonalTab() {
+    final hasJoinRequests = _myJoinRequests.isNotEmpty;
+    final hasPersonal = _personalNotifications.isNotEmpty;
 
     return RefreshIndicator(
       color: Colors.white,
       backgroundColor: AppColors.primary,
       onRefresh: _refreshNotifications,
-      child: personalNotifications.isEmpty
+      child: (!hasJoinRequests && !hasPersonal)
           ? const SingleChildScrollView(
               physics: AlwaysScrollableScrollPhysics(),
               child: SizedBox(
                 height: 500,
                 child: Center(
-                  child: Text(
-                    'No personal notifications yet.',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: Text('No notifications yet.',
+                      style: TextStyle(color: Colors.white54)),
                 ),
               ),
             )
-          : ListView.builder(
+          : ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: personalNotifications.length,
-              itemBuilder: (context, index) {
-                final n = personalNotifications[index];
-                final appNotif = n.source as AppNotification;
-                return ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: appNotif.icon != null
-                      ? GestureDetector(
-                          onTap: () {
-                            if (appNotif.type == "post_like") {
-                              Navigator.push(
-                                context,
-                                PageTransition(
-                                  type: PageTransitionType.fade,
-                                  child: PublicProfilePage(
-                                    dbIndex:
-                                        appNotif.data!['dbIndex'].toString() ??
-                                            "x",
-                                    uid: appNotif.data!['author'],
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: ClipOval(
-                            child: Image.network(
-                              appNotif.icon!,
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                            ),
+              children: [
+                // ── My Join Requests section ──
+                if (hasJoinRequests) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      'My Join Requests',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ..._myJoinRequests.map((r) => GestureDetector(
+                        onTap: () {
+                          final groupId = r['groupId'] as String?;
+                          if (groupId != null && groupId.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              PageTransition(
+                                type: PageTransitionType.rightToLeft,
+                                child: GroupPublicViewScreen(groupId: groupId),
+                              ),
+                            );
+                          }
+                        },
+                        child: JoinRequestStatusCard(request: r),
+                      )),
+                  const Divider(
+                      color: Colors.white12,
+                      indent: 16,
+                      endIndent: 16,
+                      height: 24),
+                ],
+
+                // ── Personal Notifications ──
+                ..._personalNotifications.map((n) {
+                  final id = n['id'] as String? ?? '';
+                  final isUnread = n['isRead'] == false;
+                  final appNotif = AppNotification.fromStoreMap(n);
+
+                  return Dismissible(
+                    key: ValueKey(id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.only(right: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.delete_outline,
+                          color: Colors.white, size: 28),
+                    ),
+                    onDismissed: (_) async {
+                      await NotificationStore.removeNotification(id);
+                      NotificationManager.instance.refreshCount();
+                      _loadFromStore();
+                      if (mounted) setState(() {});
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Notification dismissed'),
+                            duration: Duration(seconds: 2),
                           ),
-                        )
-                      : const Icon(Icons.notifications),
-                  title: Text(
-                    appNotif.title ?? "Notification",
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  subtitle: Text(
-                    appNotif.body ?? "",
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  onTap: () {
-                    if (appNotif.link != null) {
-                      // Handle deep link or navigation
-                    }
-                  },
-                );
-              },
+                        );
+                      }
+                    },
+                    child: _buildPersonalNotifTile(appNotif, isUnread, id),
+                  );
+                }),
+              ],
             ),
     );
   }
 
-  Widget _buildGroupNotificationsList() {
-    final groupNotifications = _unifiedNotifications
-        .where((n) => n.sourceType == NotificationSourceType.api)
-        .toList();
+  Widget _buildPersonalNotifTile(
+      AppNotification notif, bool isUnread, String id) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: isUnread
+            ? Border.all(color: Colors.tealAccent.withOpacity(0.35), width: 1)
+            : null,
+        color: isUnread
+            ? Colors.tealAccent.withOpacity(0.08)
+            : Colors.white.withOpacity(0.03),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: notif.icon != null
+            ? GestureDetector(
+                onTap: () {
+                  if (notif.type == "post_like" && notif.data != null) {
+                    Navigator.push(
+                      context,
+                      PageTransition(
+                        type: PageTransitionType.fade,
+                        child: PublicProfilePage(
+                          dbIndex: notif.data!['dbIndex']?.toString() ?? "x",
+                          uid: notif.data!['author'],
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: ClipOval(
+                  child: Image.network(
+                    notif.icon!,
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 40,
+                      height: 40,
+                      color: Colors.grey[800],
+                      child: const Icon(Icons.person,
+                          color: Colors.white54, size: 24),
+                    ),
+                  ),
+                ),
+              )
+            : const Icon(Icons.notifications, color: Colors.white54),
+        trailing: isUnread
+            ? Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Colors.tealAccent,
+                  shape: BoxShape.circle,
+                ),
+              )
+            : null,
+        title: Text(
+          notif.title ?? "Notification",
+          style: TextStyle(
+            color: isUnread ? Colors.white : Colors.white60,
+            fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+            fontSize: isUnread ? 15 : 14,
+          ),
+        ),
+        subtitle: Text(
+          notif.body ?? "",
+          style: TextStyle(
+            color: isUnread ? Colors.white70 : Colors.white38,
+          ),
+        ),
+        onTap: () async {
+          // Mark as read on tap
+          if (isUnread && id.isNotEmpty) {
+            await NotificationManager.instance.markAsRead(id);
+            _loadFromStore();
+            if (mounted) setState(() {});
+          }
 
+          if (notif.link != null) {
+            // Handle deep link or navigation
+          }
+        },
+      ),
+    );
+  }
+
+  // ── Group Tab ────────────────────────────────────────────────────────
+
+  Widget _buildGroupTab() {
     return RefreshIndicator(
       color: Colors.white,
       backgroundColor: AppColors.primary,
       onRefresh: _refreshNotifications,
-      child: groupNotifications.isEmpty
+      child: _groupNotifications.isEmpty
           ? const SingleChildScrollView(
               physics: AlwaysScrollableScrollPhysics(),
               child: SizedBox(
                 height: 500,
                 child: Center(
-                  child: Text(
-                    'No group notifications yet.',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: Text('No group notifications yet.',
+                      style: TextStyle(color: Colors.white54)),
                 ),
               ),
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: groupNotifications.length,
+              itemCount: _groupNotifications.length,
               itemBuilder: (context, index) {
-                final n = groupNotifications[index];
                 return NotificationCard(
-                  notification: n.source as NotificationModel,
+                  notification: _groupNotifications[index],
                   onVote: _onVote,
                 );
               },
             ),
-    );
-  }
-}
-
-enum NotificationSourceType { api, redis, unknown }
-
-class UnifiedNotification {
-  final String id;
-  final String? title;
-  final String? body;
-  final String type;
-  final String? userId;
-  final dynamic source; // can hold NotificationModel or AppNotification
-  final DateTime createdAt;
-  final NotificationSourceType sourceType;
-
-  UnifiedNotification({
-    required this.id,
-    required this.type,
-    this.title,
-    this.body,
-    this.userId,
-    required this.source,
-    required this.createdAt,
-    required this.sourceType,
-  });
-
-  factory UnifiedNotification.fromNotificationModel(NotificationModel n) {
-    return UnifiedNotification(
-      id: n.id,
-      type: n.type,
-      title: n.type,
-      body: "Votes: ${n.votes}/${n.totalMembers}",
-      userId: n.userId,
-      source: n,
-      createdAt: DateTime.now(),
-      sourceType: NotificationSourceType.api,
-    );
-  }
-
-  factory UnifiedNotification.fromAppNotification(AppNotification a) {
-    return UnifiedNotification(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      type: a.type ?? 'system',
-      title: a.title,
-      body: a.body,
-      userId: null,
-      source: a,
-      createdAt: DateTime.now(),
-      sourceType: NotificationSourceType.redis,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/components/recomandedgroups.dart';
@@ -132,6 +133,8 @@ class _WatchlistPageState extends State<WatchlistPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      extendBody: true,
+      bottomNavigationBar: AppBottomNav(highlightIndex: 2),
       body: SafeArea(
         child: Column(
           children: [

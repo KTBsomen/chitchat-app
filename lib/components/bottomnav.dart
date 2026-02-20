@@ -1,61 +1,98 @@
 import 'dart:ui';
 import 'package:chitchat/constants/colors.dart';
-import 'package:chitchat/screens/profilePrivet.dart';
+import 'package:chitchat/screens/camera.dart';
+import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/search.dart';
 import 'package:chitchat/screens/watchlist.dart';
+import 'package:chitchat/screens/profilePrivet.dart';
 import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
 
-class AppBottomNav extends StatefulWidget {
-  final VoidCallback? onHomeRefresh;
-  final int initialIndex;
+// ---------------------------------------------------------------------------
+// NavMenuItem — describes one bottom nav icon + optional custom tap handler
+// ---------------------------------------------------------------------------
+class NavMenuItem {
+  final IconData icon;
+  final String? label;
+
+  /// Custom handler called when this item is tapped.
+  final VoidCallback? onTap;
+
+  const NavMenuItem({
+    required this.icon,
+    this.label,
+    this.onTap,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// AppBottomNav — stateless, pass highlightIndex from each screen
+// ---------------------------------------------------------------------------
+class AppBottomNav extends StatelessWidget {
+  /// Which icon (0-3) to highlight. Use -1 for no highlight (sub-pages).
+  final int highlightIndex;
+
+  /// Nav items (left + right of center). Defaults to 4 icons if empty.
+  final List<NavMenuItem> items;
+
+  // ── Center button options ──────────────────────────────────────────
+  final bool showCenterButton;
+
+  /// If true the center button floats above the bar (FAB-style).
+  /// Home page sets this to true; other pages default to false (inline).
+  final bool centerButtonFloat;
+  final IconData centerButtonIcon;
+  final Color? centerButtonColor;
+  final double? centerButtonSize;
+  final VoidCallback? onCenterButtonTap;
 
   const AppBottomNav({
     super.key,
-    this.onHomeRefresh,
-    this.initialIndex = 0,
+    this.highlightIndex = -1,
+    this.items = const [],
+    this.showCenterButton = true,
+    this.centerButtonFloat = false,
+    this.centerButtonIcon = Icons.camera_alt_rounded,
+    this.centerButtonColor,
+    this.centerButtonSize,
+    this.onCenterButtonTap,
   });
 
-  @override
-  State<AppBottomNav> createState() => _AppBottomNavState();
-}
+  /// Default nav icons (no onTap — handled by [_defaultNavigate]).
+  static const List<NavMenuItem> _defaultItems = [
+    NavMenuItem(icon: Icons.home_rounded),
+    NavMenuItem(icon: Icons.search_rounded),
+    NavMenuItem(icon: Icons.favorite_rounded),
+    NavMenuItem(icon: Icons.groups),
+  ];
 
-class _AppBottomNavState extends State<AppBottomNav> {
-  late int _activeIndex;
+  List<NavMenuItem> get _effectiveItems =>
+      items.isEmpty ? _defaultItems : items;
 
-  @override
-  void initState() {
-    super.initState();
-    _activeIndex = widget.initialIndex;
-  }
+  bool get _usingDefaults => items.isEmpty;
 
-  void _onItemTapped(int index) {
-    if (_activeIndex == index) {
-      if (index == 0 && widget.onHomeRefresh != null) {
-        widget.onHomeRefresh!();
-      }
-      return;
-    }
+  // ── Default navigation for tapping a default item ──────────────────
+  void _defaultNavigate(BuildContext context, int index) {
+    if (index == highlightIndex) return; // already on this tab
 
-    setState(() => _activeIndex = index);
-
+    Widget page;
     switch (index) {
       case 0:
-        widget.onHomeRefresh?.call();
+        page = const HomePage();
         break;
       case 1:
-        _navigate(SearchPage());
+        page = SearchPage();
         break;
       case 2:
-        _navigate(WatchlistPage());
+        page = WatchlistPage();
         break;
       case 3:
-        _navigate(PrivetProfilePage());
+        page = const PrivetProfilePage();
         break;
+      default:
+        return;
     }
-  }
 
-  void _navigate(Widget page) {
     Navigator.push(
       context,
       PageTransition(
@@ -68,57 +105,116 @@ class _AppBottomNavState extends State<AppBottomNav> {
     );
   }
 
+  void _defaultCameraTap(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CameraPage()),
+    );
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(50),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            height: 65,
-            decoration: BoxDecoration(
-              // color: Colors.white.withOpacity(0.08),
-              color: AppColors.background.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(50),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.15),
-                width: 1.2,
+    const barHeight = 52.0;
+    final centerBtnSize = this.centerButtonSize ?? 58.0;
+    final centerBtnColor = this.centerButtonColor ?? Colors.blue;
+
+    final navItems = _effectiveItems;
+    final int half = (navItems.length / 2).floor();
+    final leftItems = navItems.sublist(0, half);
+    final rightItems = navItems.sublist(half);
+
+    Widget bar = ClipRRect(
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(22),
+        topRight: Radius.circular(22),
+      ),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          height: barHeight,
+          decoration: BoxDecoration(
+            // Colored glass — opaque-ish, not transparent
+            color: AppColors.background.withValues(alpha: 0.88),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(22),
+              topRight: Radius.circular(22),
+            ),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withOpacity(0.10),
+                width: 0.8,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 30,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 8),
-                ),
-              ],
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _navItem(Icons.home_rounded, 0),
-                _navItem(Icons.search_rounded, 1),
-                _navItem(Icons.favorite_rounded, 2),
-                _navItem(Icons.groups, 3),
-              ],
-            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              // Left items
+              ...leftItems.map((item) {
+                final idx = navItems.indexOf(item);
+                return _navIcon(context, item, idx);
+              }),
+
+              // Center placeholder / inline button
+              if (showCenterButton && !centerButtonFloat)
+                _inlineCenterButton(context, centerBtnColor, centerBtnSize)
+              else if (showCenterButton && centerButtonFloat)
+                SizedBox(width: centerBtnSize + 12),
+
+              // Right items
+              ...rightItems.map((item) {
+                final idx = navItems.indexOf(item);
+                return _navIcon(context, item, idx);
+              }),
+            ],
           ),
         ),
       ),
     );
+
+    // If center button floats, wrap in a Stack so it protrudes above the bar
+    if (showCenterButton && centerButtonFloat) {
+      return SizedBox(
+        height: barHeight + (centerBtnSize / 2) + 4,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(left: 0, right: 0, bottom: 0, child: bar),
+            Positioned(
+              bottom: barHeight - (centerBtnSize / 2) + 2,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _floatingCenterButton(
+                    context, centerBtnColor, centerBtnSize),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return bar;
   }
 
-  Widget _navItem(IconData icon, int index) {
-    final isSelected = _activeIndex == index;
+  // ── Individual nav icon ─────────────────────────────────────────────
+  Widget _navIcon(BuildContext context, NavMenuItem item, int index) {
+    final isSelected = highlightIndex == index;
 
     return GestureDetector(
-      onTap: () => _onItemTapped(index),
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (item.onTap != null) {
+          item.onTap!.call();
+        } else if (_usingDefaults) {
+          _defaultNavigate(context, index);
+        }
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.warning.withOpacity(0.15)
@@ -126,9 +222,68 @@ class _AppBottomNavState extends State<AppBottomNav> {
           borderRadius: BorderRadius.circular(30),
         ),
         child: Icon(
-          icon,
-          size: 26,
+          item.icon,
+          size: 24,
           color: isSelected ? AppColors.warning : Colors.white.withOpacity(0.5),
+        ),
+      ),
+    );
+  }
+
+  // ── Inline center button (non-floating) ─────────────────────────────
+  Widget _inlineCenterButton(BuildContext context, Color color, double size) {
+    return GestureDetector(
+      onTap: onCenterButtonTap ?? () => _defaultCameraTap(context),
+      child: Container(
+        width: size * 0.70,
+        height: size * 0.70,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Icon(
+          centerButtonIcon,
+          color: Colors.white,
+          size: size * 0.38,
+        ),
+      ),
+    );
+  }
+
+  // ── Floating center button ──────────────────────────────────────────
+  Widget _floatingCenterButton(BuildContext context, Color color, double size) {
+    return GestureDetector(
+      onTap: onCenterButtonTap ?? () => _defaultCameraTap(context),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.background.withValues(alpha: 0.8),
+            width: 4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.4),
+              blurRadius: 14,
+              spreadRadius: 1,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(
+          centerButtonIcon,
+          color: Colors.white,
+          size: size * 0.45,
         ),
       ),
     );

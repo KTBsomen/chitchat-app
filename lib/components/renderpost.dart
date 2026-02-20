@@ -29,7 +29,7 @@ class DynamicPostWidget extends StatefulWidget {
   final List<Map<String, dynamic>> media;
   final String postId;
   final String author;
-  final String group;
+  final String? group;
   final bool? isGroupPost;
   final String? authorName;
   final String? profilePic;
@@ -47,7 +47,7 @@ class DynamicPostWidget extends StatefulWidget {
     required this.media,
     required this.postId,
     required this.author,
-    required this.group,
+    this.group,
     this.authorName,
     this.profilePic,
     this.borderRadius = 12,

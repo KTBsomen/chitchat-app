@@ -2,8 +2,10 @@
 
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/friendcircle.dart';
+import 'package:chitchat/components/searchBar.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/groupPrivet.dart';
 import 'package:chitchat/screens/groupPublic.dart';
@@ -27,9 +29,15 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
   bool isLoading = true;
   bool isLoadingError = false;
 
+  // Search result state
+  String selectedType = 'Groups';
+  List<Map<String, dynamic>> searchResultUsers = [];
+  List<Map<String, dynamic>> searchResultColleges = [];
+  List<Map<String, dynamic>> searchResultUniversities = [];
+  List<Map<String, dynamic>> searchResultSchools = [];
+
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     _getGroups();
   }
@@ -44,6 +52,7 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
         isLoading = false;
         isLoadingError = true;
       });
+      return <FriendCircleGroup>[];
     });
     print(groups);
     setState(() {
@@ -58,25 +67,10 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
         body: Container(
           decoration: BoxDecoration(
             color: AppColors.background,
-            // gradient: LinearGradient(
-            //   begin: Alignment.topCenter,
-            //   end: Alignment.bottomCenter,
-            //   colors: [
-            //     Colors.blue.shade900,
-            //     Colors.blue.shade800,
-            //     Colors.blue.shade700,
-            //     Colors.blue.shade600,
-            //     Colors.blue.shade500,
-            //     Colors.blue.shade400,
-            //     Colors.blue.shade300,
-            //     Colors.blue.shade200,
-            //     Colors.blue.shade100,
-            //     Colors.blue.shade50,
-            //   ],
-            // ),
           ),
           child: Column(
             children: [
+              SizedBox(height: 20),
               Text(
                 "Join or Create",
                 style: TextStyle(
@@ -93,328 +87,75 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                     fontWeight: FontWeight.bold,
                     color: Colors.white),
               ),
-              SizedBox(
-                height: 20,
+              SizedBox(height: 10),
+              ImprovedSearchBar(
+                selectedType: selectedType,
+                onLoading: (loading) {
+                  setState(() {
+                    isLoading = loading;
+                  });
+                },
+                onSelectedType: (type) {
+                  setState(() {
+                    selectedType = type;
+                  });
+                  // Reload recommended groups when switching back to Groups
+                  if (type == 'Groups' || type == 'Passout') {
+                    _getGroups();
+                  }
+                },
+                onGroupSearchResult: (resultGroups) {
+                  setState(() {
+                    groups = resultGroups;
+                  });
+                },
+                onUserSearchResult: (results) {
+                  setState(() {
+                    searchResultUsers = results;
+                  });
+                },
+                onCollegeSearchResult: (results) {
+                  setState(() {
+                    searchResultColleges = results;
+                  });
+                },
+                onUniversitySearchResult: (results) {
+                  setState(() {
+                    searchResultUniversities = results;
+                  });
+                },
+                onSchoolSearchResult: (results) {
+                  setState(() {
+                    searchResultSchools = results;
+                  });
+                },
+                debounceDuration: Duration(milliseconds: 800),
               ),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
-                child: TextField(
-                  style: TextStyle(color: Colors.black),
-                  decoration: InputDecoration(
-                    hintText: 'Search friend circles...',
-                    hintStyle: TextStyle(color: Colors.black54),
-                    prefixIcon: Icon(Icons.search, color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color.fromARGB(255, 255, 255, 255),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide(color: Colors.grey[800]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide(color: Colors.blue),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    // Add search functionality here
-                  },
-                ),
-              ),
-              SizedBox(
-                height: 10,
-              ),
-              Container(
-                width: double.infinity,
-                height: MediaQuery.of(context).size.height * 0.55,
-                margin: EdgeInsets.only(left: 25, right: 25),
-                child: isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                        ),
-                      )
-                    : isLoadingError
-                        ? Center(
-                            child: Text('Error loading data',
-                                style: TextStyle(
-                                    fontSize: 20,
-                                    fontFamily: 'Poppins',
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white)))
-                        : InteractiveViewer(
-                            onInteractionUpdate: (details) {
-                              setState(() {
-                                scale = details.scale;
-                              });
-                              print(details.scale);
-                            },
-                            maxScale: 10.0,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: FriendCircleLayout(
-                                groups: groups,
-                                spacing: 10 * scale,
-                                crossAxisCount: 2,
-                                defaultEdgeStyle: EdgeStyle(
-                                  color:
-                                      const Color.fromARGB(255, 189, 190, 190),
-                                  width: 3.5,
-                                  outerGlow: 3.0,
-                                  outerGlowColor: Colors.blue.withOpacity(0.3),
-                                  cornerRadius: 100.0,
-                                ),
-                                onGroupTap: (groupId, groupData) {
-                                  print(
-                                      'Group $groupId tapped with data: $groupData');
-                                  Navigator.push(
-                                    context,
-                                    PageTransition(
-                                      type: PageTransitionType.rightToLeft,
-                                      child: GroupPublicViewScreen(
-                                        groupId: groupId,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                onMemberTap: (groupId, memberId, memberData) {
-                                  print(
-                                      'Member $memberId in group $groupId tapped with data: $memberData');
-                                  Navigator.push(
-                                    context,
-                                    PageTransition(
-                                      type: PageTransitionType.rightToLeft,
-                                      child: PublicProfilePage(
-                                          dbIndex: memberData['dbIndex'],
-                                          uid: memberId),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
+              SizedBox(height: 10),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.only(left: 25, right: 25),
+                  child: isLoading
+                      ? Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
                           ),
+                        )
+                      : isLoadingError
+                          ? Center(
+                              child: Text('Error loading data',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white)))
+                          : _buildSearchResults(),
+                ),
               ),
               ElevatedButton(
                 onPressed: () async {
-                  String groupName = '';
-                  File? logoFile;
-                  bool isNameEmpty = false;
-                  bool isSubmitted = false;
-                  S3Uploader? uploader;
-
-                  String baseurl =
-                      AppVariables.get<String>('baseurl')!.trim() ??
-                          'http://localhost:3000';
-                  ValueNotifier<FileUploadProgress> _progressNotifier =
-                      ValueNotifier<FileUploadProgress>(
-                    FileUploadProgress(fileName: 'Uploading...'),
-                  );
-                  uploader = S3Uploader(
-                    presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
-                    progressNotifier: _progressNotifier,
-                  );
-                  // Add your create functionality here
-                  showDialog(
-                    barrierDismissible: false,
-                    context: context,
-                    builder: (BuildContext context) {
-                      return StatefulBuilder(
-                          builder: (BuildContext context, setState) {
-                        return AlertDialog(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          title: Row(
-                            children: [
-                              Icon(Icons.group_add, color: Colors.blue),
-                              SizedBox(width: 8),
-                              Text(
-                                'Create New Group',
-                                style: TextStyle(
-                                    fontSize: 18,
-                                    color: AppColors.background,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'Poppins'),
-                              ),
-                            ],
-                          ),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Group Name Input
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    TextField(
-                                      decoration: InputDecoration(
-                                        labelText: 'Group Name',
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        prefixIcon: Icon(Icons.group),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          groupName = value;
-                                          isNameEmpty = false;
-                                        });
-                                      },
-                                    ),
-                                    Visibility(
-                                      visible: isNameEmpty,
-                                      child: Text(
-                                        "Group Name must be filled",
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 20),
-
-                                // Logo Picker
-                                isSubmitted
-                                    // ignore: dead_code
-                                    ? Visibility(
-                                        visible: isSubmitted,
-                                        child: UploadProgressWidget(
-                                            progressNotifier:
-                                                _progressNotifier))
-                                    : InkWell(
-                                        onTap: () async {
-                                          final ImagePicker _picker =
-                                              ImagePicker();
-                                          final XFile? image =
-                                              await _picker.pickImage(
-                                            source: ImageSource.gallery,
-                                          );
-                                          if (image != null) {
-                                            logoFile = File(image.path);
-                                            setState(() {});
-                                          }
-                                        },
-                                        child: Container(
-                                          height: 100,
-                                          width: double.infinity,
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[200],
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: Colors.blue,
-                                            ),
-                                          ),
-                                          child: logoFile == null
-                                              ? Center(
-                                                  child: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      Icon(
-                                                          Icons
-                                                              .add_photo_alternate,
-                                                          size: 40,
-                                                          color: Colors.grey),
-                                                      SizedBox(height: 8),
-                                                      Text('Choose Logo'),
-                                                    ],
-                                                  ),
-                                                )
-                                              : ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  child: Image.file(
-                                                    logoFile!,
-                                                    fit: BoxFit.fitHeight,
-                                                  ),
-                                                ),
-                                        ),
-                                      ),
-                              ],
-                            ),
-                          ),
-                          actionsPadding:
-                              EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          actions: [
-                            // Cancel Button
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            ),
-                            // Create Button
-                            ElevatedButton(
-                              onPressed: isSubmitted
-                                  ? null
-                                  : () async {
-                                      if (groupName.length > 0) {
-                                        print(groupName);
-                                        setState(() {
-                                          isNameEmpty = false;
-                                          isSubmitted = true;
-                                        });
-                                        List<String> url =
-                                            await uploader!.uploadFiles(files: [
-                                          logoFile!
-                                        ], compressionParams: {
-                                          "width": 600,
-                                          "height": 600,
-                                          "quality": 100,
-                                        });
-                                        print(url);
-                                        Map<String, dynamic> result =
-                                            await GroupsService.createGroup(
-                                                groupName, url[0]);
-                                        print(result);
-                                        if (result['success'] == true) {
-                                          Navigator.pop(context);
-                                          Navigator.push(
-                                              context,
-                                              PageTransition(
-                                                  type: PageTransitionType
-                                                      .leftToRight,
-                                                  child:
-                                                      GroupPrivateViewScreen(),
-                                                  duration: Duration(
-                                                      milliseconds: 400)));
-                                        } else {
-                                          _progressNotifier.value =
-                                              _progressNotifier.value.copyWith(
-                                            stage: UploadStage.failed,
-                                            customStageText:
-                                                "Error Creating Group",
-                                            customStageTextDetail:
-                                                "Only one group can be created at a time",
-                                            errorMessage: result['error'],
-                                          );
-                                        }
-                                      } else {
-                                        setState(() {
-                                          isNameEmpty = true;
-                                        });
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text('Create',
-                                  style: TextStyle(color: Colors.white)),
-                            ),
-                          ],
-                        );
-                      });
-                    },
-                  );
+                  _showCreateGroupDialog();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
@@ -435,7 +176,6 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
               ),
               InkWell(
                 onTap: () {
-                  // Add skip functionality here
                   showDialog(
                     context: context,
                     builder: (BuildContext context) {
@@ -474,7 +214,6 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                                       type: PageTransitionType.leftToRight,
                                       child: HomePage(),
                                       duration: Duration(milliseconds: 400)));
-                              // Add navigation logic here
                             },
                             child: Text(
                               'Skip',
@@ -510,6 +249,341 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Build search results based on the selected type
+  Widget _buildSearchResults() {
+    switch (selectedType) {
+      case 'Name':
+        return _buildUserResults();
+      case 'University':
+        return _buildInstitutionResults(searchResultUniversities, 'university');
+      case 'College':
+        return _buildInstitutionResults(searchResultColleges, 'college');
+      case 'School':
+        return _buildInstitutionResults(searchResultSchools, 'school');
+      case 'Groups':
+      case 'Passout':
+      default:
+        return _buildGroupResults();
+    }
+  }
+
+  /// Group ring display (same as before)
+  Widget _buildGroupResults() {
+    if (groups.isEmpty) {
+      return Center(
+        child: Text('No groups found. Try searching!',
+            style: TextStyle(color: Colors.white54, fontSize: 16)),
+      );
+    }
+    return InteractiveViewer(
+      onInteractionUpdate: (details) {
+        setState(() {
+          scale = details.scale;
+        });
+      },
+      maxScale: 10.0,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: FriendCircleLayout(
+          groups: groups,
+          spacing: 10 * scale,
+          crossAxisCount: 2,
+          defaultEdgeStyle: EdgeStyle(
+            color: const Color.fromARGB(255, 189, 190, 190),
+            width: 3.5,
+            outerGlow: 3.0,
+            outerGlowColor: Colors.blue.withOpacity(0.3),
+            cornerRadius: 100.0,
+          ),
+          onGroupTap: (groupId, groupData) {
+            Navigator.push(
+              context,
+              PageTransition(
+                type: PageTransitionType.rightToLeft,
+                child: GroupPublicViewScreen(groupId: groupId),
+              ),
+            );
+          },
+          onMemberTap: (groupId, memberId, memberData) {
+            Navigator.push(
+              context,
+              PageTransition(
+                type: PageTransitionType.rightToLeft,
+                child: PublicProfilePage(
+                    dbIndex: memberData['dbIndex'], uid: memberId),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// User search results list
+  Widget _buildUserResults() {
+    if (searchResultUsers.isEmpty) {
+      return Center(
+        child: Text('Search for users by name',
+            style: TextStyle(color: Colors.white54, fontSize: 16)),
+      );
+    }
+    return ListView.builder(
+      itemCount: searchResultUsers.length,
+      itemBuilder: (context, index) {
+        final user = searchResultUsers[index];
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage: CachedNetworkImageProvider(
+                user['profilePic'] ?? 'https://unsplash.it/200/200'),
+          ),
+          title: Text(user['name'] ?? '',
+              style: TextStyle(color: Colors.white, fontFamily: 'Poppins')),
+          subtitle: Text(user['education'] ?? '',
+              style: TextStyle(color: Colors.white54, fontSize: 12)),
+          onTap: () {
+            Navigator.push(
+              context,
+              PageTransition(
+                type: PageTransitionType.rightToLeft,
+                child: PublicProfilePage(
+                    dbIndex: user['dbIndex'] ?? 0, uid: user['_id'] ?? ''),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Institution search results (college / university / school)
+  Widget _buildInstitutionResults(
+      List<Map<String, dynamic>> results, String type) {
+    if (results.isEmpty) {
+      return Center(
+        child: Text('Search for ${type}s...',
+            style: TextStyle(color: Colors.white54, fontSize: 16)),
+      );
+    }
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final item = results[index];
+        return ListTile(
+          leading: Icon(
+            type == 'school'
+                ? Icons.menu_book_outlined
+                : type == 'college'
+                    ? Icons.school_outlined
+                    : Icons.account_balance_outlined,
+            color: Colors.white70,
+          ),
+          title: Text(
+              item['name'] ?? item['institution_name'] ?? item['Name'] ?? '',
+              style: TextStyle(color: Colors.white, fontFamily: 'Poppins')),
+          subtitle: Text(
+              item['address'] ?? item['district'] ?? item['District'] ?? '',
+              style: TextStyle(color: Colors.white54, fontSize: 12)),
+        );
+      },
+    );
+  }
+
+  /// Create group dialog — extracted from original inline code
+  void _showCreateGroupDialog() {
+    String groupName = '';
+    File? logoFile;
+    bool isNameEmpty = false;
+    bool isSubmitted = false;
+    S3Uploader? uploader;
+
+    String baseurl =
+        AppVariables.get<String>('baseurl')?.trim() ?? 'http://localhost:3000';
+    ValueNotifier<FileUploadProgress> progressNotifier =
+        ValueNotifier<FileUploadProgress>(
+      FileUploadProgress(fileName: 'Uploading...'),
+    );
+    uploader = S3Uploader(
+      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+      progressNotifier: progressNotifier,
+    );
+
+    showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(builder: (BuildContext context, setState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.group_add, color: Colors.blue),
+                SizedBox(width: 8),
+                Text(
+                  'Create New Group',
+                  style: TextStyle(
+                      fontSize: 18,
+                      color: AppColors.background,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Poppins'),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          labelText: 'Group Name',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: Icon(Icons.group),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            groupName = value;
+                            isNameEmpty = false;
+                          });
+                        },
+                      ),
+                      Visibility(
+                        visible: isNameEmpty,
+                        child: Text(
+                          "Group Name must be filled",
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 20),
+                  isSubmitted
+                      ? Visibility(
+                          visible: isSubmitted,
+                          child: UploadProgressWidget(
+                              progressNotifier: progressNotifier))
+                      : InkWell(
+                          onTap: () async {
+                            final ImagePicker picker = ImagePicker();
+                            final XFile? image = await picker.pickImage(
+                              source: ImageSource.gallery,
+                            );
+                            if (image != null) {
+                              logoFile = File(image.path);
+                              setState(() {});
+                            }
+                          },
+                          child: Container(
+                            height: 100,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue),
+                            ),
+                            child: logoFile == null
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.add_photo_alternate,
+                                            size: 40, color: Colors.grey),
+                                        SizedBox(height: 8),
+                                        Text('Choose Logo'),
+                                      ],
+                                    ),
+                                  )
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.file(
+                                      logoFile!,
+                                      fit: BoxFit.fitHeight,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                ],
+              ),
+            ),
+            actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitted
+                    ? null
+                    : () async {
+                        if (groupName.length > 0) {
+                          setState(() {
+                            isNameEmpty = false;
+                            isSubmitted = true;
+                          });
+                          List<String> url =
+                              await uploader!.uploadFiles(files: [
+                            logoFile!
+                          ], compressionParams: {
+                            "width": 600,
+                            "height": 600,
+                            "quality": 100,
+                          });
+                          print(url);
+                          Map<String, dynamic> result =
+                              await GroupsService.createGroup(
+                                  groupName, url[0]);
+                          print(result);
+                          if (result['success'] == true) {
+                            Navigator.pop(context);
+                            Navigator.push(
+                                context,
+                                PageTransition(
+                                    type: PageTransitionType.leftToRight,
+                                    child: GroupPrivateViewScreen(),
+                                    duration: Duration(milliseconds: 400)));
+                          } else {
+                            progressNotifier.value =
+                                progressNotifier.value.copyWith(
+                              stage: UploadStage.failed,
+                              customStageText: "Error Creating Group",
+                              customStageTextDetail:
+                                  "Only one group can be created at a time",
+                              errorMessage: result['error'],
+                            );
+                          }
+                        } else {
+                          setState(() {
+                            isNameEmpty = true;
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text('Create', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 }

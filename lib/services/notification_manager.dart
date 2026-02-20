@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:chitchat/appstate/notification_store.dart';
 import 'package:chitchat/services/chats.dart';
 
 /// Centralized notification polling manager.
@@ -10,7 +10,10 @@ import 'package:chitchat/services/chats.dart';
 class NotificationManager {
   static NotificationManager? _instance;
   static NotificationManager get instance {
-    _instance ??= NotificationManager._();
+    if (_instance == null) {
+      _instance = NotificationManager._();
+      _instance!.initialize();
+    }
     return _instance!;
   }
 
@@ -26,10 +29,7 @@ class NotificationManager {
 
   // Rate limit backoff
   int _consecutiveFailures = 0;
-  static const int _maxBackoffSeconds = 300; // Max 5 minutes between retries
-
-  // Track locally read notification IDs (database will eventually clean server-side)
-  Set<String> _locallyReadIds = {};
+  static const int _maxBackoffSeconds = 300;
 
   /// Initialize the notification manager and start polling.
   /// Call this once at app startup (e.g., in main.dart after login).
@@ -37,11 +37,11 @@ class NotificationManager {
     if (_isInitialized) return;
     _isInitialized = true;
 
-    // Load locally read IDs from SharedPreferences
-    await _loadLocallyReadIds();
+    // Initialize the local notification store
+    await NotificationStore.init();
 
-    // Fetch initial counts
-    await _fetchCounts();
+    // Fetch initial counts from local store
+    _syncCountFromStore();
 
     // Start polling every 30 seconds
     _startPolling();
@@ -63,7 +63,6 @@ class NotificationManager {
   }
 
   Future<void> _fetchCounts() async {
-    // Prevent concurrent polling
     if (_isPolling) {
       debugPrint('NotificationManager: Skipping poll (previous still running)');
       return;
@@ -72,25 +71,22 @@ class NotificationManager {
     _isPolling = true;
 
     try {
-      // Fetch notification count (from SharedPreferences, does NOT call API anymore)
-      final notifCount = await _getNotificationCountLocal();
-      notificationCount.value = notifCount;
+      // Sync notification count from local store
+      _syncCountFromStore();
 
       // Fetch message count
       final msgCount = await ChatServices.getMessageNotificationCount();
       messageCount.value = msgCount;
 
-      // Reset failure count on success
       _consecutiveFailures = 0;
 
       debugPrint(
-          'NotificationManager: counts fetched - notif=$notifCount, msg=$msgCount');
+          'NotificationManager: counts fetched - notif=${notificationCount.value}, msg=$msgCount');
     } catch (e) {
       _consecutiveFailures++;
       debugPrint(
           'NotificationManager: Error fetching counts: $e (failures: $_consecutiveFailures)');
 
-      // Apply exponential backoff if too many failures
       if (_consecutiveFailures >= 3) {
         final backoffSeconds =
             (_consecutiveFailures * 30).clamp(30, _maxBackoffSeconds);
@@ -107,78 +103,26 @@ class NotificationManager {
     }
   }
 
-  /// Get notification count from local storage only (no API call)
-  Future<int> _getNotificationCountLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt("unreadcount") ?? 0;
+  /// Sync the notification count from the local store.
+  void _syncCountFromStore() {
+    notificationCount.value = NotificationStore.getUnreadCount();
   }
 
-  /// Store new unread notification IDs, deduplicating against existing and locally read ones.
-  /// Returns the new unique count.
-  Future<int> storeUnreadIds(List<String> newIds) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Get already stored unread IDs
-    List<String> storedIds = prefs.getStringList("unreadIds") ?? [];
-    Set<String> storedSet = storedIds.toSet();
-
-    // Add only new unique IDs that haven't been locally read
-    int addedCount = 0;
-    for (String id in newIds) {
-      if (!storedSet.contains(id) && !_locallyReadIds.contains(id)) {
-        storedSet.add(id);
-        addedCount++;
-      }
-    }
-
-    // Save updated unique list
-    final updatedList = storedSet.toList();
-    await prefs.setStringList("unreadIds", updatedList);
-
-    // Update unread count
-    final newCount = updatedList.length;
-    await prefs.setInt("unreadcount", newCount);
-
-    // Update ValueNotifier
-    notificationCount.value = newCount;
-
-    debugPrint(
-        'NotificationManager: storeUnreadIds added $addedCount new IDs, total=$newCount');
-
-    return newCount;
-  }
-
-  /// Mark a notification as read locally
+  /// Mark a notification as read and update count.
   Future<void> markAsRead(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> storedIds = prefs.getStringList("unreadIds") ?? [];
-
-    // Remove the ID if it exists
-    if (storedIds.contains(id)) {
-      storedIds.remove(id);
-      await prefs.setStringList("unreadIds", storedIds);
-      await prefs.setInt("unreadcount", storedIds.length);
-      notificationCount.value = storedIds.length;
-    }
-
-    // Add to locally read set so it doesn't get re-added on next API fetch
-    _locallyReadIds.add(id);
-    await _saveLocallyReadIds();
+    await NotificationStore.markAsRead(id);
+    _syncCountFromStore();
   }
 
-  /// Clear all unread notifications
-  Future<void> clearAllUnread() async {
-    final prefs = await SharedPreferences.getInstance();
+  /// Mark all notifications as read and update count.
+  Future<void> markAllAsRead() async {
+    await NotificationStore.markAllAsRead();
+    _syncCountFromStore();
+  }
 
-    // Move all unread to locally read
-    List<String> storedIds = prefs.getStringList("unreadIds") ?? [];
-    _locallyReadIds.addAll(storedIds);
-    await _saveLocallyReadIds();
-
-    // Clear unread
-    await prefs.remove("unreadIds");
-    await prefs.remove("unreadcount");
-    notificationCount.value = 0;
+  /// Called after new notifications are added to the store.
+  void refreshCount() {
+    _syncCountFromStore();
   }
 
   /// Reset message notification count
@@ -187,29 +131,7 @@ class NotificationManager {
     messageCount.value = 0;
   }
 
-  /// Load locally read IDs from SharedPreferences
-  Future<void> _loadLocallyReadIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    final ids = prefs.getStringList("locallyReadIds") ?? [];
-    _locallyReadIds = ids.toSet();
-
-    // Clean up old IDs (keep only last 1000 to prevent memory bloat)
-    if (_locallyReadIds.length > 1000) {
-      _locallyReadIds = _locallyReadIds
-          .toList()
-          .sublist(_locallyReadIds.length - 1000)
-          .toSet();
-      await _saveLocallyReadIds();
-    }
-  }
-
-  /// Save locally read IDs to SharedPreferences
-  Future<void> _saveLocallyReadIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList("locallyReadIds", _locallyReadIds.toList());
-  }
-
-  /// Force refresh notification count (call after viewing notifications screen)
+  /// Force refresh notification count
   Future<void> refresh() async {
     await _fetchCounts();
   }

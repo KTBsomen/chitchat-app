@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:chitchat/appstate/joinRequestPrefs.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/components/bottomnav.dart';
@@ -58,6 +59,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   final Map<String, bool> likeStatus = {};
   final Map<String, int> likeCountForMember = {};
   bool isJoinLoading = false;
+  bool isRequestSent = false;
 
   // Animation variables for FriendCircle
   late AnimationController _friendCircleAnimationController;
@@ -160,6 +162,27 @@ class _PublicProfilePageState extends State<PublicProfilePage>
     });
   }
 
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('Error',
+              style: TextStyle(
+                  color: AppColors.background, fontFamily: 'Poppins')),
+          content: Text(message,
+              style: const TextStyle(color: Colors.red, fontFamily: 'Poppins')),
+          actions: [
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _friendCircleAnimationController.dispose();
@@ -180,7 +203,11 @@ class _PublicProfilePageState extends State<PublicProfilePage>
 
       if (result['group'] != null) {
         userGroup = result['group'] as FriendCircleGroup;
-        setState(() {});
+        // Check local prefs for pending join request
+        await JoinRequestPrefs.init();
+        setState(() {
+          isRequestSent = JoinRequestPrefs.hasRequestedSync(userGroup!.groupId);
+        });
         print('Group Name: ${userGroup?.groupData['name']}');
         print('Members:');
         for (var member in userGroup!.members) {
@@ -442,79 +469,113 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton.icon(
-                          onPressed: () async {
-                            // Handle the "Join" button press
-                            setState(() {
-                              isJoinLoading = true;
-                            });
+                          onPressed: isJoinLoading
+                              ? null
+                              : () async {
+                                  setState(() {
+                                    isJoinLoading = true;
+                                  });
 
-                            Map<String, dynamic> result =
-                                await GroupsService.joinGroup(
-                                    userGroup!.groupId);
-                            setState(() {
-                              isJoinLoading = false;
-                            });
-                            if (result['success']) {
-                              showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return AlertDialog(
-                                    title: Text('Success'),
-                                    content: Text(
-                                        "🚀Group Joined successfully 🎉🎉"),
-                                    actions: [
-                                      TextButton(
-                                        child: Text('OK'),
-                                        onPressed: () {
-                                          Navigator.of(context).pop();
-                                        },
-                                      ),
-                                    ],
-                                  );
+                                  Map<String, dynamic> result;
+
+                                  if (isRequestSent) {
+                                    // ── Unsend request ──
+                                    result =
+                                        await GroupsService.cancelJoinRequest(
+                                            userGroup!.groupId,
+                                            requestId:
+                                                JoinRequestPrefs.getRequestId(
+                                                    userGroup!.groupId));
+                                    setState(() {
+                                      isJoinLoading = false;
+                                    });
+                                    if (result['success']) {
+                                      await JoinRequestPrefs.unmarkRequested(
+                                          userGroup!.groupId);
+                                      setState(() {
+                                        isRequestSent = false;
+                                      });
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content:
+                                                Text('Join request cancelled'),
+                                            backgroundColor: Colors.orange,
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      _showErrorDialog(
+                                          context,
+                                          result['error'] ??
+                                              'Failed to cancel request');
+                                    }
+                                  } else {
+                                    // ── Send join request ──
+                                    result = await GroupsService.joinGroup(
+                                        userGroup!.groupId);
+                                    setState(() {
+                                      isJoinLoading = false;
+                                    });
+                                    if (result['success']) {
+                                      final requestId = result['data']
+                                              ?['joinrequest']?['_id'] ??
+                                          '';
+                                      await JoinRequestPrefs.markRequested(
+                                          userGroup!.groupId, requestId);
+                                      setState(() {
+                                        isRequestSent = true;
+                                      });
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                '🚀 Request Sent! Wait for members to let you in 🎉'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      _showErrorDialog(
+                                          context,
+                                          result['error'] ??
+                                              'Failed to join group');
+                                    }
+                                  }
                                 },
-                              );
-                            } else {
-                              showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return AlertDialog(
-                                    title: Text('Error',
-                                        style: TextStyle(
-                                            color: AppColors.background,
-                                            fontFamily: "Poppins")),
-                                    content: Text(
-                                        "Failed to join group😔\n${result['error']}",
-                                        style: TextStyle(
-                                            color: Colors.red,
-                                            fontFamily: "Poppins")),
-                                    actions: [
-                                      TextButton(
-                                        child: Text('OK'),
-                                        onPressed: () {
-                                          Navigator.of(context).pop();
-                                        },
-                                      ),
-                                    ],
-                                  );
-                                },
-                              );
-                            }
-                          },
                           style: TextButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor:
+                                isRequestSent ? Colors.deepOrange : Colors.blue,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
                             ),
                           ),
                           icon: isJoinLoading
-                              ? CircularProgressIndicator(
-                                  color: Colors.white,
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
                                 )
-                              : Icon(Icons.add, color: Colors.white),
+                              : Icon(
+                                  isRequestSent
+                                      ? Icons.undo_rounded
+                                      : Icons.add,
+                                  color: Colors.white),
                           label: Text(
-                              isJoinLoading ? "Joining..." : "Join Group",
-                              style:
-                                  TextStyle(fontSize: 16, color: Colors.white)),
+                              isJoinLoading
+                                  ? (isRequestSent
+                                      ? 'Cancelling...'
+                                      : 'Joining...')
+                                  : (isRequestSent
+                                      ? 'Unsend Request'
+                                      : 'Join Group'),
+                              style: const TextStyle(
+                                  fontSize: 16, color: Colors.white)),
                         ),
                       ],
                     ),

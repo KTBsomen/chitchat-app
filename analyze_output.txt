@@ -1,0 +1,17 @@
+﻿Analyzing recomandedgroups.dart...
+
+warning - recomandedgroups.dart:49:76 - This 'onError' handler must return a value assignable to 'List<FriendCircleGroup>', but ends without returning a value. Try adding a return statement. - body_might_complete_normally_catch_error
+warning - recomandedgroups.dart:402:56 - The left operand can't be null, so the right operand is never executed. Try removing the operator and the right operand. - dead_null_aware_expression
+   info - recomandedgroups.dart:17:8 - The import of 'package:flutter/widgets.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart'. Try removing the import directive. - unnecessary_import
+   info - recomandedgroups.dart:21:7 - Constructors for public widgets should have a named 'key' parameter. Try adding a named parameter to the constructor. - use_key_in_widget_constructors
+   info - recomandedgroups.dart:45:3 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - recomandedgroups.dart:50:7 - Don't invoke 'print' in production code. Try using a logging framework. - avoid_print
+   info - recomandedgroups.dart:56:5 - Don't invoke 'print' in production code. Try using a logging framework. - avoid_print
+   info - recomandedgroups.dart:297:41 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - recomandedgroups.dart:532:29 - Use 'isNotEmpty' instead of 'length' to test whether the collection is empty. Try rewriting the expression to use 'isNotEmpty'. - prefer_is_empty
+   info - recomandedgroups.dart:545:27 - Don't invoke 'print' in production code. Try using a logging framework. - avoid_print
+   info - recomandedgroups.dart:549:27 - Don't invoke 'print' in production code. Try using a logging framework. - avoid_print
+   info - recomandedgroups.dart:551:43 - Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check. - use_build_context_synchronously
+   info - recomandedgroups.dart:553:33 - Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check. - use_build_context_synchronously
+
+13 issues found.

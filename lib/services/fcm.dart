@@ -6,7 +6,8 @@ import 'package:chitchat/main.dart';
 import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/services/chats.dart';
 import 'package:chitchat/services/groups.dart';
-import 'package:chitchat/services/notification.dart';
+import 'package:chitchat/appstate/notification_store.dart';
+import 'package:chitchat/services/notification_manager.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -323,7 +324,17 @@ class FCMHandler {
         'RemoteMessage.raw: ${message.data} | notification=${message.notification}');
 
     if (id != null) {
-      await NotificationService.storeUnreadIds([id]);
+      await NotificationStore.addNotifications([
+        {
+          'id': id,
+          'title': data['title'],
+          'body': data['body'] ?? data['message'],
+          'type': type,
+          'sourceType': 'redis',
+          'data': data,
+        }
+      ]);
+      NotificationManager.instance.refreshCount();
     }
 
     // If this message was delivered because the user tapped the notification

@@ -1,3 +1,4 @@
+import 'package:chitchat/appstate/notification_store.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/services/notification_manager.dart';
@@ -5,7 +6,6 @@ import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AppNotification {
   final String? title;
@@ -51,12 +51,24 @@ class AppNotification {
       icon: json['icon'] as String?,
       image: (json['image'] as List?)?.map((e) => e as String).toList(),
       data: parsedData,
-      // support both snake_case and camelCase keys
       clickAction: (json['click_action'] ?? json['clickAction']) as String?,
       link: json['link'] as String?,
-      id: json['_id'] as String? ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
+      id: json['_id'] as String? ?? _generateContentId(json),
     );
+  }
+
+  /// Generate a deterministic ID from notification content so the same
+  /// notification always produces the same key (prevents duplicates when
+  /// the server doesn't provide an _id).
+  static String _generateContentId(Map<String, dynamic> json) {
+    final seed =
+        '${json['title']}|${json['body']}|${json['type']}|${json['icon']}';
+    // Simple hash — deterministic across parses.
+    var hash = 0;
+    for (var i = 0; i < seed.length; i++) {
+      hash = (hash * 31 + seed.codeUnitAt(i)) & 0x7FFFFFFF;
+    }
+    return 'gen_$hash';
   }
 
   Map<String, dynamic> toJson() {
@@ -71,6 +83,37 @@ class AppNotification {
       'link': link,
       'id': id,
     }..removeWhere((_, v) => v == null);
+  }
+
+  /// Convert to a map suitable for NotificationStore.
+  Map<String, dynamic> toStoreMap() {
+    return {
+      'id': id,
+      'title': title,
+      'body': body,
+      'type': type,
+      'icon': icon,
+      'image': image,
+      'data': data,
+      'clickAction': clickAction,
+      'link': link,
+      'sourceType': 'redis',
+    };
+  }
+
+  /// Reconstruct from NotificationStore map.
+  factory AppNotification.fromStoreMap(Map<String, dynamic> map) {
+    return AppNotification(
+      id: map['id'] as String?,
+      title: map['title'] as String?,
+      body: map['body'] as String?,
+      type: map['type'] as String?,
+      icon: map['icon'] as String?,
+      image: (map['image'] as List?)?.map((e) => e.toString()).toList(),
+      data: map['data'] is Map ? Map<String, dynamic>.from(map['data']) : null,
+      clickAction: map['clickAction'] as String?,
+      link: map['link'] as String?,
+    );
   }
 
   AppNotification copyWith({
@@ -197,67 +240,27 @@ class NotificationService {
     );
   }
 
-// Save unique unread IDs and update count (now delegates to NotificationManager for deduplication)
-  static Future<void> storeUnreadIds(List<String> newIds) async {
-    await NotificationManager.instance.storeUnreadIds(newIds);
-  }
-
-// Get unread count (reads from local storage only, no API call)
-  static Future<int> getNotificationCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt("unreadcount") ?? 0;
-  }
-
-// Get stored unread IDs
-  static Future<List<String>> getUnreadIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList("unreadIds") ?? [];
-  }
-
-// Check if a specific notification ID is unread
-  static Future<bool> isUnread(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> storedIds = prefs.getStringList("unreadIds") ?? [];
-    return storedIds.contains(id);
-  }
-
-// Remove a specific notification ID when read
-  static Future<void> markAsRead(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> storedIds = prefs.getStringList("unreadIds") ?? [];
-
-    // Remove the ID if it exists
-    if (storedIds.contains(id)) {
-      storedIds.remove(id);
-      await prefs.setStringList("unreadIds", storedIds);
-      await prefs.setInt("unreadcount", storedIds.length);
-    }
-  }
-
-//clear all unread notifications
-  static Future<void> clearAllUnreadNotifications() async {
-    await NotificationManager.instance.clearAllUnread();
-  }
-
-// fetch notifications
+  /// Fetch notifications from server, store locally, then clear from Redis.
+  ///
+  /// The server keeps notifications in Redis indefinitely (GET /notifications).
+  /// After storing them in NotificationStore (which deduplicates by id), we
+  /// call DELETE /notifications/clear to empty the Redis list so subsequent
+  /// fetches only return genuinely new notifications.
   static Future<List<AppNotification>?> getNotifications(BuildContext? context,
       {bool showMessage = true, bool showLoaders = true}) async {
     try {
       String? accessToken = await UserService.getAccessToken();
-      print("Fetching notifications");
       if (showLoaders && context != null) {
         showLoader(context);
       }
       final response = await http.get(
-        Uri.parse(
-            "$baseurl/notifications?id=${await UserService.getUserId()}&invalidate=true"),
+        Uri.parse("$baseurl/notifications"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $accessToken",
         },
       );
 
-      final data = jsonDecode(response.body);
       if (showLoaders && context != null) {
         hideLoader(context);
       }
@@ -266,23 +269,28 @@ class NotificationService {
         throw Exception("Failed to fetch notifications");
       }
 
-      // Parse and return the notifications
+      final data = jsonDecode(response.body);
+
+      // Parse notifications
       List<AppNotification> notifications = List<AppNotification>.from(
           data.map((notif) => AppNotification.fromJson(notif)));
-      await storeUnreadIds(
-          notifications.where((n) => n.id != null).map((n) => n.id!).toList());
+
+      // Store new notifications locally (deduplicates by id)
+      final storeMaps = notifications
+          .where((n) => n.id != null)
+          .map((n) => n.toStoreMap())
+          .toList();
+      final added = await NotificationStore.addNotifications(storeMaps);
+      if (added > 0) {
+        NotificationManager.instance.refreshCount();
+      }
+
+      // Clear Redis so next fetch only returns new notifications
+      if (notifications.isNotEmpty) {
+        _clearServerNotifications();
+      }
+
       return notifications;
-
-      // Extract unique notification IDs
-      // List<String> newUnreadIds = data["notifications"]
-      //     .where((notif) => notif["isRead"] == false)
-      //     .map<String>((notif) => notif["_id"].toString())
-      //     .toList();
-
-      // // Store only unique IDs
-      // await storeUnreadIds(newUnreadIds);
-
-      // return List<Map<String, dynamic>>.from(data["notifications"]);
     } catch (error) {
       if (showMessage && context != null) {
         hideLoader(context);
@@ -292,7 +300,28 @@ class NotificationService {
     }
   }
 
-// clear all notifications
+  /// Fire-and-forget: clear the server's Redis notification list.
+  static Future<void> _clearServerNotifications() async {
+    try {
+      String? accessToken = await UserService.getAccessToken();
+      await http.delete(
+        Uri.parse("$baseurl/notifications/clear"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+    } catch (_) {
+      // Best-effort; failure here just means next fetch may re-deliver.
+    }
+  }
+
+  /// Get all locally stored notifications (for display in the UI).
+  static List<Map<String, dynamic>> getStoredNotifications() {
+    return NotificationStore.getAll();
+  }
+
+  /// Clear all notifications from server.
   static Future<bool> clearAllNotificationsfromServer(
       BuildContext context) async {
     try {
@@ -313,7 +342,6 @@ class NotificationService {
       }
 
       print(data["message"] ?? "Notifications cleared");
-      await clearAllUnreadNotifications();
       return true;
     } catch (error) {
       print(error.toString());
@@ -321,7 +349,7 @@ class NotificationService {
     }
   }
 
-// Fetch join requests and update unread notifications
+  /// Fetch join requests for a group (for group members to vote on).
   static Future<List<Map<String, dynamic>>?> getGroupJoinRequests(
       BuildContext context, String groupId,
       {bool showMessage = true, bool showLoaders = true}) async {
@@ -345,7 +373,6 @@ class NotificationService {
       }
 
       if (response.statusCode == 404) {
-        await storeUnreadIds([]); // Reset unread count if no data
         return [];
       }
 
@@ -353,15 +380,24 @@ class NotificationService {
         throw Exception("Failed to fetch join requests");
       }
 
-      // Extract unique notification IDs
-      List<String> newUnreadIds = data["joinRequests"]
-          .map<String>((req) => req["_id"].toString())
+      // Store as group-source notifications locally
+      final joinRequests =
+          List<Map<String, dynamic>>.from(data["joinRequests"]);
+      final storeMaps = joinRequests
+          .map((req) => {
+                'id': req['_id'],
+                'title': 'Join Request',
+                'body':
+                    '${req['requestBody']?['memberName'] ?? 'Someone'} wants to join',
+                'type': req['requestType'] ?? 'joinGroup',
+                'sourceType': 'api',
+                'data': req,
+              })
           .toList();
+      await NotificationStore.addNotifications(storeMaps);
+      NotificationManager.instance.refreshCount();
 
-      // Store only unique IDs
-      await storeUnreadIds(newUnreadIds);
-
-      return List<Map<String, dynamic>>.from(data["joinRequests"]);
+      return joinRequests;
     } catch (error) {
       if (showMessage) {
         hideLoader(context);
@@ -371,7 +407,7 @@ class NotificationService {
     }
   }
 
-// Fetch post requests and update unread notifications
+  /// Fetch post requests.
   static Future<List<Map<String, dynamic>>?> getGroupPostRequests(
       BuildContext context, String postId,
       {bool showMessage = true, bool showLoaders = true}) async {
@@ -395,21 +431,12 @@ class NotificationService {
       }
 
       if (response.statusCode == 404) {
-        await storeUnreadIds([]); // Reset unread count if no data
         return [];
       }
 
       if (response.statusCode != 200) {
-        throw Exception("Failed to fetch join requests");
+        throw Exception("Failed to fetch post requests");
       }
-
-      // Extract unique notification IDs
-      List<String> newUnreadIds = data["postRequests"]
-          .map<String>((req) => req["_id"].toString())
-          .toList();
-
-      // Store only unique IDs
-      await storeUnreadIds(newUnreadIds);
 
       return List<Map<String, dynamic>>.from(data["postRequests"]);
     } catch (error) {
@@ -417,6 +444,36 @@ class NotificationService {
         hideLoader(context);
         showPopup(context, error.toString());
       }
+      return [];
+    }
+  }
+
+  /// Batch check join request statuses.
+  /// Sends request IDs to /groups/notification/join/status
+  /// Returns list of { _id, votes, totalMembers, status, groupName, groupPic, ... }
+  static Future<List<Map<String, dynamic>>> checkJoinRequestStatuses(
+      List<String> requestIds) async {
+    if (requestIds.isEmpty) return [];
+
+    try {
+      String? accessToken = await UserService.getAccessToken();
+      final response = await http.post(
+        Uri.parse("$baseurl/groups/notification/join/status"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+        body: jsonEncode({"ids": requestIds}),
+      );
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
+      final data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data["results"] ?? []);
+    } catch (e) {
+      print('Error checking join request statuses: $e');
       return [];
     }
   }
@@ -446,7 +503,7 @@ class NotificationService {
         showPopup(
           context,
           data["message"] ?? "User is now in your group",
-          onRefresh: () => onRefresh(), // Refresh group
+          onRefresh: () => onRefresh(),
         );
         return true;
       } else if (data["message"] == "You have already voted for this group") {

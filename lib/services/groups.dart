@@ -312,6 +312,39 @@ class GroupsService {
     }
   }
 
+  static Future<Map<String, dynamic>> cancelJoinRequest(
+    String groupId, {
+    String? requestId,
+  }) async {
+    try {
+      // Use direct request ID endpoint if available, otherwise fallback to groupId
+      final url = (requestId != null && requestId.isNotEmpty)
+          ? Uri.parse('$baseurl/groups/join/request/$requestId')
+          : Uri.parse('$baseurl/groups/join/$groupId');
+      String? token = await UserService.getAccessToken();
+
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      } else {
+        return {
+          'success': false,
+          'error':
+              jsonDecode(response.body)['message'] ?? 'Unknown error occurred',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   static Future<Map<String, dynamic>> leaveGroup(
     String groupId,
   ) async {

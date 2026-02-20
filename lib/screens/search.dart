@@ -183,7 +183,7 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      bottomNavigationBar: AppBottomNav(),
+      bottomNavigationBar: AppBottomNav(highlightIndex: 1),
       body: Container(
         decoration: BoxDecoration(
           color: AppColors.background,

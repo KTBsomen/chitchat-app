@@ -19,6 +19,7 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/appstate/storyPrefs.dart';
 
 import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/main.dart';
@@ -521,202 +522,74 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-          floatingActionButton: Container(
-            height: 65,
-            width: 65,
-            margin: const EdgeInsets.only(top: 0),
-            child: FloatingActionButton(
-              backgroundColor: Colors.blue,
-              elevation: 8,
-
-              // onPressed: () async {
-              //   Navigator.push(
-              //     context,
-              //     MaterialPageRoute(
-              //         builder: (context) => FlutterStoryEditor(
-              //             controller: controller,
-              //             captionController: _captionController,
-              //             selectedFiles: [],
-              //             onSaveClickListener: (files) {
-              //               // Navigator.push(
-              //               //   context,
-              //               //   MaterialPageRoute(
-              //               //     builder: (context) => ImagesPage(files: files),
-              //               //   ),
-              //               // );
-              //             })),
-              //   );
-              //   // .then((whatsappStoryEditorResult) {
-              //   //   if (whatsappStoryEditorResult != null) {
-              //   //     print(
-              //   //         "whatsappStoryEditorResult: $whatsappStoryEditorResult");
-              //   //   }
-              //   // });
-              // },
-
-              onPressed: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const CameraPage()));
-
-                // VSStoryDesigner(
-                //       centerText: "Start Creating Your chit",
-                //       // fontFamilyList: const [
-                //       //   FontType.abrilFatface,
-                //       //   FontType.alegreya,
-                //       //   FontType.typewriter
-                //       // ],
-                //       middleBottomWidget: IconButton(
-                //         icon: Icon(
-                //           Icons.camera_alt,
-                //           color: Colors.white,
-                //           size: 35,
-                //         ),
-                //         onPressed: () {
-                //           Navigator.push(
-                //             context,
-                //             MaterialPageRoute(
-                //               builder: (context) => CameraPage(),
-                //             ),
-                //           );
-                //         },
-                //       ),
-                //       themeType: ThemeType
-                //           .light, // OPTIONAL, Default ThemeType.dark
-                //       galleryThumbnailQuality: 250,
-                //       onDone: (uri) {
-                //         debugPrint(uri);
-                //         //Share.shareUri(Uri.file(uri));
-                //       },
-                //       onDoneButtonStyle: Container(
-                //           padding: EdgeInsets.all(10),
-                //           decoration: BoxDecoration(
-                //               color: Colors.blue,
-                //               borderRadius: BorderRadius.circular(10)),
-                //           child: const Text(
-                //             'Done',
-                //             style: TextStyle(color: Colors.white),
-                //           )),
-                //     )
-                // UserService.signOut(
-                //   (p0) {},
-                // ).then(
-                //   (value) {
-                //     Navigator.pushAndRemoveUntil(
-                //       context,
-                //       PageTransition(
-                //         child: LoginScreen(),
-                //         type: PageTransitionType.fade,
-                //       ),
-                //       (route) => false,
-                //     );
-                //   },
-                // );
-              },
-              child: const Icon(
-                Icons.camera_alt_rounded,
-                size: 35,
+          bottomNavigationBar: AppBottomNav(
+            highlightIndex: 0,
+            showCenterButton: true,
+            centerButtonFloat: true,
+            centerButtonIcon: Icons.camera_alt_rounded,
+            centerButtonColor: Colors.blue,
+            centerButtonSize: 58,
+            onCenterButtonTap: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => const CameraPage()));
+            },
+            items: [
+              NavMenuItem(
+                icon: Icons.home_rounded,
+                onTap: () {
+                  _loadMoreItems(invalidate: "true");
+                  _getStories();
+                },
               ),
-              shape: const CircleBorder(),
-            ),
-          ),
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerDocked,
-          bottomNavigationBar: buildBottomNav(),
-        ),
-      ),
-    );
-  }
-
-  Widget buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: BottomAppBar(
-        height: 60,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        notchMargin: 10,
-        shape: const CircularNotchedRectangle(),
-        color: AppColors.Secondarybackground,
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_rounded, 0, onPressed: () {
-                _loadMoreItems(invalidate: "true");
-                _getStories();
-              }),
-              _buildNavItem(Icons.search_rounded, 1, onPressed: () {
-                Navigator.push(
-                  context,
-                  PageTransition(
-                    isIos: true,
-                    type: PageTransitionType.rightToLeft,
-                    child: SearchPage(),
-                    curve: Curves.fastEaseInToSlowEaseOut,
-                    duration: const Duration(milliseconds: 500),
-                  ),
-                );
-              }),
-              const SizedBox(width: 30),
-              _buildNavItem(Icons.favorite_rounded, 2, onPressed: () {
-                Navigator.push(
-                  context,
-                  PageTransition(
-                    isIos: true,
-                    type: PageTransitionType.rightToLeft,
-                    child: WatchlistPage(),
-                    curve: Curves.fastEaseInToSlowEaseOut,
-                    duration: const Duration(milliseconds: 500),
-                  ),
-                );
-              }),
-              _buildNavItem(Icons.groups, 3, onPressed: () {
-                Navigator.push(
-                  context,
-                  PageTransition(
-                    isIos: true,
-                    type: PageTransitionType.rightToLeft,
-                    child: const PrivetProfilePage(),
-                    curve: Curves.fastEaseInToSlowEaseOut,
-                    duration: const Duration(milliseconds: 500),
-                  ),
-                );
-              }),
+              NavMenuItem(
+                icon: Icons.search_rounded,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    PageTransition(
+                      isIos: true,
+                      type: PageTransitionType.rightToLeft,
+                      child: SearchPage(),
+                      curve: Curves.fastEaseInToSlowEaseOut,
+                      duration: const Duration(milliseconds: 500),
+                    ),
+                  );
+                },
+              ),
+              NavMenuItem(
+                icon: Icons.favorite_rounded,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    PageTransition(
+                      isIos: true,
+                      type: PageTransitionType.rightToLeft,
+                      child: WatchlistPage(),
+                      curve: Curves.fastEaseInToSlowEaseOut,
+                      duration: const Duration(milliseconds: 500),
+                    ),
+                  );
+                },
+              ),
+              NavMenuItem(
+                icon: Icons.groups,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    PageTransition(
+                      isIos: true,
+                      type: PageTransitionType.rightToLeft,
+                      child: const PrivetProfilePage(),
+                      curve: Curves.fastEaseInToSlowEaseOut,
+                      duration: const Duration(milliseconds: 500),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, int index, {Function()? onPressed}) {
-    bool isSelected = index == 0;
-
-    return IconButton(
-      icon: Icon(
-        icon,
-        size: 30,
-      ),
-      onPressed: onPressed,
-      color: isSelected ? AppColors.warning : Colors.white,
     );
   }
 

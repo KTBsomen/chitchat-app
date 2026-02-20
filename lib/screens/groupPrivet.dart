@@ -164,9 +164,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   }
 
   void _handleProfileUpdate(Map<String, dynamic>? data) {
-    if (mounted) {
+    if (mounted && data != null && data['myGroup'] != null) {
       setState(() {
-        groupDetails = GroupsService.buildFriendCircleGroup(data!['myGroup']);
+        groupDetails = GroupsService.buildFriendCircleGroup(data['myGroup']);
       });
     }
   }
@@ -236,8 +236,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       print("Error in shareing group invitation : $e");
     }
     print(profileDetails);
-    groupDetails =
-        GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
+    try {
+      if (profileDetails != null && profileDetails!['myGroup'] != null) {
+        groupDetails =
+            GroupsService.buildFriendCircleGroup(profileDetails!['myGroup']);
+      }
+    } catch (e, s) {
+      print("Error building group details: $e");
+      print(s);
+    }
     _getUserLikes();
     _tabController = TabController(length: 2, vsync: this);
     AppVariables.registerState(this);
