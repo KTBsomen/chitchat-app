@@ -274,19 +274,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             controller: _pageController,
             onPageChanged: (i) => setState(() => _currentPage = i),
             children: const [
-<<<<<<< HEAD
-              _Slide1(),
-              _Slide2(),
-              _Slide3(),
-              _Slide4(),
-              _Slide5()
-=======
               _SlideContent1(),
               _SlideContent2(),
               _SlideContent3(),
               _SlideContent4(),
               _SlideContent5(),
->>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
             ],
           ),
         ),
@@ -384,39 +376,8 @@ class _DotIndicator extends StatelessWidget {
 // ─────────────────────────────────────────────
 //  SLIDE 1 — text + image
 // ─────────────────────────────────────────────
-<<<<<<< HEAD
-class _LogoHeader extends StatelessWidget {
-  const _LogoHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Row(
-        children: [
-          Image.asset('assets/images/logo.png', width: 38, height: 38),
-          const SizedBox(width: 10),
-          const Text('chitchat',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontFamily: 'PassionOne',
-                  fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  SLIDE 1
-// ─────────────────────────────────────────────
-class _Slide1 extends StatelessWidget {
-  const _Slide1();
-=======
 class _SlideContent1 extends StatelessWidget {
   const _SlideContent1();
->>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
 
   @override
   Widget build(BuildContext context) {
@@ -563,65 +524,37 @@ class _SlideContent5 extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('chitz',
-<<<<<<< HEAD
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 42,
                   fontFamily: 'PassionOne',
                   fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: const [
-              _BorderedAvatar(
-                  imagePath: 'assets/images/onboarding5_1.png',
-                  name: 'dhruv',
-                  borderColor: Color(0xFFFF4444)),
-              _BorderedAvatar(
-                  imagePath: 'assets/images/onboarding5_2.png',
-                  name: 'riya',
-                  borderColor: Color(0xFF44DD44)),
-              _BorderedAvatar(
-                  imagePath: 'assets/images/onboarding5_3.png',
-                  name: 'shruti',
-                  borderColor: Color(0xFFFFD700)),
-              _BorderedAvatar(
-                  imagePath: 'assets/images/onboarding5_4.png',
-                  name: 'ayan',
-                  borderColor: Color(0xFF44DD44)),
-            ],
-          ),
-          const SizedBox(height: 36),
-          const _BulletPoint(
-              dotColor: Color(0xFF44DD44),
-              text: 'Send to specific friends with a green border indicator'),
-          const SizedBox(height: 18),
-          const _BulletPoint(
-              dotColor: Color(0xFFFFD700),
-              text: 'Share with multiple friends with a yellow border'),
-          const SizedBox(height: 18),
-          const _BulletPoint(
-              dotColor: Color(0xFFFF4444),
-              text: 'Send to everyone in your college with a red border'),
-=======
-              style: TextStyle(color: Colors.white, fontSize: 42, fontFamily: 'PassionOne', fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: const [
-              _AvatarNoCode(imagePath: 'assets/images/onboarding5_1.png', name: 'dhruv'),
-              _AvatarNoCode(imagePath: 'assets/images/onboarding5_2.png', name: 'riya'),
-              _AvatarNoCode(imagePath: 'assets/images/onboarding5_3.png', name: 'shruti'),
-              _AvatarNoCode(imagePath: 'assets/images/onboarding5_4.png', name: 'ayan'),
+              _AvatarNoCode(
+                  imagePath: 'assets/images/onboarding5_1.png', name: 'dhruv'),
+              _AvatarNoCode(
+                  imagePath: 'assets/images/onboarding5_2.png', name: 'riya'),
+              _AvatarNoCode(
+                  imagePath: 'assets/images/onboarding5_3.png', name: 'shruti'),
+              _AvatarNoCode(
+                  imagePath: 'assets/images/onboarding5_4.png', name: 'ayan'),
             ],
           ),
           const SizedBox(height: 30),
-          const _BulletPoint(dotColor: Color(0xFF44DD44), text: 'Send to specific friends with a green border indicator'),
+          const _BulletPoint(
+              dotColor: Color(0xFF44DD44),
+              text: 'Send to specific friends with a green border indicator'),
           const SizedBox(height: 16),
-          const _BulletPoint(dotColor: Color(0xFFFFD700), text: 'Share with multiple friends with a yellow border'),
+          const _BulletPoint(
+              dotColor: Color(0xFFFFD700),
+              text: 'Share with multiple friends with a yellow border'),
           const SizedBox(height: 16),
-          const _BulletPoint(dotColor: Color(0xFFFF4444), text: 'Send to everyone in your college with a red border'),
->>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
+          const _BulletPoint(
+              dotColor: Color(0xFFFF4444),
+              text: 'Send to everyone in your college with a red border'),
           const Spacer(),
         ],
       ),
@@ -634,12 +567,7 @@ class _AvatarNoCode extends StatelessWidget {
   final String imagePath;
   final String name;
 
-<<<<<<< HEAD
-  const _BorderedAvatar(
-      {required this.imagePath, required this.name, required this.borderColor});
-=======
   const _AvatarNoCode({required this.imagePath, required this.name});
->>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
 
   @override
   Widget build(BuildContext context) {
@@ -648,12 +576,6 @@ class _AvatarNoCode extends StatelessWidget {
         SizedBox(
           width: 66,
           height: 66,
-<<<<<<< HEAD
-          decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: borderColor, width: 3)),
-=======
->>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
           child: ClipOval(
             child: Image.asset(imagePath,
                 fit: BoxFit.cover,
