@@ -214,6 +214,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
 // ─────────────────────────────────────────────
 //  ONBOARDING SCREEN
+//  - Static header (logo + chitchat) at top
+//  - Middle content slides automatically every 3 sec
+//  - Static bottom (dots + login button)
 // ─────────────────────────────────────────────
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback? onGoogleLogin;
@@ -230,9 +233,30 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  Timer? _autoSlideTimer;
+  final int _totalPages = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoSlide();
+  }
+
+  void _startAutoSlide() {
+    _autoSlideTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (!mounted) return;
+      int nextPage = (_currentPage + 1) % _totalPages;
+      _pageController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
 
   @override
   void dispose() {
+    _autoSlideTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -241,21 +265,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // ── STATIC HEADER (always visible) ──
+        const _StaticHeader(),
+
+        // ── SLIDING MIDDLE CONTENT ──
         Expanded(
           child: PageView(
             controller: _pageController,
             onPageChanged: (i) => setState(() => _currentPage = i),
             children: const [
+<<<<<<< HEAD
               _Slide1(),
               _Slide2(),
               _Slide3(),
               _Slide4(),
               _Slide5()
+=======
+              _SlideContent1(),
+              _SlideContent2(),
+              _SlideContent3(),
+              _SlideContent4(),
+              _SlideContent5(),
+>>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
             ],
           ),
         ),
+
+        // ── STATIC BOTTOM ──
         const SizedBox(height: 12),
-        _DotIndicator(count: 5, current: _currentPage),
+        _DotIndicator(count: _totalPages, current: _currentPage),
         const SizedBox(height: 20),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 50.0),
@@ -284,6 +322,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         const SizedBox(height: 10),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  STATIC HEADER — always on top
+// ─────────────────────────────────────────────
+class _StaticHeader extends StatelessWidget {
+  const _StaticHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(
+        children: [
+          Image.asset('assets/images/logo.png', width: 38, height: 38),
+          const SizedBox(width: 10),
+          const Text('chitchat',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontFamily: 'PassionOne',
+                  fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }
@@ -318,8 +382,9 @@ class _DotIndicator extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  LOGO HEADER
+//  SLIDE 1 — text + image
 // ─────────────────────────────────────────────
+<<<<<<< HEAD
 class _LogoHeader extends StatelessWidget {
   const _LogoHeader();
 
@@ -348,18 +413,19 @@ class _LogoHeader extends StatelessWidget {
 // ─────────────────────────────────────────────
 class _Slide1 extends StatelessWidget {
   const _Slide1();
+=======
+class _SlideContent1 extends StatelessWidget {
+  const _SlideContent1();
+>>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFF01021D),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const _LogoHeader(),
-          const SizedBox(height: 20),
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
             child: Text('" Ur college\'s virtual hangout "',
                 style: TextStyle(
                     color: Colors.white,
@@ -368,7 +434,6 @@ class _Slide1 extends StatelessWidget {
                     fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center),
           ),
-          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
@@ -388,7 +453,7 @@ class _Slide1 extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -406,10 +471,10 @@ class _Slide1 extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  SLIDE 2 — Full image (already has bg + content)
+//  SLIDE 2 — full image only (logo is static above)
 // ─────────────────────────────────────────────
-class _Slide2 extends StatelessWidget {
-  const _Slide2();
+class _SlideContent2 extends StatelessWidget {
+  const _SlideContent2();
 
   @override
   Widget build(BuildContext context) {
@@ -420,10 +485,10 @@ class _Slide2 extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  SLIDE 3 — Full image (already has bg + content)
+//  SLIDE 3 — full image only (logo is static above)
 // ─────────────────────────────────────────────
-class _Slide3 extends StatelessWidget {
-  const _Slide3();
+class _SlideContent3 extends StatelessWidget {
+  const _SlideContent3();
 
   @override
   Widget build(BuildContext context) {
@@ -434,10 +499,10 @@ class _Slide3 extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  SLIDE 4
+//  SLIDE 4 — text + image
 // ─────────────────────────────────────────────
-class _Slide4 extends StatelessWidget {
-  const _Slide4();
+class _SlideContent4 extends StatelessWidget {
+  const _SlideContent4();
 
   @override
   Widget build(BuildContext context) {
@@ -446,10 +511,8 @@ class _Slide4 extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _LogoHeader(),
-          const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Row(children: const [
               Text('Ur College ',
                   style: TextStyle(
@@ -486,22 +549,21 @@ class _Slide4 extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  SLIDE 5 — chitz
+//  SLIDE 5 — chitz (no border in code, image already has border)
 // ─────────────────────────────────────────────
-class _Slide5 extends StatelessWidget {
-  const _Slide5();
+class _SlideContent5 extends StatelessWidget {
+  const _SlideContent5();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFF01021D),
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _LogoHeader(),
-          const SizedBox(height: 28),
           const Text('chitz',
+<<<<<<< HEAD
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 42,
@@ -541,6 +603,25 @@ class _Slide5 extends StatelessWidget {
           const _BulletPoint(
               dotColor: Color(0xFFFF4444),
               text: 'Send to everyone in your college with a red border'),
+=======
+              style: TextStyle(color: Colors.white, fontSize: 42, fontFamily: 'PassionOne', fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: const [
+              _AvatarNoCode(imagePath: 'assets/images/onboarding5_1.png', name: 'dhruv'),
+              _AvatarNoCode(imagePath: 'assets/images/onboarding5_2.png', name: 'riya'),
+              _AvatarNoCode(imagePath: 'assets/images/onboarding5_3.png', name: 'shruti'),
+              _AvatarNoCode(imagePath: 'assets/images/onboarding5_4.png', name: 'ayan'),
+            ],
+          ),
+          const SizedBox(height: 30),
+          const _BulletPoint(dotColor: Color(0xFF44DD44), text: 'Send to specific friends with a green border indicator'),
+          const SizedBox(height: 16),
+          const _BulletPoint(dotColor: Color(0xFFFFD700), text: 'Share with multiple friends with a yellow border'),
+          const SizedBox(height: 16),
+          const _BulletPoint(dotColor: Color(0xFFFF4444), text: 'Send to everyone in your college with a red border'),
+>>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
           const Spacer(),
         ],
       ),
@@ -548,24 +629,31 @@ class _Slide5 extends StatelessWidget {
   }
 }
 
-class _BorderedAvatar extends StatelessWidget {
+// Avatar WITHOUT any border in code (border already in image)
+class _AvatarNoCode extends StatelessWidget {
   final String imagePath;
   final String name;
-  final Color borderColor;
 
+<<<<<<< HEAD
   const _BorderedAvatar(
       {required this.imagePath, required this.name, required this.borderColor});
+=======
+  const _AvatarNoCode({required this.imagePath, required this.name});
+>>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: 66,
           height: 66,
+<<<<<<< HEAD
           decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: borderColor, width: 3)),
+=======
+>>>>>>> 3d138487b61370e46f0bab4e54000261abcb119a
           child: ClipOval(
             child: Image.asset(imagePath,
                 fit: BoxFit.cover,
