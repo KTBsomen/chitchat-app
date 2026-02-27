@@ -41,6 +41,28 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
   bool hasMore = true;
   bool isLoadingMore = false;
   bool isLoadingGroup = true;
+  int profileVersion = 0;
+
+  String? _getBustedUrl(String? url) {
+    if (url == null || url.isEmpty) return url;
+    final separator = url.contains('?') ? '&' : '?';
+    return "$url${separator}v=$profileVersion";
+  }
+
+  FriendCircleGroup _getBustedGroup(FriendCircleGroup group) {
+    return group.copyWith(
+      members: group.members
+          .map((m) => FriendCircleMember(
+                avatarUrl: _getBustedUrl(m.avatarUrl) ?? "",
+                id: m.id,
+                additionalData: m.additionalData,
+                status: m.status,
+                lastSeen: m.lastSeen,
+              ))
+          .toList(),
+    );
+  }
+
   void _handlePostUpdate(value) {
     print("Posts updated from AppVariables listener $value");
     if (mounted) {
@@ -109,7 +131,6 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
       if (mounted) {
         setState(() {});
       }
-      profileReady.complete();
       if (result['group'] != null) {
         myGroup = result['group'] as FriendCircleGroup;
         if (mounted) {
@@ -136,6 +157,11 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
       );
       print('Error fetching profile: ${result['error']}');
     }
+    profileVersion++;
+    if (!profileReady.isCompleted) {
+      profileReady.complete();
+    }
+
     if (mounted) {
       setState(() {});
     }
@@ -283,7 +309,25 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     }
   }
 
-  Future<void> editProfilePic(BuildContext context) async {
+  String? extractS3Key(String? oldPic) {
+    if (oldPic == null || oldPic.isEmpty) return null;
+
+    try {
+      // Parse URL and get path without leading '/'
+      String path = Uri.parse(oldPic).path;
+      if (path.startsWith('/')) path = path.substring(1);
+
+      // Ensure the path starts with 'uploads/'
+      if (!path.startsWith('uploads/')) return null;
+
+      return path;
+    } catch (e) {
+      // Invalid URL or parsing failed
+      return null;
+    }
+  }
+
+  Future<void> editProfilePic(BuildContext context, String? oldPicUrl) async {
     final ImagePicker picker = ImagePicker();
 
     // 1️⃣ Pick image
@@ -367,9 +411,11 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                           });
 
                           try {
-                            // 3️⃣ Upload
+                            String? oldPicKey = extractS3Key(oldPicUrl);
                             final urls = await uploader.uploadFiles(
                               files: [selectedFile],
+                              keys: [oldPicKey ?? ""],
+                              sendingKeys: oldPicKey != null ? true : false,
                               compressionParams: {
                                 "width": 600,
                               },
@@ -536,7 +582,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                           ],
                         ))
                       : FriendCircle(
-                          group: myGroup!,
+                          group: _getBustedGroup(myGroup!),
                           size: 200,
                           nodeSize: (myGroup!.members.length > 5
                               ? myGroup!.members.length * 8.0
@@ -630,10 +676,13 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                                   (BuildContext context, _,
                                                       __) {
                                                 return ZoomableImagePopup(
-                                                  imageUrl:
-                                                      myProfile?['profilePic'],
-                                                  onEdit: () =>
-                                                      editProfilePic(context),
+                                                  imageUrl: _getBustedUrl(
+                                                          myProfile?[
+                                                              'profilePic']) ??
+                                                      "",
+                                                  onEdit: () => editProfilePic(
+                                                      context,
+                                                      myProfile?['profilePic']),
                                                   onClose: () =>
                                                       Navigator.of(context)
                                                           .pop(),
@@ -645,11 +694,12 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                         child: CircleAvatar(
                                           radius: 35,
                                           backgroundColor: Colors.orange,
-                                          backgroundImage:
-                                              myProfile?['profilePic'] != null
-                                                  ? NetworkImage(
-                                                      myProfile?['profilePic'])
-                                                  : null,
+                                          backgroundImage: myProfile?[
+                                                      'profilePic'] !=
+                                                  null
+                                              ? NetworkImage(_getBustedUrl(
+                                                  myProfile?['profilePic'])!)
+                                              : null,
                                           child: myProfile?['profilePic'] ==
                                                   null
                                               ? Icon(Icons.person,

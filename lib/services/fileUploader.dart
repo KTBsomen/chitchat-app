@@ -79,6 +79,8 @@ class S3Uploader {
   /// Main upload function with detailed progress tracking
   Future<List<String>> uploadFiles({
     required List<dynamic> files,
+    List<String>? keys,
+    bool sendingKeys = false,
     Map<String, dynamic>? compressionParams,
     bool showResizingProgress = true,
     bool showPresignedUrlProgress = false,
@@ -140,8 +142,11 @@ class S3Uploader {
           .map(
               (file) => lookupMimeType(file.path) ?? 'application/octet-stream')
           .toList();
-
-      presignedUrls = await _fetchPresignedUrls(contentTypes);
+      if (sendingKeys && keys != null && keys.isNotEmpty) {
+        presignedUrls = await _fetchPresignedUrls(keys);
+      } else {
+        presignedUrls = await _fetchPresignedUrls(contentTypes);
+      }
 
       // Step 3: Upload to S3
       progressNotifier.value = progressNotifier.value.copyWith(

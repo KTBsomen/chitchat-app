@@ -95,18 +95,26 @@ class _LoginScreenState extends State<LoginScreen> {
           await PresenceManager().init();
         } else {
           await UserService.signOut((x) => {});
-          setState(() { showSplashScreen = false; });
+          setState(() {
+            showSplashScreen = false;
+          });
           return;
         }
         Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
         if (pendingLink != null) {
           await DeepLinkRouter.completePendingNavigation(context);
         } else {
-          Navigator.pushReplacement(context,
-              PageTransition(isIos: true, type: PageTransitionType.leftToRight, child: HomePage()));
+          Navigator.pushReplacement(
+              context,
+              PageTransition(
+                  isIos: true,
+                  type: PageTransitionType.leftToRight,
+                  child: HomePage()));
         }
       } else {
-        setState(() { showSplashScreen = false; });
+        setState(() {
+          showSplashScreen = false;
+        });
       }
     });
   }
@@ -120,7 +128,8 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset('assets/images/logo.png', width: 200, height: 200),
+                  Image.asset('assets/images/logo.png',
+                      width: 200, height: 200),
                   const SizedBox(height: 20),
                   const CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -143,13 +152,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                 if (value) {
                                   setState(() => showSplashScreen = true);
                                   Future.delayed(Duration(seconds: 1), () {
-                                    Navigator.pushReplacement(context,
-                                        PageTransition(isIos: true, type: PageTransitionType.leftToRight, child: HomePage()));
+                                    Navigator.pushReplacement(
+                                        context,
+                                        PageTransition(
+                                            isIos: true,
+                                            type:
+                                                PageTransitionType.leftToRight,
+                                            child: HomePage()));
                                   });
                                 } else {
                                   setState(() => showSplashScreen = false);
-                                  Navigator.pushReplacement(context,
-                                      PageTransition(isIos: true, type: PageTransitionType.leftToRight, child: RegistrationScreen()));
+                                  Navigator.pushReplacement(
+                                      context,
+                                      PageTransition(
+                                          isIos: true,
+                                          type: PageTransitionType.leftToRight,
+                                          child: RegistrationScreen()));
                                 }
                               });
                             }).catchError((error) {
@@ -157,17 +175,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: Text('Sign-In Error'),
-                                  content: Text('Failed to sign in with Google: $error'),
+                                  content: Text(
+                                      'Failed to sign in with Google: $error'),
                                   actions: [
-                                    TextButton(child: Text('OK'), onPressed: () => Navigator.of(context).pop()),
+                                    TextButton(
+                                        child: Text('OK'),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop()),
                                   ],
                                 ),
                               );
                             });
                           },
                     onAdminLogin: () {
-                      Navigator.push(context,
-                          PageTransition(isIos: true, type: PageTransitionType.leftToRight, child: AdminLoginPage()));
+                      Navigator.push(
+                          context,
+                          PageTransition(
+                              isIos: true,
+                              type: PageTransitionType.leftToRight,
+                              child: AdminLoginPage()));
                     },
                   ),
                   if (isLoading)
@@ -175,7 +201,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Colors.white,
                       child: Center(
                         child: Image.asset("assets/images/loginAni.gif",
-                            fit: BoxFit.contain, filterQuality: FilterQuality.high),
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high),
                       ),
                     ),
                 ],
@@ -192,7 +219,9 @@ class OnboardingScreen extends StatefulWidget {
   final VoidCallback? onGoogleLogin;
   final VoidCallback onAdminLogin;
 
-  const OnboardingScreen({Key? key, required this.onGoogleLogin, required this.onAdminLogin}) : super(key: key);
+  const OnboardingScreen(
+      {Key? key, required this.onGoogleLogin, required this.onAdminLogin})
+      : super(key: key);
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -216,7 +245,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: PageView(
             controller: _pageController,
             onPageChanged: (i) => setState(() => _currentPage = i),
-            children: const [_Slide1(), _Slide2(), _Slide3(), _Slide4(), _Slide5()],
+            children: const [
+              _Slide1(),
+              _Slide2(),
+              _Slide3(),
+              _Slide4(),
+              _Slide5()
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -228,18 +263,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             onPressed: widget.onGoogleLogin,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E90FF),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
               minimumSize: const Size(double.infinity, 54),
               elevation: 5,
             ),
             child: const Text('login with google',
-                style: TextStyle(color: Colors.white, fontSize: 22, fontFamily: 'PassionOne', letterSpacing: 0.5)),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontFamily: 'PassionOne',
+                    letterSpacing: 0.5)),
           ),
         ),
         TextButton(
           onPressed: widget.onAdminLogin,
           child: const Text('Admin Login',
-              style: TextStyle(color: Colors.white54, fontSize: 14, fontFamily: 'Poppins')),
+              style: TextStyle(
+                  color: Colors.white54, fontSize: 14, fontFamily: 'Poppins')),
         ),
         const SizedBox(height: 10),
       ],
@@ -292,7 +333,10 @@ class _LogoHeader extends StatelessWidget {
           const SizedBox(width: 10),
           const Text('chitchat',
               style: TextStyle(
-                  color: Colors.white, fontSize: 26, fontFamily: 'PassionOne', fontWeight: FontWeight.bold)),
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontFamily: 'PassionOne',
+                  fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -317,7 +361,11 @@ class _Slide1 extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
             child: Text('" Ur college\'s virtual hangout "',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center),
           ),
           const SizedBox(height: 8),
@@ -326,9 +374,17 @@ class _Slide1 extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
-                Text('make college life ', style: TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Poppins')),
+                Text('make college life ',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontFamily: 'Poppins')),
                 Text('⚡', style: TextStyle(fontSize: 15)),
-                Text(' more interesting', style: TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Poppins')),
+                Text(' more interesting',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontFamily: 'Poppins')),
               ],
             ),
           ),
@@ -338,7 +394,8 @@ class _Slide1 extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.asset('assets/images/onboarding1.png', fit: BoxFit.cover, width: double.infinity),
+                child: Image.asset('assets/images/onboarding1.png',
+                    fit: BoxFit.cover, width: double.infinity),
               ),
             ),
           ),
@@ -394,19 +451,33 @@ class _Slide4 extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(children: const [
-              Text('Ur College ', style: TextStyle(color: Colors.white, fontSize: 22, fontFamily: 'PassionOne', fontWeight: FontWeight.bold)),
+              Text('Ur College ',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontFamily: 'PassionOne',
+                      fontWeight: FontWeight.bold)),
               Text('⚡', style: TextStyle(fontSize: 22)),
-              Text(' Ur Domain', style: TextStyle(color: Colors.white, fontSize: 22, fontFamily: 'PassionOne', fontWeight: FontWeight.bold)),
+              Text(' Ur Domain',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontFamily: 'PassionOne',
+                      fontWeight: FontWeight.bold)),
             ]),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Text('explore other networks in ur college',
-                style: TextStyle(color: Colors.white70, fontSize: 13, fontFamily: 'Poppins')),
+                style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontFamily: 'Poppins')),
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: Image.asset('assets/images/onboarding4.png', fit: BoxFit.contain, width: double.infinity),
+            child: Image.asset('assets/images/onboarding4.png',
+                fit: BoxFit.contain, width: double.infinity),
           ),
         ],
       ),
@@ -431,23 +502,45 @@ class _Slide5 extends StatelessWidget {
           const _LogoHeader(),
           const SizedBox(height: 28),
           const Text('chitz',
-              style: TextStyle(color: Colors.white, fontSize: 42, fontFamily: 'PassionOne', fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 42,
+                  fontFamily: 'PassionOne',
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: const [
-              _BorderedAvatar(imagePath: 'assets/images/onboarding5_1.png', name: 'dhruv', borderColor: Color(0xFFFF4444)),
-              _BorderedAvatar(imagePath: 'assets/images/onboarding5_2.png', name: 'riya', borderColor: Color(0xFF44DD44)),
-              _BorderedAvatar(imagePath: 'assets/images/onboarding5_3.png', name: 'shruti', borderColor: Color(0xFFFFD700)),
-              _BorderedAvatar(imagePath: 'assets/images/onboarding5_4.png', name: 'ayan', borderColor: Color(0xFF44DD44)),
+              _BorderedAvatar(
+                  imagePath: 'assets/images/onboarding5_1.png',
+                  name: 'dhruv',
+                  borderColor: Color(0xFFFF4444)),
+              _BorderedAvatar(
+                  imagePath: 'assets/images/onboarding5_2.png',
+                  name: 'riya',
+                  borderColor: Color(0xFF44DD44)),
+              _BorderedAvatar(
+                  imagePath: 'assets/images/onboarding5_3.png',
+                  name: 'shruti',
+                  borderColor: Color(0xFFFFD700)),
+              _BorderedAvatar(
+                  imagePath: 'assets/images/onboarding5_4.png',
+                  name: 'ayan',
+                  borderColor: Color(0xFF44DD44)),
             ],
           ),
           const SizedBox(height: 36),
-          const _BulletPoint(dotColor: Color(0xFF44DD44), text: 'Send to specific friends with a green border indicator'),
+          const _BulletPoint(
+              dotColor: Color(0xFF44DD44),
+              text: 'Send to specific friends with a green border indicator'),
           const SizedBox(height: 18),
-          const _BulletPoint(dotColor: Color(0xFFFFD700), text: 'Share with multiple friends with a yellow border'),
+          const _BulletPoint(
+              dotColor: Color(0xFFFFD700),
+              text: 'Share with multiple friends with a yellow border'),
           const SizedBox(height: 18),
-          const _BulletPoint(dotColor: Color(0xFFFF4444), text: 'Send to everyone in your college with a red border'),
+          const _BulletPoint(
+              dotColor: Color(0xFFFF4444),
+              text: 'Send to everyone in your college with a red border'),
           const Spacer(),
         ],
       ),
@@ -460,7 +553,8 @@ class _BorderedAvatar extends StatelessWidget {
   final String name;
   final Color borderColor;
 
-  const _BorderedAvatar({required this.imagePath, required this.name, required this.borderColor});
+  const _BorderedAvatar(
+      {required this.imagePath, required this.name, required this.borderColor});
 
   @override
   Widget build(BuildContext context) {
@@ -469,16 +563,22 @@ class _BorderedAvatar extends StatelessWidget {
         Container(
           width: 66,
           height: 66,
-          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: borderColor, width: 3)),
+          decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: borderColor, width: 3)),
           child: ClipOval(
-            child: Image.asset(imagePath, fit: BoxFit.cover,
+            child: Image.asset(imagePath,
+                fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
                     color: const Color(0xFF1a1a4e),
-                    child: const Icon(Icons.person, color: Colors.white54, size: 34))),
+                    child: const Icon(Icons.person,
+                        color: Colors.white54, size: 34))),
           ),
         ),
         const SizedBox(height: 6),
-        Text(name, style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'Poppins')),
+        Text(name,
+            style: const TextStyle(
+                color: Colors.white70, fontSize: 12, fontFamily: 'Poppins')),
       ],
     );
   }
@@ -496,12 +596,17 @@ class _BulletPoint extends StatelessWidget {
       children: [
         Container(
             margin: const EdgeInsets.only(top: 5),
-            width: 10, height: 10,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor)),
         const SizedBox(width: 12),
         Expanded(
           child: Text(text,
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'Poppins', height: 1.4)),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontFamily: 'Poppins',
+                  height: 1.4)),
         ),
       ],
     );
