@@ -123,7 +123,7 @@ class _HomePageState extends State<HomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.bottomSheetBackground,
       builder: (context) => Stack(
         children: [
           VSMediaPicker(
@@ -835,25 +835,39 @@ class _StoryItem extends StatelessWidget {
                     ),
                     child: ClipRRect(
                       clipBehavior: Clip.antiAlias,
-                      child: CachedNetworkImage(
+                      child: Image.network(
+                        userStory.profilePic,
                         width: 67,
                         height: 80,
-                        imageUrl: userStory.profilePic,
-                        imageBuilder: (context, imageProvider) => ClipRRect(
-                          borderRadius: BorderRadius.circular(35),
-                          child: Image(
-                            image: imageProvider,
-                            width: 67,
-                            height: 80,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        placeholder: (context, url) => ClipRRect(
-                          borderRadius: BorderRadius.circular(35),
-                          child: ColoredBox(
-                            color: Color(0xFF2A2A2A),
-                          ),
-                        ),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(Icons.error);
+                        },
+                        // imageBuilder: (context, imageProvider) => ClipRRect(
+                        //   borderRadius: BorderRadius.circular(35),
+                        //   child: Image(
+                        //     image: imageProvider,
+                        //     width: 67,
+                        //     height: 80,
+                        //     fit: BoxFit.cover,
+                        //   ),
+                        // ),
+                        // placeholder: (context, url) => ClipRRect(
+                        //   borderRadius: BorderRadius.circular(35),
+                        //   child: ColoredBox(
+                        //     color: Color(0xFF2A2A2A),
+                        //   ),
+                        // ),
                       ),
                     ),
                   ),

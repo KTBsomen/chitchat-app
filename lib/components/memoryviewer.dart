@@ -34,7 +34,6 @@ class _MemoryViewerState extends State<MemoryViewer> {
     super.initState();
 
     _controller = PageController(initialPage: widget.initialIndex);
-    fetchPublicStatus();
     _controller.addListener(() {
       setState(() {}); // Rebuild to update icon visibility on page change
     });
@@ -46,21 +45,15 @@ class _MemoryViewerState extends State<MemoryViewer> {
     super.dispose();
   }
 
-  fetchPublicStatus() async {
-    for (var memory in widget.memories) {
-      bool isPublic = await AppVariables.getPersistent(memory.url) ?? false;
-      setState(() {
-        memory.isPublic = isPublic;
-      });
-    }
-  }
-
-  /// Toggle memory public status using the new API
-  Future<void> _togglePublic() async {
+  /// Make memory public
+  Future<void> _makePublic() async {
     if (_isTogglingPublic) return;
 
     final int currentIndex = _controller.page!.round();
     final MemoryItem currentMemory = widget.memories[currentIndex];
+
+    // Already public, do nothing
+    if (currentMemory.isPublic) return;
 
     final profile = AppVariables.get<Map<String, dynamic>>('profile');
     if (profile == null || profile['myGroup'] == null) {
@@ -78,7 +71,7 @@ class _MemoryViewerState extends State<MemoryViewer> {
 
     final result = await PostService.toggleMemoryPublic(
       memoryId: currentMemory.id,
-      isPublic: !currentMemory.isPublic,
+      isPublic: true,
     );
 
     setState(() {
@@ -87,34 +80,33 @@ class _MemoryViewerState extends State<MemoryViewer> {
 
     if (result['success']) {
       setState(() {
-        currentMemory.isPublic = !currentMemory.isPublic;
+        currentMemory.isPublic = true;
       });
-      // Persist the public status locally
-      AppVariables.setPersistent(currentMemory.url, currentMemory.isPublic);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(currentMemory.isPublic
-                ? 'Memory is now public'
-                : 'Memory is now private'),
-          ),
+          const SnackBar(content: Text('Memory is now public')),
         );
       }
-      if (currentMemory.isPublic) {
-        Map<String, dynamic> result = await PostService.createPost(
-            files: [currentMemory.url], isGroupPost: true, myGroupId: groupId);
-        if (result['success']) {
-          AppVariables.update("group_posts", result['data']);
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(currentMemory.isPublic
-                    ? 'Memory is now public and added to your Group posts'
-                    : 'Memory is now private and added to your Group posts'),
-              ),
-            );
-          }
+      // Create a group post for the public memory
+      Map<String, dynamic> postResult = await PostService.createPost(
+          files: [currentMemory.url],
+          isGroupPost: true,
+          myGroupId: groupId,
+          memoryId: currentMemory.id,
+          memoryDBIndex: currentMemory.dbIndex,
+          isMemory: true);
+
+      if (postResult['success']) {
+        AppVariables.update("group_posts", postResult['data']);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Memory added to your Group posts'),
+            ),
+          );
         }
       }
     } else {
@@ -229,10 +221,22 @@ class _MemoryViewerState extends State<MemoryViewer> {
       );
     } else {
       return InteractiveViewer(
-        child: CachedNetworkImage(
-          imageUrl: item.url,
-          placeholder: (context, url) => const CircularProgressIndicator(),
-          errorWidget: (context, url, error) => const Icon(Icons.error),
+        child: Image.network(
+          item.url,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Icon(Icons.error);
+          },
         ),
       );
     }
@@ -288,17 +292,17 @@ class _MemoryViewerState extends State<MemoryViewer> {
                       strokeWidth: 2,
                     ),
                   )
-                : IconButton(
-                    icon: Icon(
-                      currentMemory.isPublic ? Icons.public : Icons.public_off,
-                      color:
-                          currentMemory.isPublic ? Colors.green : Colors.white,
-                      size: 30,
-                    ),
-                    onPressed: _togglePublic,
-                    tooltip:
-                        currentMemory.isPublic ? 'Make private' : 'Make public',
-                  ),
+                : currentMemory.isPublic
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        icon: const Icon(
+                          Icons.public,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                        onPressed: _makePublic,
+                        tooltip: 'Make public',
+                      ),
           ),
           // Delete button (top-left, next to public button)
           Positioned(
@@ -334,7 +338,7 @@ class _MemoryViewerState extends State<MemoryViewer> {
                 children: [
                   CircleAvatar(
                     backgroundImage: currentMemory.profilePic.isNotEmpty
-                        ? CachedNetworkImageProvider(currentMemory.profilePic)
+                        ? NetworkImage(currentMemory.profilePic)
                         : null,
                     radius: 22,
                     child: currentMemory.profilePic.isEmpty

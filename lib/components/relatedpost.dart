@@ -484,7 +484,7 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
                     child: CircleAvatar(
                       radius: 14,
                       backgroundImage: widget.profilePic != null
-                          ? CachedNetworkImageProvider(widget.profilePic!)
+                          ? NetworkImage(widget.profilePic!)
                           : null,
                       child: widget.profilePic != null
                           ? null
@@ -610,11 +610,10 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
                     ),
                     child: CircleAvatar(
                       radius: 14,
-                      backgroundImage:
-                          group!.groupData["GroupProfilePic"] != null
-                              ? CachedNetworkImageProvider(
-                                  group!.groupData["GroupProfilePic"]!)
-                              : null,
+                      backgroundImage: group!.groupData["GroupProfilePic"] !=
+                              null
+                          ? NetworkImage(group!.groupData["GroupProfilePic"]!)
+                          : null,
                       child: group!.groupData["GroupProfilePic"] != null
                           ? null
                           : const Icon(Icons.person,

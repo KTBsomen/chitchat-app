@@ -336,7 +336,7 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
         final user = searchResultUsers[index];
         return ListTile(
           leading: CircleAvatar(
-            backgroundImage: CachedNetworkImageProvider(
+            backgroundImage: NetworkImage(
                 user['profilePic'] ?? 'https://unsplash.it/200/200'),
           ),
           title: Text(user['name'] ?? '',
@@ -554,7 +554,9 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                                 context,
                                 PageTransition(
                                     type: PageTransitionType.leftToRight,
-                                    child: GroupPrivateViewScreen(),
+                                    child: GroupPrivateViewScreen(
+                                      fromRegister: true,
+                                    ),
                                     duration: Duration(milliseconds: 400)));
                           } else {
                             progressNotifier.value =

@@ -145,7 +145,10 @@ class PostService {
   static Future<Map<String, dynamic>> createPost(
       {required List<String> files,
       required bool isGroupPost,
-      required String myGroupId}) async {
+      required String myGroupId,
+      String? memoryId,
+      bool isMemory = false,
+      int? memoryDBIndex}) async {
     List<Map<String, dynamic>> media = [];
     for (String file in files) {
       String mediaType;
@@ -179,6 +182,9 @@ class PostService {
             "media": media,
             "groupId": myGroupId,
             "isGroupPost": isGroupPost,
+            "isMemory": isMemory,
+            "memoryId": memoryId,
+            "memoryDBIndex": memoryDBIndex
           }));
 
       if (response.statusCode == 201) {

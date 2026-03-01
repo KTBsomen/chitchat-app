@@ -1,3 +1,4 @@
+import 'package:chitchat/constants/colors.dart';
 import 'package:flutter/material.dart';
 
 /// A reusable bottom sheet component with search functionality
@@ -88,8 +89,9 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
     return Container(
       height: screenHeight * 0.75,
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: AppColors.bottomSheetBackground,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border.all(color: AppColors.bottomSheetBorder, width: 0.5),
       ),
       child: Column(
         children: [
@@ -99,7 +101,7 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[400],
+              color: Colors.grey[500],
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -113,6 +115,7 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Poppins',
+                color: Colors.white,
               ),
             ),
           ),
@@ -126,10 +129,11 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(Icons.clear, color: Colors.grey[400]),
                         onPressed: () {
                           _searchController.clear();
                         },
@@ -139,7 +143,7 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.grey.withOpacity(0.1),
+                fillColor: Colors.white.withOpacity(0.05),
               ),
             ),
           ),
@@ -154,11 +158,11 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.search_off,
-                            size: 48, color: Colors.grey[400]),
+                            size: 48, color: Colors.grey[500]),
                         const SizedBox(height: 8),
                         Text(
                           'No results found',
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: TextStyle(color: Colors.grey[400]),
                         ),
                       ],
                     ),
@@ -182,9 +186,11 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 16,
+                            color: Colors.white,
                           ),
                         ),
-                        trailing: const Icon(Icons.chevron_right),
+                        trailing: const Icon(Icons.chevron_right,
+                            color: Colors.white70),
                         onTap: () => widget.onSelected(item),
                       );
                     },
@@ -324,8 +330,9 @@ class _AsyncSelectionBottomSheetState<T>
     return Container(
       height: screenHeight * 0.75,
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: AppColors.bottomSheetBackground,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border.all(color: AppColors.bottomSheetBorder, width: 0.5),
       ),
       child: Column(
         children: [
@@ -335,7 +342,7 @@ class _AsyncSelectionBottomSheetState<T>
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[400],
+              color: Colors.grey[500],
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -349,6 +356,7 @@ class _AsyncSelectionBottomSheetState<T>
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Poppins',
+                color: Colors.white,
               ),
             ),
           ),
@@ -363,10 +371,11 @@ class _AsyncSelectionBottomSheetState<T>
               autofocus: true,
               decoration: InputDecoration(
                 hintText: 'Type to search (min 2 characters)...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(Icons.clear, color: Colors.grey[400]),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _items = []);
@@ -377,7 +386,7 @@ class _AsyncSelectionBottomSheetState<T>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.grey.withOpacity(0.1),
+                fillColor: Colors.white.withOpacity(0.05),
               ),
             ),
           ),
@@ -409,7 +418,7 @@ class _AsyncSelectionBottomSheetState<T>
             const SizedBox(height: 8),
             Text(
               'Error loading data',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: Colors.grey[400]),
             ),
           ],
         ),
@@ -421,11 +430,11 @@ class _AsyncSelectionBottomSheetState<T>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 48, color: Colors.grey[400]),
+            Icon(Icons.search, size: 48, color: Colors.grey[500]),
             const SizedBox(height: 8),
             Text(
               'Start typing to search',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: Colors.grey[400]),
             ),
           ],
         ),
@@ -437,11 +446,11 @@ class _AsyncSelectionBottomSheetState<T>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
+            Icon(Icons.search_off, size: 48, color: Colors.grey[500]),
             const SizedBox(height: 8),
             Text(
               'No results found',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: Colors.grey[400]),
             ),
           ],
         ),
@@ -467,9 +476,10 @@ class _AsyncSelectionBottomSheetState<T>
             style: const TextStyle(
               fontFamily: 'Poppins',
               fontSize: 16,
+              color: Colors.white,
             ),
           ),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: const Icon(Icons.chevron_right, color: Colors.white70),
           onTap: () => widget.onSelected(item),
         );
       },

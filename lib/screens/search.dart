@@ -904,7 +904,7 @@ class _SearchPageState extends State<SearchPage> {
               fontSize: 15,
               fontFamily: 'Poppins',
               fontWeight: FontWeight.bold,
-              color: Colors.white),
+              color: AppColors.divider),
         ),
         SizedBox(height: 10, child: Divider()),
         Card(
@@ -963,7 +963,7 @@ class _SearchPageState extends State<SearchPage> {
               fontSize: 15,
               fontFamily: 'Poppins',
               fontWeight: FontWeight.bold,
-              color: Colors.white),
+              color: AppColors.divider),
         ),
         SizedBox(height: 10, child: Divider()),
       ],

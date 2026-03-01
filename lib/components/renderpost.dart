@@ -393,10 +393,12 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
               builder: (context, scrollController) {
                 var commentController = TextEditingController();
                 return Container(
-                  decoration: const BoxDecoration(
-                    color: AppColors.background,
+                  decoration: BoxDecoration(
+                    color: AppColors.bottomSheetBackground,
                     borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(20)),
+                        const BorderRadius.vertical(top: Radius.circular(20)),
+                    border: Border.all(
+                        color: AppColors.bottomSheetBorder, width: 0.5),
                   ),
                   child: Column(
                     children: [
@@ -1351,8 +1353,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                             CircleAvatar(
                               radius: 10,
                               backgroundImage: widget.profilePic != null
-                                  ? CachedNetworkImageProvider(
-                                      widget.profilePic!)
+                                  ? NetworkImage(widget.profilePic!)
                                   : null,
                               child: widget.profilePic != null
                                   ? null

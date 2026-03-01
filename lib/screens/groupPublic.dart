@@ -754,12 +754,14 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                   maxChildSize: 0.9,
                   builder: (context, scrollController) {
                     return Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
+                      decoration: BoxDecoration(
+                        color: AppColors.bottomSheetBackground,
+                        borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(35),
                           topRight: Radius.circular(35),
                         ),
+                        border: Border.all(
+                            color: AppColors.bottomSheetBorder, width: 0.5),
                       ),
                       child: Column(
                         children: [
@@ -779,7 +781,7 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                         textAlign: TextAlign.center,
                                         "Memories",
                                         style: TextStyle(
-                                          color: Colors.black,
+                                          color: Colors.white,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 18,
                                         ),
@@ -1105,7 +1107,7 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                           isInWatchList ? 'not watch' : 'watch',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.black,
+                                            color: Colors.white,
                                           ))
                                     ],
                                   ),
@@ -1126,14 +1128,13 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                           child: Text("Loading..."),
                                         )
                                       : posts.isEmpty
-                                          ? const Center(
+                                          ? Center(
                                               child: Text(
                                                 "No shared memories yet 😔",
                                                 style: TextStyle(
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Color.fromARGB(
-                                                      255, 66, 65, 65),
+                                                  color: Colors.grey[400],
                                                 ),
                                               ),
                                             )

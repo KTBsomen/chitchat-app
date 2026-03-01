@@ -8,8 +8,6 @@ import 'package:chatview/chatview.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/components/bottomnav.dart';
-import 'package:chitchat/components/comments.dart';
-import 'package:chitchat/components/createPost.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/components/memoryviewer.dart';
 import 'package:chitchat/components/renderpost.dart';
@@ -23,19 +21,15 @@ import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/posts.dart';
 import 'package:chitchat/services/user.dart';
-import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/userOnline.dart';
+import 'package:chitchat/components/like.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-
 import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:vs_media_picker/vs_media_picker.dart';
-
-// Import the LikeButton widget
-import 'package:chitchat/components/like.dart';
+// import 'package:shimmer/shimmer.dart';
+// import 'package:video_player/video_player.dart';
 
 class GroupPrivateViewScreen extends StatefulWidget {
   final bool? fromRegister;
@@ -100,6 +94,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   final ScrollController _scrollController = ScrollController();
   String? next;
   bool isLoadingPost = false;
+  bool hasMorePost = true;
   bool hasMore = true;
   bool isLoadingMore = false;
   bool isLoadingGroup = true;
@@ -113,13 +108,30 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   Future<void> _fetchMemories({bool refresh = false}) async {
     if (isLoading) return;
     setState(() => isLoading = true);
-
+    if (refresh) {
+      remoteMemories.clear();
+      nextPageCursor = null;
+    }
     try {
+      print(
+          "[MEMORIES] Calling API with nextPageCursor=$nextPageCursor, groupId=${groupDetails!.groupId}");
       Map<String, dynamic> data = await PostService.fetchMyGroupMemories(
           groupId: groupDetails!.groupId, limit: 10, next: nextPageCursor);
 
       if (data['success']) {
-        final List<dynamic> fetched = data["data"]['_memories'];
+        print("[MEMORIES] Raw response keys: ${data['data']?.keys}");
+        print("[MEMORIES] Raw response data: ${data['data']}");
+
+        final memoriesData =
+            data["data"]['_memories'] ?? data["data"]['memories'];
+        if (memoriesData == null) {
+          print(
+              "[MEMORIES] ERROR: No '_memories' or 'memories' key found in response!");
+          return;
+        }
+        final List<dynamic> fetched = memoriesData;
+        print("[MEMORIES] Fetched ${fetched.length} items from API");
+
         List<MemoryItem> newRemoteMemories = fetched.map((item) {
           String url = item['media'][0]['url'];
           String type = item['media'][0]['type'];
@@ -141,20 +153,30 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
         // Deduplicate by id
         final existingIds = remoteMemories.map((m) => m.id).toSet();
+        final beforeDedup = newRemoteMemories.length;
         newRemoteMemories = newRemoteMemories
             .where((m) => !existingIds.contains(m.id))
             .toList();
+        print(
+            "[MEMORIES] After dedup: ${newRemoteMemories.length} new (removed ${beforeDedup - newRemoteMemories.length} duplicates)");
+
+        final nextCursor = data["data"]["next"] ?? data["data"]["nextId"];
+        print("[MEMORIES] nextCursor from response: $nextCursor");
 
         setState(() {
           if (refresh) remoteMemories.clear();
           remoteMemories.addAll(newRemoteMemories);
-          nextPageCursor = data["next"];
-          hasMore = data["next"] != null;
+          nextPageCursor = nextCursor;
+          hasMore = nextCursor != null;
         });
+        print(
+            "[MEMORIES] After setState: remoteMemories.length=${remoteMemories.length}");
       }
     } catch (e) {
       print("Error fetching memories: $e");
     } finally {
+      print(
+          "[MEMORIES] Fetch complete. remoteMemories.length=${remoteMemories.length}, hasMore=$hasMore, nextPageCursor=$nextPageCursor");
       setState(() => isLoading = false);
     }
   }
@@ -350,7 +372,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       posts.addAll(newPosts.where((p) => !existingIds.contains(p['_id'])));
       setState(() {
         isLoadingPost = false;
-        hasMore = next != null;
+        hasMorePost = next != null;
       });
     } else {
       print(result);
@@ -652,6 +674,140 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     );
   }
 
+  void _showUploadSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bottomSheetBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        side: BorderSide(color: AppColors.bottomSheetBorder, width: 0.5),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image, color: Colors.white),
+                title: const Text('Pick Image',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final ImagePicker _picker = ImagePicker();
+                  final XFile? image =
+                      await _picker.pickImage(source: ImageSource.gallery);
+                  if (image != null) {
+                    _handleDirectUpload(File(image.path));
+                  }
+                },
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.video_collection, color: Colors.white),
+                title: const Text('Pick Video',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final ImagePicker _picker = ImagePicker();
+                  final XFile? video =
+                      await _picker.pickVideo(source: ImageSource.gallery);
+                  if (video != null) {
+                    _handleDirectUpload(File(video.path));
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleDirectUpload(File file) async {
+    final baseurl =
+        AppVariables.get<String>('baseurl')?.trim() ?? 'http://localhost:3000';
+    final _progressNotifier = ValueNotifier<FileUploadProgress>(
+      FileUploadProgress(fileName: 'Uploading memory...'),
+    );
+
+    final uploader = S3Uploader(
+      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+      progressNotifier: _progressNotifier,
+    );
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bottomSheetBackground,
+        title: const Text('Uploading Memory',
+            style: TextStyle(color: Colors.white)),
+        content: UploadProgressWidget(
+          progressNotifier: _progressNotifier,
+          stageTextStyle:
+              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          progressTextStyle: TextStyle(color: Colors.white),
+        ),
+      ),
+    );
+
+    try {
+      final List<String> urls = await uploader.uploadFiles(
+        files: [file],
+        compressionParams: file.path.endsWith('.mp4') ||
+                file.path.endsWith('.mov') ||
+                file.path.endsWith('.avi')
+            ? null // No compression for video through this helper yet
+            : {"width": 1080, "quality": 85},
+      );
+
+      if (urls.isNotEmpty) {
+        final result = await PostService.createMemories(
+          myGroupId: groupDetails!.groupId,
+          files: urls,
+        );
+
+        if (mounted) Navigator.pop(context); // Close progress dialog
+
+        if (result['success']) {
+          // Trigger the listener for immediate update
+          if (result['data'] is List) {
+            for (var m in result['data']) {
+              AppVariables.update("memories", m);
+            }
+          } else {
+            AppVariables.update("memories", result['data']);
+          }
+          // Also fetch to ensure everything is synced (cursor, etc.)
+          _fetchMemories(refresh: true);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Memory uploaded successfully!')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text('Failed to save memory: ${result['error']}')),
+            );
+          }
+        }
+      } else {
+        if (mounted) Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      print("Upload error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -664,6 +820,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     AppVariables.removeListener("memories", _handleMemoryUpdate);
     AppVariables.removeListener("deleted_posts", _handlePostDelete);
     super.dispose();
+  }
+
+  Widget _buildSpinnerLoader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 40.0),
+      child: const Center(
+        child: CircularProgressIndicator(color: Colors.blue),
+      ),
+    );
   }
 
   @override
@@ -703,8 +868,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               ),
               CircleAvatar(
                 radius: 20,
-                backgroundImage: CachedNetworkImageProvider(
-                    groupDetails?.groupData['GroupProfilePic']),
+                backgroundImage:
+                    NetworkImage(groupDetails?.groupData['GroupProfilePic']),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1076,27 +1241,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             minChildSize: 0.5,
             maxChildSize: 0.9,
             builder: (context, scrollController) {
-              scrollController.addListener(() {
-                if (scrollController.position.pixels >=
-                    scrollController.position.maxScrollExtent - 200) {
-                  if (selectedTab == 0) {
-                    if (!isLoadingPost && hasMore) {
-                      _fetchPosts();
-                    }
-                  } else {
-                    if (hasMore && !isLoading) {
-                      _fetchMemories();
-                    }
-                  }
-                }
-              });
               return Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
+                decoration: BoxDecoration(
+                  color: AppColors.bottomSheetBackground,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(35),
                     topRight: Radius.circular(35),
                   ),
+                  border: Border.all(
+                      color: AppColors.bottomSheetBorder, width: 0.5),
                 ),
                 child: Column(
                   children: [
@@ -1109,7 +1262,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                             height: 50,
                             width: MediaQuery.of(context).size.width * 0.8,
                             decoration: BoxDecoration(
-                                color: const Color.fromARGB(255, 255, 255, 255),
+                                color: Colors
+                                    .black, // const Color.fromARGB(255, 255, 255, 255),
                                 border:
                                     Border.all(color: Colors.grey, width: 0.5),
                                 borderRadius:
@@ -1244,178 +1398,221 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                           controller: _tabController,
                           children: [
                             // Posts View
-                            MasonryGridView.builder(
-                              controller: scrollController,
-                              gridDelegate:
-                                  const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                              ),
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                              itemCount: posts.length,
-                              itemBuilder: (context, index) {
-                                final post = posts[index];
-                                if (post?['media'] == null)
-                                  return Container();
-                                else if (post?['media'].runtimeType == String) {
-                                  post['media'] = jsonDecode(post['media']);
+                            NotificationListener<ScrollNotification>(
+                              onNotification: (ScrollNotification scrollInfo) {
+                                if (scrollInfo.metrics.pixels >=
+                                    scrollInfo.metrics.maxScrollExtent - 200) {
+                                  if (!isLoadingPost && hasMorePost) {
+                                    _fetchPosts();
+                                  }
                                 }
-                                try {
-                                  return DynamicPostWidget(
-                                    content: post['content'],
-                                    media: List<Map<String, dynamic>>.from(
-                                        (post['media'] as List<dynamic>)
-                                            .map((m) => {
-                                                  'type': m['type'],
-                                                  'url': m['url'],
-                                                })),
-                                    postId: post['_id'],
-                                    author: post['author'],
-                                    group: post['group'],
-                                    authorName: post['authorName'],
-                                    profilePic: post['profilePic'],
-                                    likes: post['likes'],
-                                    isGroupPost: post['isGroupPost'] ?? false,
-                                    public: post['public'],
-                                    comments: post['comments'],
-                                    onRefresh: updatePublicPostStatus,
-                                    showMenu: true,
-                                  );
-                                } on Exception catch (e) {
-                                  return Container();
-                                }
+                                return false;
                               },
+                              child: MasonryGridView.builder(
+                                controller: scrollController,
+                                gridDelegate:
+                                    const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                ),
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                                itemCount: posts.length + 1,
+                                itemBuilder: (context, index) {
+                                  if (index == posts.length) {
+                                    return (hasMorePost || isLoadingPost)
+                                        ? _buildSpinnerLoader()
+                                        : const SizedBox(height: 100);
+                                  }
+                                  final post = posts[index];
+                                  if (post?['media'] == null)
+                                    return Container();
+                                  else if (post?['media'].runtimeType ==
+                                      String) {
+                                    post['media'] = jsonDecode(post['media']);
+                                  }
+                                  try {
+                                    return DynamicPostWidget(
+                                      content: post['content'],
+                                      media: List<Map<String, dynamic>>.from(
+                                          (post['media'] as List<dynamic>)
+                                              .map((m) => {
+                                                    'type': m['type'],
+                                                    'url': m['url'],
+                                                  })),
+                                      postId: post['_id'],
+                                      author: post['author'],
+                                      group: post['group'],
+                                      authorName: post['authorName'],
+                                      profilePic: post['profilePic'],
+                                      likes: post['likes'],
+                                      isGroupPost: post['isGroupPost'] ?? false,
+                                      public: post['public'],
+                                      comments: post['comments'],
+                                      onRefresh: updatePublicPostStatus,
+                                      showMenu: true,
+                                    );
+                                  } on Exception catch (e) {
+                                    return Container();
+                                  }
+                                },
+                              ),
                             ),
 
                             // Memories View
-                            MasonryGridView.builder(
-                              controller: scrollController,
-                              gridDelegate:
-                                  const SliverSimpleGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                              ),
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                              itemCount: allMemories.length + 2,
-                              itemBuilder: (context, index) {
-                                if (index == 0) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      CreatePost.show(
-                                        context,
-                                        myGroupId: groupDetails!.groupId,
-                                        isGroupPost: false,
-                                        isPost: false,
-                                        isMemory: true,
-                                        message: "Share a memory",
-                                      );
-                                    },
-                                    child: Container(
-                                      height: 150,
-                                      width: 50,
-                                      decoration: BoxDecoration(
-                                        color: Colors.blueAccent,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.upload,
-                                                color: Colors.white, size: 30),
-                                            Text(
-                                              "Upload",
-                                              style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 15),
-                                            ),
-                                          ],
+                            NotificationListener<ScrollNotification>(
+                              onNotification: (ScrollNotification scrollInfo) {
+                                print(
+                                    "[MEMORIES_SCROLL] pixels=${scrollInfo.metrics.pixels}, max=${scrollInfo.metrics.maxScrollExtent}, hasMore=$hasMore, isLoading=$isLoading");
+                                if (scrollInfo.metrics.pixels >=
+                                    scrollInfo.metrics.maxScrollExtent - 200) {
+                                  if (hasMore && !isLoading) {
+                                    print(
+                                        "[MEMORIES_SCROLL] Triggering _fetchMemories!");
+                                    _fetchMemories();
+                                  }
+                                }
+                                return false;
+                              },
+                              child: MasonryGridView.builder(
+                                controller: scrollController,
+                                gridDelegate:
+                                    const SliverSimpleGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                ),
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                                itemCount: allMemories.length + 2,
+                                itemBuilder: (context, index) {
+                                  if (index == 0) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        _showUploadSheet();
+                                      },
+                                      child: Container(
+                                        height: 150,
+                                        width: 50,
+                                        decoration: BoxDecoration(
+                                          color: Colors.blueAccent,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
-                                      ),
-                                    ),
-                                  );
-                                }
-
-                                if (index == allMemories.length + 1) {
-                                  return hasMore
-                                      ? const Center(
-                                          child: CircularProgressIndicator())
-                                      : const SizedBox.shrink();
-                                }
-
-                                final memory = allMemories[index - 1];
-
-                                return GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => MemoryViewer(
-                                          memories: allMemories,
-                                          initialIndex: index - 1,
-                                          onMemoryDeleted: (memoryId) {
-                                            setState(() {
-                                              remoteMemories.removeWhere(
-                                                  (m) => m.id == memoryId);
-                                            });
-                                          },
+                                        child: const Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.upload,
+                                                  color: Colors.white,
+                                                  size: 30),
+                                              Text(
+                                                "Upload",
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 15),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     );
-                                  },
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: memory.type == MessageType.video
-                                        ? VideoMessageView(
-                                            url: memory.url,
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => MemoryViewer(
-                                                    memories: allMemories,
-                                                    initialIndex: index - 1,
-                                                    onMemoryDeleted:
-                                                        (memoryId) {
-                                                      setState(() {
-                                                        remoteMemories
-                                                            .removeWhere((m) =>
-                                                                m.id ==
-                                                                memoryId);
-                                                      });
-                                                    },
-                                                  ),
-                                                ),
-                                              );
+                                  }
+
+                                  if (index == allMemories.length + 1) {
+                                    return (hasMore || isLoading)
+                                        ? _buildSpinnerLoader()
+                                        : const SizedBox(height: 100);
+                                  }
+
+                                  final memory = allMemories[index - 1];
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => MemoryViewer(
+                                            memories: allMemories,
+                                            initialIndex: index - 1,
+                                            onMemoryDeleted: (memoryId) {
+                                              setState(() {
+                                                remoteMemories.removeWhere(
+                                                    (m) => m.id == memoryId);
+                                              });
                                             },
-                                          )
-                                        : memory.type == MessageType.image
-                                            ? Container(
-                                                decoration: BoxDecoration(
-                                                  color: Colors.grey.shade200,
-                                                  borderRadius:
-                                                      BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: memory.type == MessageType.video
+                                          ? Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.shade200,
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                              padding: const EdgeInsets.all(4),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                child: VideoMessageView(
+                                                  url: memory.url,
+                                                  onTap: () {
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) =>
+                                                            MemoryViewer(
+                                                          memories: allMemories,
+                                                          initialIndex:
+                                                              index - 1,
+                                                          onMemoryDeleted:
+                                                              (memoryId) {
+                                                            setState(() {
+                                                              remoteMemories
+                                                                  .removeWhere((m) =>
+                                                                      m.id ==
+                                                                      memoryId);
+                                                            });
+                                                          },
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
                                                 ),
-                                                padding:
-                                                    const EdgeInsets.all(4),
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  child: CachedNetworkImage(
-                                                    imageUrl: memory.url,
-                                                    placeholder: (context,
-                                                            url) =>
-                                                        const CircularProgressIndicator(),
-                                                    errorWidget: (context, url,
-                                                            error) =>
-                                                        const Icon(Icons.error),
+                                              ),
+                                            )
+                                          : memory.type == MessageType.image
+                                              ? Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade200,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            16),
                                                   ),
-                                                ))
-                                            : null,
-                                  ),
-                                );
-                              },
+                                                  padding:
+                                                      const EdgeInsets.all(4),
+                                                  child: ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                    child: CachedNetworkImage(
+                                                      imageUrl: memory.url,
+                                                      placeholder: (context,
+                                                              url) =>
+                                                          const CircularProgressIndicator(),
+                                                      errorWidget: (context,
+                                                              url, error) =>
+                                                          const Icon(
+                                                              Icons.error),
+                                                    ),
+                                                  ))
+                                              : null,
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ],
                         ),

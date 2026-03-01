@@ -67,7 +67,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     print("Posts updated from AppVariables listener $value");
     if (mounted) {
       setState(() {
-        posts.add(value);
+        posts.insert(0, value);
       });
     }
   }
@@ -643,12 +643,14 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                 }
               });
               return Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: AppColors.bottomSheetBackground,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(35),
                     topRight: Radius.circular(35),
                   ),
+                  border: Border.all(
+                      color: AppColors.bottomSheetBorder, width: 0.5),
                 ),
                 padding: const EdgeInsets.all(16),
                 child: myProfile == null
@@ -718,13 +720,14 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                             "${myProfile?['username'] ?? 'No username'}",
                                             style: TextStyle(
                                                 fontSize: 20,
-                                                fontWeight: FontWeight.bold),
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white),
                                           ),
                                           Text(
                                             "${myProfile?['name'] ?? 'No Name'}",
                                             style: TextStyle(
                                                 fontSize: 16,
-                                                color: Colors.grey),
+                                                color: Colors.grey[400]),
                                           ),
                                         ],
                                       ),
@@ -851,7 +854,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                     "No education",
                                 style: TextStyle(
                                     fontSize: 14,
-                                    color: AppColors.background,
+                                    color: Colors.white70,
                                     fontFamily: "Poppins"),
                                 textAlign: TextAlign.left,
                               ),
@@ -872,7 +875,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                           fontSize: 30,
                                           fontWeight: FontWeight.bold,
                                           fontFamily: "Poppins",
-                                          color: Colors.black)),
+                                          color: Colors.white)),
                                 ],
                               ),
                             ),
@@ -881,7 +884,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                               Center(
                                 child: Text("You Didn't Post Yet 😔",
                                     style: TextStyle(
-                                        fontSize: 16, color: Colors.black)),
+                                        fontSize: 16, color: Colors.white)),
                               ),
                             SizedBox(height: 10),
                             if (posts.isNotEmpty)

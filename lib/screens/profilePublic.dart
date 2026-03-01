@@ -601,12 +601,14 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                 }
               });
               return Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: AppColors.bottomSheetBackground,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(35),
                     topRight: Radius.circular(35),
                   ),
+                  border: Border.all(
+                      color: AppColors.bottomSheetBorder, width: 0.5),
                 ),
                 padding: const EdgeInsets.all(16),
                 child: userProfile == null
@@ -672,13 +674,14 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                             "${userProfile?['username'] ?? 'No username'}",
                                             style: TextStyle(
                                                 fontSize: 20,
-                                                fontWeight: FontWeight.bold),
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white),
                                           ),
                                           Text(
                                             "${userProfile?['name'] ?? 'No Name'}",
                                             style: TextStyle(
                                                 fontSize: 16,
-                                                color: Colors.grey),
+                                                color: Colors.grey[400]),
                                           ),
                                         ],
                                       ),
@@ -696,8 +699,8 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                     showLikeCount: true,
                                     // Custom colors for white background
                                     likedColor: Colors.red,
-                                    unlikedColor: Colors.grey,
-                                    textColor: Colors.black87,
+                                    unlikedColor: Colors.grey[400],
+                                    textColor: Colors.white70,
                                     iconSize: 32,
                                     fontSize: 14,
                                     onLikeChanged: (isLiked) async {
@@ -807,7 +810,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                     "No Education",
                                 style: TextStyle(
                                     fontSize: 14,
-                                    color: AppColors.background,
+                                    color: Colors.white70,
                                     fontFamily: "Poppins"),
                                 textAlign: TextAlign.left,
                               ),
@@ -829,7 +832,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                           fontSize: 30,
                                           fontWeight: FontWeight.bold,
                                           fontFamily: "Poppins",
-                                          color: Colors.black)),
+                                          color: Colors.white)),
                                 ],
                               ),
                             ),
@@ -838,7 +841,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                               Center(
                                 child: Text("No Post Yet 😔",
                                     style: TextStyle(
-                                        fontSize: 16, color: Colors.black)),
+                                        fontSize: 16, color: Colors.white)),
                               ),
                             SizedBox(height: 10),
                             if (posts.isNotEmpty)

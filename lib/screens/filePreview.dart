@@ -544,7 +544,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                     }
                     await showModalBottomSheet(
                       context: context,
-                      backgroundColor: Colors.black.withValues(alpha: 0.3),
+                      backgroundColor: AppColors.bottomSheetBackground,
                       barrierColor: Colors.black.withValues(alpha: 0.6),
                       isScrollControlled: true,
                       useSafeArea: true,

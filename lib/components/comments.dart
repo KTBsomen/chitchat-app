@@ -173,10 +173,22 @@ class CommentMedia extends StatelessWidget {
           case 'video':
             return VideoWidget(url: mediaItem.url);
           case 'image':
-            return CachedNetworkImage(
-              imageUrl: mediaItem.url,
-              placeholder: (context, url) => CircularProgressIndicator(),
-              errorWidget: (context, url, error) => Icon(Icons.error),
+            return Image.network(
+              mediaItem.url,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(Icons.error);
+              },
             );
           case 'audio':
             return AudioWidget(url: mediaItem.url);

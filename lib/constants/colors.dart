@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const Color transparent = Colors.transparent;
   static const Color black = const Color(0xFF000000);
+
+  // Bottom sheet colors
+  static const Color bottomSheetBackground = Color(0xFF000000);
+  static const Color bottomSheetBorder = Color(0xFF424242);
   // Primary colors
   static const Color primary = Color(0xFF1E88E5);
   static const Color secondary = Color(0xFF42A5F5);

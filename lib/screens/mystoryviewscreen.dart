@@ -243,9 +243,11 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
                 final views = currentStory.views;
                 return Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
+                    color: AppColors.bottomSheetBackground.withOpacity(0.92),
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(18)),
+                    border: Border.all(
+                        color: AppColors.bottomSheetBorder, width: 0.5),
                   ),
                   child: Column(
                     children: [
@@ -271,21 +273,21 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
                                 children: [
                                   const Icon(
                                     Icons.remove_red_eye,
-                                    color: Colors.black,
+                                    color: Colors.white,
                                     size: 18,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     '${views.length} views',
                                     style: const TextStyle(
-                                      color: Colors.black,
+                                      color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const Divider(color: Colors.white24, height: 1),
+                            const Divider(color: Colors.grey, height: 1),
                           ],
                         ),
                       ),
@@ -308,13 +310,13 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
                               ),
                               title: Text(
                                 user['username'] ?? 'Unknown',
-                                style: const TextStyle(color: Colors.black),
+                                style: const TextStyle(color: Colors.white),
                               ),
                               subtitle: user['viewedAt'] != null
                                   ? Text(
                                       _timeAgo(user['viewedAt']),
                                       style: const TextStyle(
-                                        color: Colors.black87,
+                                        color: Colors.white70,
                                         fontSize: 11,
                                       ),
                                     )

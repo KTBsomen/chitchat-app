@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:better_open_file/better_open_file.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:camerawesome/pigeon.dart';
+import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/filePreview.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -36,9 +37,12 @@ class CreatePost {
         isScrollControlled: false,
         builder: (context) {
           return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            decoration: BoxDecoration(
+              color: AppColors.bottomSheetBackground,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+              border:
+                  Border.all(color: AppColors.bottomSheetBorder, width: 0.5),
             ),
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: SafeArea(
@@ -51,7 +55,7 @@ class CreatePost {
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: Colors.grey[500],
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -356,6 +360,7 @@ class _MediaTile extends StatelessWidget {
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
+          color: Colors.white,
         ),
       ),
       onTap: onTap,
