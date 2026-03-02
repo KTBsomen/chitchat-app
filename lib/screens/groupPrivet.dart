@@ -15,6 +15,7 @@ import 'package:chitchat/components/videoWidget.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/chat.dart';
+import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/profilePrivet.dart';
 import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/fileUploader.dart';
@@ -107,6 +108,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
   Future<void> _fetchMemories({bool refresh = false}) async {
     if (isLoading) return;
+    if (groupDetails == null) return;
     setState(() => isLoading = true);
     if (refresh) {
       remoteMemories.clear();
@@ -187,9 +189,17 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
   void _handleProfileUpdate(Map<String, dynamic>? data) {
     if (mounted && data != null && data['myGroup'] != null) {
+      final bool wasNull = groupDetails == null;
       setState(() {
         groupDetails = GroupsService.buildFriendCircleGroup(data['myGroup']);
       });
+      // If groupDetails was null before (e.g. freshly created group), fetch data now
+      if (wasNull && groupDetails != null) {
+        _fetchPosts();
+        _fetchMemories();
+        _getUserLikes();
+        _fetchUserStatus();
+      }
     }
   }
 
@@ -237,6 +247,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   }
 
   void shareGroupInvitation() {
+    if (groupDetails == null) return;
     SharePlus.instance.share(ShareParams(
       title: "ChitChat Group Invitation",
       text:
@@ -267,7 +278,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       print("Error building group details: $e");
       print(s);
     }
-    _getUserLikes();
     _tabController = TabController(length: 2, vsync: this);
     AppVariables.registerState(this);
     AppVariables.addListener("profile", _handleProfileUpdate);
@@ -279,13 +289,19 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         selectedTab = _tabController.index;
       });
     });
-    _fetchPosts();
-    _fetchMemories();
-    _fetchUserStatus();
-    _startRandomRefreshTimer();
+    // Only fetch data if groupDetails is already available;
+    // otherwise _handleProfileUpdate will trigger fetching when profile arrives
+    if (groupDetails != null) {
+      _getUserLikes();
+      _fetchPosts();
+      _fetchMemories();
+      _fetchUserStatus();
+      _startRandomRefreshTimer();
+    }
   }
 
   void _fetchUserStatus() async {
+    if (groupDetails == null) return;
     final ids = groupDetails!.members.map((e) => e.id).toList();
 
     try {
@@ -355,6 +371,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
 
   void _fetchPosts() async {
     if (isLoadingPost) return;
+    if (groupDetails == null) return;
     setState(() {
       isLoadingPost = true;
     });
@@ -402,8 +419,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     }
     List<String>? ids =
         groupDetails?.members.map((member) => member.id).toList();
+    if (ids == null || ids.isEmpty) return;
     Map<String, dynamic> result =
-        await UserService.fetchUserLikes(ids: ids!, invalidate: true);
+        await UserService.fetchUserLikes(ids: ids, invalidate: true);
     if (result['success']) {
       for (var user in result['data']) {
         likeCountForMember[user['_id']] = user['likes'];
@@ -916,8 +934,16 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                             onPressed: () async {
                               await GroupsService.leaveGroup(
                                   groupDetails!.groupId);
-                              Navigator.pop(context);
-                              Navigator.pop(context);
+                              // UserService.fetchMyProfile(invalidate: true);
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                PageTransition(
+                                  type: PageTransitionType.leftToRight,
+                                  child: const HomePage(),
+                                  duration: const Duration(milliseconds: 400),
+                                ),
+                                (route) => false,
+                              );
                             },
                           ),
                         ],

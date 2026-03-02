@@ -13,6 +13,7 @@ import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
+import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:image_picker/image_picker.dart';
@@ -549,7 +550,14 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                                   groupName, url[0]);
                           print(result);
                           if (result['success'] == true) {
+                            // Refresh profile so AppVariables has the new myGroup data
+                            await UserService.fetchMyProfile();
                             Navigator.pop(context);
+                            Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const HomePage()),
+                                (route) => false);
                             Navigator.push(
                                 context,
                                 PageTransition(

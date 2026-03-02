@@ -99,6 +99,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     AppVariables.registerState(this);
     AppVariables.addListener<Map<String, dynamic>>("posts", _handlePostUpdate);
     AppVariables.addListener("deleted_posts", _handlePostDelete);
+    AppVariables.addListener("profile", _handleProfileUpdate);
   }
 
   void _handlePostDelete(value) {
@@ -111,10 +112,29 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     }
   }
 
+  void _handleProfileUpdate(Map<String, dynamic>? data) {
+    if (mounted && data != null) {
+      setState(() {
+        myProfile = data;
+        if (data['myGroup'] != null) {
+          myGroup = GroupsService.buildFriendCircleGroup(data['myGroup']);
+        } else {
+          // User left their group — show empty state
+          myGroup = FriendCircleGroup(
+            groupId: 'defaultGroup',
+            groupData: {'name': 'Default Group'},
+            members: [],
+          );
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     AppVariables.unregisterState(this);
     AppVariables.removeListener("posts", _handlePostUpdate);
+    AppVariables.removeListener("profile", _handleProfileUpdate);
     _scrollController.dispose();
     super.dispose();
   }

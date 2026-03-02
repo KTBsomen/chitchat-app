@@ -175,7 +175,9 @@ class UserService {
   }
 
   // Profile-fetching function
-  static Future<Map<String, dynamic>> fetchMyProfile() async {
+  static Future<Map<String, dynamic>> fetchMyProfile({
+    bool invalidate = false,
+  }) async {
     // String? token =
     //     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsInVzZXJJZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsImVtYWlsIjoicHJhbmF2XzYwNUBleGFtcGxlLmNvbSIsInByb2ZpbGVQaWMiOiJodHRwczovL3JhbmRvbXVzZXIubWUvYXBpL3BvcnRyYWl0cy9tZW4vNTMuanBnP25hdD1pbiIsIm5hbWUiOiJQcmFuYXYiLCJ1c2VybmFtZSI6InByYW5hdl82MDUiLCJiaW8iOiJIaSwgSSdtIFByYW5hdi4gRXhjaXRlZCB0byBjb25uZWN0ISIsImVkdWNhdGlvbkxldmVsIjoiVW5pdmVyc2l0eSIsInVuaXZlcnNpdHkiOiJCYW5hcmFzIEhpbmR1IFVuaXZlcnNpdHkiLCJjb2xsZWdlIjoiSGluZHUgQ29sbGVnZSIsInNjaG9vbCI6Ik5hdm9kYXlhIFZpZHlhbGF5YSIsInNlbWVzdGVyIjoiU2VtIDIiLCJ1c2VyQ2xhc3MiOm51bGwsInllYXIiOm51bGwsImJpcnRoZGF5IjoiMjAwNS0wOS0wMlQxODozMDowMC4wMDBaIiwiZGJJbmRleCI6MCwiaWF0IjoxNzMyMjA2NzE3fQ.RnRHKaY82lze39GppuXsJHxWphfpA8sFkQXKUGCm5OA";
 
@@ -184,7 +186,8 @@ class UserService {
       throw Exception('User is not authenticated. Please log in.');
     }
     try {
-      final url = Uri.parse('$baseurl/myprofile');
+      final url = Uri.parse(
+          '$baseurl/myprofile${invalidate ? "?invalidate=true" : ""}');
 
       final response = await http.get(
         url,
@@ -207,7 +210,8 @@ class UserService {
               'watchlist', userProfile['watchList'] as List<dynamic>);
 
           // Check for `myGroup` and parse if present
-          if (userProfile.containsKey('myGroup')) {
+          if (userProfile.containsKey('myGroup') &&
+              userProfile['myGroup'] != null) {
             final groupData = userProfile['myGroup'];
             final friendCircleGroup =
                 GroupsService.buildFriendCircleGroup(groupData);

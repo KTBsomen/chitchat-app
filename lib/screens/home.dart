@@ -819,58 +819,49 @@ class _StoryItem extends StatelessWidget {
                 //     Color.fromARGB(255, 96, 4, 194)
                 //   ],
                 // ),
-                color:
-                    isEverythingViewed() ? Colors.grey : userStory.getColor(),
+                color: userStory.username == "Me"
+                    ? Colors.transparent
+                    : isEverythingViewed()
+                        ? Colors.grey
+                        : userStory.getColor(),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Stack(
                 children: [
                   Container(
-                    width: 67,
-                    height: 80,
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF121212),
-                      borderRadius: BorderRadius.circular(40),
-                    ),
-                    child: ClipRRect(
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.network(
-                        userStory.profilePic,
-                        width: 67,
-                        height: 80,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                  : null,
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(Icons.error);
-                        },
-                        // imageBuilder: (context, imageProvider) => ClipRRect(
-                        //   borderRadius: BorderRadius.circular(35),
-                        //   child: Image(
-                        //     image: imageProvider,
-                        //     width: 67,
-                        //     height: 80,
-                        //     fit: BoxFit.cover,
-                        //   ),
-                        // ),
-                        // placeholder: (context, url) => ClipRRect(
-                        //   borderRadius: BorderRadius.circular(35),
-                        //   child: ColoredBox(
-                        //     color: Color(0xFF2A2A2A),
-                        //   ),
-                        // ),
+                      width: 67,
+                      height: 80,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF121212),
+                        borderRadius: BorderRadius.circular(40),
                       ),
-                    ),
-                  ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(35),
+                        child: SizedBox(
+                          width: 67,
+                          height: 80,
+                          child: Image.network(
+                            userStory.profilePic,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes !=
+                                          null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(Icons.error);
+                            },
+                          ),
+                        ),
+                      )),
                   if (userStory.username == "Me")
                     Positioned(
                         bottom: 0,
