@@ -932,6 +932,7 @@ class _VideoEditorState extends State<VideoEditor> {
   final _exportingProgress = ValueNotifier<double>(0.0);
   final _isExporting = ValueNotifier<bool>(false);
   final double height = 60;
+  bool _canPop = false;
 
   late final VideoEditorController _controller = VideoEditorController.file(
     widget.file,
@@ -1061,7 +1062,35 @@ class _VideoEditorState extends State<VideoEditor> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+
+        Future.delayed(Duration.zero, () {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text("Exit"),
+              content: const Text("Are you sure you want to exit?"),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("No"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx); // Close dialog
+                    setState(() => _canPop = true);
+                    Navigator.pop(context); // Close screen
+                  },
+                  child: const Text("Yes"),
+                ),
+              ],
+            ),
+          );
+        });
+      },
       child: Scaffold(
         backgroundColor: Colors.black,
         body: _controller.initialized
@@ -1208,7 +1237,7 @@ class _VideoEditorState extends State<VideoEditor> {
             Expanded(
               child: IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.exit_to_app, color: Colors.white),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
                 tooltip: 'Leave editor',
               ),
             ),
@@ -1243,9 +1272,20 @@ class _VideoEditorState extends State<VideoEditor> {
             // ),
             const VerticalDivider(endIndent: 22, indent: 22),
             Expanded(
-              child: IconButton(
-                icon: const Icon(Icons.save, color: Colors.white),
-                onPressed: _exportVideo,
+              child: Row(
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 10),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _exportVideo,
+                    child: const Text("Next"),
+                  ),
+                  const SizedBox(width: 10),
+                ],
               ),
             ),
           ],
@@ -1290,7 +1330,7 @@ class _VideoEditorState extends State<VideoEditor> {
       ),
       Container(
         width: MediaQuery.of(context).size.width,
-        margin: EdgeInsets.symmetric(vertical: height / 4),
+        margin: EdgeInsets.symmetric(vertical: height / 4, horizontal: 15),
         child: TrimSlider(
           controller: _controller,
           height: height,
