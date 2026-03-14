@@ -3,21 +3,26 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:chatview/chatview.dart';
+import 'package:chitchat/main.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+
+import 'package:visibility_detector/visibility_detector.dart';
 
 class VideoMessageView extends StatefulWidget {
   const VideoMessageView({
     super.key,
     required this.url,
     this.onTap,
+    this.height, // Made height configurable
     this.highlightVideo = false,
     this.highlightScale = 1.2,
   });
 
   final String url;
   final VoidCallback? onTap;
+  final double? height;
   final bool highlightVideo;
   final double highlightScale;
 
@@ -25,8 +30,15 @@ class VideoMessageView extends StatefulWidget {
   State<VideoMessageView> createState() => _VideoMessageViewState();
 }
 
-class _VideoMessageViewState extends State<VideoMessageView> {
+class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
   Uint8List? _thumbnailBytes;
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _isVisible = false;
+  bool _isMuted = true;
+  bool _isRouteActive = true;
+  bool _disposed = false;
+  bool _isInitializing = false;
 
   String get videoUrl => widget.url;
 
@@ -34,6 +46,74 @@ class _VideoMessageViewState extends State<VideoMessageView> {
   void initState() {
     super.initState();
     _generateThumbnail();
+    // DO NOT init controller here — wait until visible (lazy init)
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    _isRouteActive = false;
+    // Fully dispose the controller to release the native hardware decoder
+    _releaseController();
+  }
+
+  @override
+  void didPopNext() {
+    _isRouteActive = true;
+    // Lazy re-init will pick it up if visible via _onVisibilityChanged
+    if (_isVisible && !_isInitialized && !_isInitializing) {
+      _initController();
+    }
+  }
+
+  void _releaseController() {
+    _controller?.dispose();
+    _controller = null;
+    _isInitialized = false;
+    _isInitializing = false;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _initController() async {
+    if (_isInitializing || _disposed) return;
+    _isInitializing = true;
+    try {
+      final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+      // Check disposed BEFORE the expensive network call
+      if (_disposed) {
+        controller.dispose();
+        return;
+      }
+      await controller.initialize();
+      // Check disposed AFTER the async gap
+      if (_disposed) {
+        controller.dispose();
+        return;
+      }
+      _controller = controller;
+      _controller!.setLooping(true);
+      _controller!.setVolume(_isMuted ? 0.0 : 1.0);
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+        if (_isVisible && _isRouteActive) {
+          _controller!.play();
+        }
+      }
+    } catch (e) {
+      debugPrint("VideoMessageView: Error initializing video: $e");
+    } finally {
+      _isInitializing = false;
+    }
   }
 
   Future<void> _generateThumbnail() async {
@@ -43,7 +123,7 @@ class _VideoMessageViewState extends State<VideoMessageView> {
         imageFormat: ImageFormat.PNG,
         quality: 75,
       );
-      if (uint8list != null) {
+      if (uint8list != null && mounted && !_disposed) {
         setState(() {
           _thumbnailBytes = uint8list;
         });
@@ -53,59 +133,144 @@ class _VideoMessageViewState extends State<VideoMessageView> {
     }
   }
 
+  void _onVisibilityChanged(VisibilityInfo info) {
+    if (!mounted || _disposed) return;
+    final visible = info.visibleFraction >= 0.5;
+    _isVisible = visible;
+
+    // Lazy init: only create the controller when scrolled into view
+    if (visible && !_isInitialized && !_isInitializing) {
+      _initController();
+      return;
+    }
+
+    if (!_isInitialized || _controller == null) return;
+
+    if (visible && _isRouteActive) {
+      if (!_controller!.value.isPlaying) {
+        _controller!.play();
+      }
+    } else {
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    routeObserver.unsubscribe(this);
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _toggleMute() {
+    if (_controller == null) return;
+    setState(() {
+      _isMuted = !_isMuted;
+      _controller!.setVolume(_isMuted ? 0.0 : 1.0);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 200,
-      height: 300,
-      child: Stack(
-        children: [
-          GestureDetector(
-            onTap: widget.onTap ??
-                () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FullScreenVideoPlayer(
-                          videoUrl: videoUrl,
-                          heroTag: widget.url,
-                          fromMemory: false,
-                        ),
-                      ),
-                    ),
-            child: SizedBox(
-              child: _thumbnailBytes != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.memory(
-                          _thumbnailBytes!,
-                          fit: BoxFit.cover,
-                        ),
-                        Container(
-                          color: Colors.black26,
-                        ),
-                        Center(
-                          child: Icon(
-                            Icons.play_circle_fill,
-                            color: Colors.white.withOpacity(0.8),
-                            size: 64,
+    return VisibilityDetector(
+      key: Key('video-view-${widget.url}-${identityHashCode(this)}'),
+      onVisibilityChanged: _onVisibilityChanged,
+      child: SizedBox(
+        width: double.infinity,
+        height: widget.height ?? 240,
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: widget.onTap ??
+                  () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FullScreenVideoPlayer(
+                            videoUrl: videoUrl,
+                            heroTag: widget.url,
+                            fromMemory: false,
                           ),
                         ),
-                      ],
-                    )
-                  : Container(
-                      color: Colors.black12,
-                      child: Center(
-                        child: Icon(
-                          Icons.videocam,
-                          size: 48,
-                          color: Colors.grey.shade700,
-                        ),
                       ),
-                    ),
+              onPanUpdate: (_) {
+                if (_isInitialized &&
+                    _controller != null &&
+                    !_controller!.value.isPlaying &&
+                    _isVisible &&
+                    _isRouteActive) {
+                  _controller!.play();
+                }
+              },
+              child: SizedBox.expand(
+                child: _isInitialized
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: _controller!.value.size.width,
+                            height: _controller!.value.size.height,
+                            child: VideoPlayer(_controller!),
+                          ),
+                        ),
+                      )
+                    : (_thumbnailBytes != null
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.memory(
+                                _thumbnailBytes!,
+                                fit: BoxFit.cover,
+                              ),
+                              Container(
+                                color: Colors.black26,
+                              ),
+                              Center(
+                                child: Icon(
+                                  Icons.play_circle_fill,
+                                  color: Colors.white.withOpacity(0.8),
+                                  size: 48,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Container(
+                            color: Colors.black12,
+                            child: Center(
+                              child: Icon(
+                                Icons.videocam,
+                                size: 32,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          )),
+              ),
             ),
-          ),
-        ],
+            if (_isInitialized)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: _toggleMute,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isMuted ? Icons.volume_off : Icons.volume_up,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

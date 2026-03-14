@@ -1,15 +1,12 @@
 import 'dart:async';
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:chitchat/appstate/store.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/comments.dart';
 import 'package:chitchat/components/like.dart';
 import 'package:chitchat/components/relatedpost.dart';
 import 'package:chitchat/components/simpleaudioplayer.dart';
-import 'package:chitchat/components/videoWidget.dart';
 import 'package:chitchat/components/feedVideoPlayer.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
@@ -41,8 +38,12 @@ class DynamicPostWidget extends StatefulWidget {
   final bool? showMenu;
   final bool? public;
   final Function? onRefresh;
+  final bool isFullPage;
+  final String? initialCommentId;
+  final Map<String, dynamic>? initialCommentData;
 
   DynamicPostWidget({
+    Key? key,
     required this.content,
     required this.media,
     required this.postId,
@@ -59,7 +60,10 @@ class DynamicPostWidget extends StatefulWidget {
     this.showMenu = false,
     this.onRefresh,
     this.isGroupPost,
-  });
+    this.isFullPage = false,
+    this.initialCommentId,
+    this.initialCommentData,
+  }) : super(key: key);
 
   @override
   State<DynamicPostWidget> createState() => _DynamicPostWidgetState();
@@ -72,6 +76,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
       AppVariables.get<Map<String, dynamic>>('profile') ?? {};
   bool isPanning = false;
   bool isLoading = true;
+  int mediaIndex = 1;
   void pickimage(context, TextEditingController commentController,
       {String filetype = "image"}) async {
     String baseurl =
@@ -219,8 +224,14 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
   @override
   void initState() {
     super.initState();
+    _initializeProfile();
     AppVariables.registerState(this);
-    //initStores();
+    if (widget.initialCommentId != null &&
+        widget.initialCommentId!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openCommentSheet(context);
+      });
+    }
   }
 
   final ValueNotifier<List<NotificationModel>> notificationsNotifier =
@@ -262,18 +273,22 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
       print(fetchedComments);
       if (mounted) {
         setState(() {
-          if (comments.isNotEmpty &&
-              !comments.contains(fetchedComments["comments"])) {
-            comments.addAll(fetchedComments["comments"]);
+          final incoming = fetchedComments["comments"] as List<Comment>;
+          if (comments.isNotEmpty) {
+            // Deduplicate: only add comments not already in the list
+            final existingIds = comments.map((c) => c.Id).toSet();
+            final uniqueIncoming =
+                incoming.where((c) => !existingIds.contains(c.Id)).toList();
+
+            comments.addAll(uniqueIncoming);
             lastCommentId = fetchedComments["lastId"];
             hasMoreComments = fetchedComments["hasMore"];
           } else {
-            comments = fetchedComments["comments"];
+            comments = incoming;
 
             lastCommentId = fetchedComments["lastId"];
             hasMoreComments = fetchedComments["hasMore"];
           }
-          // comments = fetchedComments;
         });
       }
       dispatchCustomEvent([comments, isCommentsAreLoading], "comments");
@@ -370,10 +385,134 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     });
   }
 
-  // Open BottomSheet with media slider
-  void _openBottomSheet(BuildContext context) {
-    int mediaIndex = 1;
+  Widget _buildDetailedView(ScrollController? scrollController) {
+    ScrollController effectiveController =
+        scrollController ?? ScrollController();
     _getNotifications();
+    var commentController = TextEditingController();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bottomSheetBackground,
+        borderRadius: widget.isFullPage
+            ? BorderRadius.zero
+            : const BorderRadius.vertical(top: Radius.circular(20)),
+        border: widget.isFullPage
+            ? null
+            : Border.all(color: AppColors.bottomSheetBorder, width: 0.5),
+      ),
+      child: Column(
+        children: [
+          if (!widget.isFullPage)
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              height: 4,
+              width: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          // Main content
+          Expanded(
+            child: CustomScrollView(
+              controller: scrollController,
+              slivers: [
+                // Collapsible media section
+                SliverAppBar(
+                  backgroundColor: Colors.transparent,
+                  pinned: true,
+                  expandedHeight: widget.isFullPage ? 400 : 500,
+                  automaticallyImplyLeading: false,
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: PageView.builder(
+                      onPageChanged: (value) {
+                        setState(() {
+                          mediaIndex = value + 1;
+                        });
+                      },
+                      itemCount: widget.media.length,
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          child: _buildMediaContent(widget.media[index]),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                //likes comments
+                if (widget.public == false)
+                  SliverToBoxAdapter(child: _buildVotingSection())
+                else
+                  RelatedPostsWidget(
+                    postId: widget.postId,
+                    authorId: widget.author,
+                    profilePic: widget.profilePic ?? "",
+                    authorName: widget.authorName ?? "",
+                    scrollController: effectiveController,
+                    isGroupPost: widget.isGroupPost,
+                    showMoreButton: widget.showMenu != null && widget.showMenu!
+                        ? () {
+                            _openMore(context);
+                          }
+                        : null,
+                    middleItem: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: LikeButton(
+                                buttonType: ButtonType.post,
+                                postId: widget.postId,
+                                initialLikes: widget.likes,
+                                initiallyLiked: false,
+                                onLikeChanged: (isLiked) async {
+                                  Map<String, dynamic> result =
+                                      await PostService.toggleLikeOnPost(
+                                          widget.postId);
+                                  if (result["success"] && mounted) {
+                                    return true;
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                            content: Text(result["message"])));
+                                    return false;
+                                  }
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              icon: Row(
+                                children: [
+                                  const Icon(Icons.comment,
+                                      color: Colors.white),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    widget.comments.toString(),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                              onPressed: () => _openCommentSheet(context),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openBottomSheet(BuildContext context) {
     showModalBottomSheet(
       enableDrag: true,
       context: context,
@@ -391,150 +530,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
               minChildSize: 0.3,
               maxChildSize: 1,
               builder: (context, scrollController) {
-                var commentController = TextEditingController();
-                return Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.bottomSheetBackground,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(20)),
-                    border: Border.all(
-                        color: AppColors.bottomSheetBorder, width: 0.5),
-                  ),
-                  child: Column(
-                    children: [
-                      // Drag handle
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        height: 4,
-                        width: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      // Main content
-                      Expanded(
-                        child: CustomScrollView(
-                          controller: scrollController,
-                          slivers: [
-                            // Collapsible media section
-                            SliverAppBar(
-                              backgroundColor: Colors.transparent,
-                              pinned: true,
-                              expandedHeight: 500,
-                              automaticallyImplyLeading: false,
-                              flexibleSpace: FlexibleSpaceBar(
-                                background: PageView.builder(
-                                  onPageChanged: (value) {
-                                    setState(() {
-                                      mediaIndex = value + 1;
-                                    });
-                                  },
-                                  itemCount: widget.media.length,
-                                  itemBuilder: (context, index) {
-                                    return GestureDetector(
-                                      child: _buildMediaContent(
-                                          widget.media[index]),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                            //likes comments
-                            if (widget.public == false)
-                              SliverToBoxAdapter(child: _buildVotingSection())
-                            else
-                              RelatedPostsWidget(
-                                postId: widget.postId,
-                                authorId: widget.author,
-                                profilePic: widget.profilePic ?? "",
-                                authorName: widget.authorName ?? "",
-                                scrollController: scrollController,
-                                isGroupPost: widget.isGroupPost,
-                                showMoreButton:
-                                    widget.showMenu != null && widget.showMenu!
-                                        ? () {
-                                            _openMore(context);
-                                          }
-                                        : null,
-                                middleItem: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: LikeButton(
-                                            buttonType: ButtonType.post,
-                                            postId: widget.postId,
-                                            initialLikes: widget.likes,
-                                            initiallyLiked: false,
-                                            onLikeChanged: (isLiked) async {
-                                              Map<String, dynamic> result =
-                                                  await PostService
-                                                      .toggleLikeOnPost(
-                                                          widget.postId);
-                                              if (result["success"] &&
-                                                  mounted) {
-                                                setState(() {
-                                                  // Update the like count and state based on the result
-                                                });
-                                                return true;
-                                              } else {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(SnackBar(
-                                                        content: Text(result[
-                                                            "message"])));
-                                                return false;
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Row(
-                                            children: [
-                                              const Icon(Icons.comment,
-                                                  color: Colors.white),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                comments.isNotEmpty
-                                                    ? comments.length.toString()
-                                                    : widget.comments
-                                                        .toString(),
-                                                style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 14),
-                                              ),
-                                            ],
-                                          ),
-                                          onPressed: () =>
-                                              _openCommentSheet(context),
-                                        ),
-                                      ],
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(
-                                        mediaIndex == widget.media.length
-                                            ? ""
-                                            : "$mediaIndex/${widget.media.length}",
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      // Fixed comment input at bottom
-                    ],
-                  ),
-                );
+                return _buildDetailedView(scrollController);
               },
             ),
           );
@@ -549,6 +545,33 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     int mediaIndex = 1;
     bool isCommenting = false;
     comments = [];
+    if (widget.initialCommentId != null && widget.initialCommentData != null) {
+      try {
+        final data = widget.initialCommentData!;
+        // Construct a safe Comment object
+        final prefilled = Comment(
+          Id: data['_id']?.toString() ?? widget.initialCommentId!,
+          author: data['author']?.toString() ?? '',
+          postId: data['post']?.toString() ?? widget.postId,
+          content: data['content']?.toString() ?? '',
+          authorName: data['authorName']?.toString() ?? 'User',
+          profilePic: data['profilePic']?.toString() ?? '',
+          media: (data['media'] as List?)
+                  ?.map((m) => Media.fromJson(m as Map<String, dynamic>))
+                  .toList() ??
+              [],
+          likes: data['likes'] as int? ?? 0,
+          createdAt: data['createdAt'] != null
+              ? DateTime.parse(data['createdAt'])
+              : DateTime.now(),
+        );
+        comments.add(prefilled);
+      } catch (e) {
+        print('Error pre-filling comment: $e');
+      }
+    }
+    ScrollController? activeScrollController;
+    bool haveScrolledToInitial = false;
     _getComments();
     showModalBottomSheet(
       enableDrag: true,
@@ -561,10 +584,37 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
           if (mounted) {
             subscription ??= addCustomEventListener("comments", (data) {
               if (mounted) {
+                final newComments = data[0] as List<Comment>;
                 setState(() {
-                  comments = data[0];
-                  isCommentsAreLoading = data[1];
+                  comments = newComments;
+                  isCommentsAreLoading = data[1] as bool;
                 });
+
+                // Auto-scroll to highlighted comment if present
+                if (!haveScrolledToInitial &&
+                    widget.initialCommentId != null &&
+                    widget.initialCommentId!.isNotEmpty) {
+                  final index = newComments
+                      .indexWhere((c) => c.Id == widget.initialCommentId);
+                  if (index != -1) {
+                    haveScrolledToInitial = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      try {
+                        // Approximate scroll to the item
+                        if (activeScrollController != null &&
+                            activeScrollController!.hasClients) {
+                          activeScrollController!.animateTo(
+                            index * 120.0, // Rough estimate of comment height
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      } catch (e) {
+                        print('Error scrolling to comment: $e');
+                      }
+                    });
+                  }
+                }
               }
             });
           }
@@ -578,6 +628,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
               minChildSize: 0.3,
               maxChildSize: 1,
               builder: (context, scrollController) {
+                activeScrollController = scrollController;
                 var commentController = TextEditingController();
                 return Container(
                   decoration: const BoxDecoration(
@@ -609,6 +660,8 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                           },
                           child: CustomScrollView(
                             controller: scrollController,
+                            cacheExtent:
+                                1000, // Pre-render some items for smoother scrolling
                             slivers: [
                               // Comments list
                               const SliverToBoxAdapter(
@@ -651,73 +704,91 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                         (context, index) {
                                           final comment = comments[index];
                                           bool likefound = false;
+                                          final isHighlighted =
+                                              widget.initialCommentId ==
+                                                  comment.Id;
 
-                                          return ListTile(
-                                            isThreeLine: true,
-                                            leading: CircleAvatar(
-                                                backgroundImage: NetworkImage(
-                                                    comment.profilePic)),
-                                            title: Text(comment.authorName,
-                                                style: const TextStyle(
-                                                    fontSize: 10,
-                                                    color: Colors.white54,
-                                                    fontWeight:
-                                                        FontWeight.bold)),
-                                            //TODO: Add like functionality
-                                            trailing: LikeButton(
-                                              postId: comment.Id,
-                                              buttonType: ButtonType.comment,
-                                              initialLikes: comment.likes,
-                                              initiallyLiked: likefound,
-                                              onLikeChanged: (isLiked) async {
-                                                print(comment.Id);
-                                                Map<String, dynamic> result =
-                                                    await PostService
-                                                        .toggleLikeOnComment(
-                                                            comment.Id);
-                                                print(result);
-
-                                                if (result["success"] &&
-                                                    mounted) {
-                                                  setState(() {});
-                                                  ScaffoldMessenger.of(context)
-                                                      .showSnackBar(SnackBar(
-                                                          content: Text(result[
-                                                              "message"])));
-                                                  if (result["status"] ==
-                                                      "unliked") {
-                                                    return false;
-                                                  } else {
-                                                    return true;
-                                                  }
-                                                } else {
-                                                  ScaffoldMessenger.of(context)
-                                                      .showSnackBar(SnackBar(
-                                                          content: Text(result[
-                                                              "message"])));
-                                                  return false;
-                                                }
-                                              },
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: isHighlighted
+                                                  ? Colors.blue.withOpacity(0.1)
+                                                  : null,
+                                              border: isHighlighted
+                                                  ? const Border(
+                                                      left: BorderSide(
+                                                          color: Colors.blue,
+                                                          width: 4))
+                                                  : null,
                                             ),
-                                            subtitle: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(comment.content,
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                      color: Colors.white,
-                                                    )),
-                                                const SizedBox(height: 8),
-                                                Text(comment.timeAgo,
-                                                    style: const TextStyle(
+                                            child: ListTile(
+                                              isThreeLine: true,
+                                              leading: CircleAvatar(
+                                                  backgroundImage: NetworkImage(
+                                                      comment.profilePic)),
+                                              title: Text(comment.authorName,
+                                                  style: const TextStyle(
                                                       fontSize: 10,
                                                       color: Colors.white54,
-                                                    )),
-                                                const SizedBox(height: 8),
-                                                CommentMedia(
-                                                    media: comment.media),
-                                              ],
+                                                      fontWeight:
+                                                          FontWeight.bold)),
+                                              //TODO: Add like functionality
+                                              trailing: LikeButton(
+                                                postId: comment.Id,
+                                                buttonType: ButtonType.comment,
+                                                initialLikes: comment.likes,
+                                                initiallyLiked: likefound,
+                                                onLikeChanged: (isLiked) async {
+                                                  print(comment.Id);
+                                                  Map<String, dynamic> result =
+                                                      await PostService
+                                                          .toggleLikeOnComment(
+                                                              comment.Id);
+                                                  print(result);
+
+                                                  if (result["success"] &&
+                                                      mounted) {
+                                                    setState(() {});
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(SnackBar(
+                                                            content: Text(result[
+                                                                "message"])));
+                                                    if (result["status"] ==
+                                                        "unliked") {
+                                                      return false;
+                                                    } else {
+                                                      return true;
+                                                    }
+                                                  } else {
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(SnackBar(
+                                                            content: Text(result[
+                                                                "message"])));
+                                                    return false;
+                                                  }
+                                                },
+                                              ),
+                                              subtitle: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(comment.content,
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        color: Colors.white,
+                                                      )),
+                                                  const SizedBox(height: 8),
+                                                  Text(comment.timeAgo,
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.white54,
+                                                      )),
+                                                  const SizedBox(height: 8),
+                                                  CommentMedia(
+                                                      media: comment.media),
+                                                ],
+                                              ),
                                             ),
                                           );
                                         },
@@ -1305,6 +1376,9 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isFullPage) {
+      return _buildDetailedView(null);
+    }
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () => _openBottomSheet(context),

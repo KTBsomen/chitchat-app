@@ -911,6 +911,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                               MasonryGridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
+                                addAutomaticKeepAlives: true,
                                 gridDelegate:
                                     const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
@@ -921,13 +922,15 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                 itemBuilder: (context, index) {
                                   final post = posts[index];
                                   if (post?['media'] == null)
-                                    return Container();
+                                    return Container(
+                                        key: ValueKey('post-empty-$index'));
                                   else if (post?['media'].runtimeType ==
                                       String) {
                                     post['media'] = jsonDecode(post['media']);
                                   }
                                   try {
                                     return DynamicPostWidget(
+                                      key: ValueKey('post-${post['_id']}'),
                                       borderRadius: 12,
                                       content: post['content'],
                                       media: List<Map<String, dynamic>>.from(
@@ -947,7 +950,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                                       comments: post['comments'],
                                     );
                                   } on Exception catch (e) {
-                                    return Container();
+                                    return Container(
+                                        key: ValueKey('post-error-$index'));
                                   }
                                   // return ClipRRect(
                                   //   borderRadius: BorderRadius.circular(8),

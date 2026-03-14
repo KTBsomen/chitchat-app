@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
+import 'package:chitchat/main.dart';
 
 /// A self-contained feed video widget that auto-plays muted when visible
 /// and pauses when scrolled out of view.
@@ -18,50 +19,108 @@ class FeedVideoPlayer extends StatefulWidget {
   State<FeedVideoPlayer> createState() => _FeedVideoPlayerState();
 }
 
-class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
+class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
   VideoPlayerController? _controller;
   bool _initialized = false;
   bool _hasError = false;
   bool _isMuted = true;
   bool _isVisible = false;
+  bool _isRouteActive = true;
+  bool _disposed = false;
+  bool _isInitializing = false;
 
   @override
   void initState() {
     super.initState();
-    _initController();
+    // DO NOT init controller here — wait until visible (lazy init)
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute != null) {
+      routeObserver.subscribe(this, modalRoute);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    _isRouteActive = false;
+    // Fully dispose the controller to release the native hardware decoder
+    _releaseController();
+  }
+
+  @override
+  void didPopNext() {
+    _isRouteActive = true;
+    // Lazy re-init will pick it up if visible via _onVisibilityChanged
+    if (_isVisible && !_initialized && !_isInitializing) {
+      _initController();
+    }
+  }
+
+  void _releaseController() {
+    _controller?.dispose();
+    _controller = null;
+    _initialized = false;
+    _isInitializing = false;
+    if (mounted) setState(() {});
   }
 
   Future<void> _initController() async {
+    if (_isInitializing || _disposed) return;
+    _isInitializing = true;
     try {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-      await _controller!.initialize();
+      final controller =
+          VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      // Check disposed BEFORE the expensive network call
+      if (_disposed) {
+        controller.dispose();
+        return;
+      }
+      await controller.initialize();
+      // Check disposed AFTER the async gap
+      if (_disposed) {
+        controller.dispose();
+        return;
+      }
+      _controller = controller;
       _controller!.setLooping(true);
       _controller!.setVolume(0.0); // start muted
       if (mounted) {
         setState(() {
           _initialized = true;
         });
-        // If already visible when init completes, start playing
-        if (_isVisible) {
+        if (_isVisible && _isRouteActive) {
           _controller!.play();
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && !_disposed) {
         setState(() {
           _hasError = true;
         });
       }
+    } finally {
+      _isInitializing = false;
     }
   }
 
   void _onVisibilityChanged(VisibilityInfo info) {
+    if (!mounted || _disposed) return;
     final visible = info.visibleFraction >= 0.5;
     _isVisible = visible;
 
+    // Lazy init: only create the controller when scrolled into view
+    if (visible && !_initialized && !_isInitializing && !_hasError) {
+      _initController();
+      return;
+    }
+
     if (!_initialized || _controller == null) return;
 
-    if (visible) {
+    if (visible && _isRouteActive) {
       if (!_controller!.value.isPlaying) {
         _controller!.play();
       }
@@ -82,6 +141,8 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
 
   @override
   void dispose() {
+    _disposed = true;
+    routeObserver.unsubscribe(this);
     _controller?.dispose();
     super.dispose();
   }
@@ -89,10 +150,19 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     return VisibilityDetector(
-      key: Key('feed-video-${widget.url}'),
+      key: Key('feed-video-${widget.url}-${identityHashCode(this)}'),
       onVisibilityChanged: _onVisibilityChanged,
       child: GestureDetector(
         onTap: widget.onTap,
+        onPanUpdate: (_) {
+          if (_initialized &&
+              _controller != null &&
+              !_controller!.value.isPlaying &&
+              _isVisible &&
+              _isRouteActive) {
+            _controller!.play();
+          }
+        },
         child: SizedBox(
           width: 200,
           height: 300,

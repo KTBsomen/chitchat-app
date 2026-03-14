@@ -26,6 +26,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/chat.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +37,11 @@ void main() async {
   await FCMHandler.initialize();
   await StoryPrefs.init();
   runApp(OKToast(
-      child: MaterialApp(navigatorKey: navigatorKey, home: LoginScreen())));
+      child: MaterialApp(
+    navigatorKey: navigatorKey,
+    home: LoginScreen(),
+    navigatorObservers: [routeObserver],
+  )));
 }
 
 class LoginScreen extends StatefulWidget {
@@ -79,8 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
       print("DeepLinkRouter initialization error: $e");
     }
 
-    // AppVariables.update('baseurl', 'https://5xlxdw5g-3000.inc1.devtunnels.ms');
-    AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
+    AppVariables.update('baseurl', 'https://5xlxdw5g-3000.inc1.devtunnels.ms');
+    // AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
 
     UserService.isLoggedIn().then((value) async {
       if (value) {

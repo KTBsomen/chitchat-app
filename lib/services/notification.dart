@@ -58,11 +58,17 @@ class AppNotification {
   }
 
   /// Generate a deterministic ID from notification content so the same
-  /// notification always produces the same key (prevents duplicates when
-  /// the server doesn't provide an _id).
+  /// notification always produces the same key (prevents duplicates).
+  /// Including a coarse date salt allows dismissed types to reappear later.
   static String _generateContentId(Map<String, dynamic> json) {
+    final data = json['data'] ?? {};
+    final extra = data is Map
+        ? '${data['post'] ?? data['_id'] ?? data['comment'] ?? ''}'
+        : '';
+    // Date salt: days since epoch
+    final salt = DateTime.now().millisecondsSinceEpoch ~/ (1000 * 60 * 60 * 24);
     final seed =
-        '${json['title']}|${json['body']}|${json['type']}|${json['icon']}';
+        '${json['title']}|${json['body']}|${json['type']}|${json['icon']}|$extra|$salt';
     // Simple hash — deterministic across parses.
     var hash = 0;
     for (var i = 0; i < seed.length; i++) {
@@ -86,7 +92,7 @@ class AppNotification {
   }
 
   /// Convert to a map suitable for NotificationStore.
-  Map<String, dynamic> toStoreMap() {
+  Map<String, dynamic> toStoreMap({String sourceType = 'redis'}) {
     return {
       'id': id,
       'title': title,
@@ -97,7 +103,7 @@ class AppNotification {
       'data': data,
       'clickAction': clickAction,
       'link': link,
-      'sourceType': 'redis',
+      'sourceType': sourceType,
     };
   }
 
@@ -278,7 +284,7 @@ class NotificationService {
       // Store new notifications locally (deduplicates by id)
       final storeMaps = notifications
           .where((n) => n.id != null)
-          .map((n) => n.toStoreMap())
+          .map((n) => n.toStoreMap(sourceType: 'redis'))
           .toList();
       final added = await NotificationStore.addNotifications(storeMaps);
       if (added > 0) {
@@ -297,6 +303,100 @@ class NotificationService {
         showPopup(context, error.toString());
       }
       return [];
+    }
+  }
+
+  /// Fetch group basic notifications from server, store locally, then clear from server.
+  static Future<List<AppNotification>?> getGroupNotifications(
+      BuildContext? context, String groupId,
+      {bool showMessage = true, bool showLoaders = true}) async {
+    try {
+      String? accessToken = await UserService.getAccessToken();
+      if (showLoaders && context != null) {
+        showLoader(context);
+      }
+      final response = await http.get(
+        Uri.parse("$baseurl/notifications/group/$groupId"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      if (showLoaders && context != null) {
+        hideLoader(context);
+      }
+
+      if (response.statusCode != 200) {
+        throw Exception("Failed to fetch group notifications");
+      }
+
+      final data = jsonDecode(response.body);
+
+      // Parse notifications
+      List<AppNotification> notifications = List<AppNotification>.from(
+          data.map((notif) => AppNotification.fromJson(notif)));
+
+      // Store new notifications locally (deduplicated by id)
+      final storeMaps = notifications
+          .where((n) => n.id != null)
+          .map((n) => n.toStoreMap(sourceType: 'group'))
+          .toList();
+      final added = await NotificationStore.addNotifications(storeMaps);
+      if (added > 0) {
+        NotificationManager.instance.refreshCount();
+      }
+
+      // Clear server group notifications
+      if (notifications.isNotEmpty) {
+        _clearGroupServerNotifications(groupId);
+      }
+
+      return notifications;
+    } catch (error) {
+      if (showMessage && context != null) {
+        hideLoader(context);
+        showPopup(context, error.toString());
+      }
+      return [];
+    }
+  }
+
+  /// Fire-and-forget: clear the server's group notification list.
+  static Future<void> _clearGroupServerNotifications(String groupId) async {
+    try {
+      String? accessToken = await UserService.getAccessToken();
+      await http.delete(
+        Uri.parse("$baseurl/notifications/group/clear/$groupId"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+    } catch (_) {}
+  }
+
+  /// Clear all group notifications from server.
+  static Future<bool> clearAllGroupNotificationsFromServer(
+      BuildContext context, String groupId) async {
+    try {
+      String? accessToken = await UserService.getAccessToken();
+      final response = await http.delete(
+        Uri.parse("$baseurl/notifications/group/clear/$groupId"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception("Failed to clear group notifications");
+      }
+
+      return true;
+    } catch (error) {
+      print(error.toString());
+      return false;
     }
   }
 
@@ -372,7 +472,12 @@ class NotificationService {
         hideLoader(context);
       }
 
-      if (response.statusCode == 404) {
+      if (response.statusCode == 404 ||
+          response.statusCode == 400 ||
+          data["joinRequests"] == null) {
+        // Clear local cache if server says none exist or error
+        await NotificationStore.removeNotificationsBySourceType('api');
+        NotificationManager.instance.refreshCount();
         return [];
       }
 
@@ -394,7 +499,10 @@ class NotificationService {
                 'data': req,
               })
           .toList();
-      await NotificationStore.addNotifications(storeMaps);
+
+      // IMPORTANT: Clear old 'api' notifications and replace with fresh ones
+      await NotificationStore.addNotifications(storeMaps,
+          clearSourceType: 'api');
       NotificationManager.instance.refreshCount();
 
       return joinRequests;
@@ -430,7 +538,10 @@ class NotificationService {
         hideLoader(context);
       }
 
-      if (response.statusCode == 404) {
+      if (response.statusCode == 404 ||
+          response.statusCode == 400 ||
+          data["postRequests"] == null) {
+        // Clear if not found or error
         return [];
       }
 

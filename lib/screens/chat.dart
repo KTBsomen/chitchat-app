@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatview/chatview.dart';
 import 'package:chitchat/screens/search.dart';
 import 'package:chitchat/services/user.dart';
+import 'package:chitchat/services/posts.dart';
 import 'package:chitchat/services/userOnline.dart';
 import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 
@@ -52,6 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int windowSize = 20;
   int pageinmemory = 2;
   List<Message> messageQueue = [];
+  final Set<String> _memorySentUrls = {}; // prevent duplicate memory uploads
   Future<List<Message>> initDB() async {
     final db = FlutterDB();
 
@@ -1385,6 +1387,26 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {});
           mqtt.publish(jsonEncode(message.toJson()));
           message.setStatus = MessageStatus.delivered;
+
+          // Auto-add media to memories (fire-and-forget, skip duplicates)
+          final url = uploadResponse.publicUrl;
+          if ((messageType == MessageType.image ||
+                  messageType == MessageType.video) &&
+              groupDetails != null &&
+              !_memorySentUrls.contains(url)) {
+            _memorySentUrls.add(url);
+            PostService.createMemories(
+              files: [url],
+              myGroupId: groupDetails!.groupId,
+            ).then((result) {
+              if (result['success']) {
+                print('[MEMORY] Auto-saved chat media as memory');
+              } else {
+                print('[MEMORY] Failed: ${result['error']}');
+                _memorySentUrls.remove(url); // allow retry
+              }
+            });
+          }
         }).catchError((error) {
           print('Upload failed: $error');
           message.setStatus = MessageStatus.error;

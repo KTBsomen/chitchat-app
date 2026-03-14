@@ -135,58 +135,75 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
 
   void _processResponse(Map<String, dynamic> response,
       {required bool isInitial}) {
-    final related = response['related'] as Map<String, dynamic>;
-    final pagination = response['pagination'] as Map<String, dynamic>;
-    final cursors = pagination['cursors'] as Map<String, dynamic>;
+    final related = response['related'] as Map<String, dynamic>?;
+    final pagination = response['pagination'] as Map<String, dynamic>?;
+
+    if (related == null || pagination == null) {
+      print('Invalid response format: related or pagination missing');
+      return;
+    }
+
+    final cursors = pagination['cursors'] as Map<String, dynamic>?;
+    if (cursors == null) {
+      print('Invalid response format: cursors missing');
+      return;
+    }
 
     // Store group data
     if (related["groupDetails"] != null) {
-      group = GroupsService.buildFriendCircleGroup(related["groupDetails"]);
+      group = GroupsService.buildFriendCircleGroup(
+          related["groupDetails"] as Map<String, dynamic>);
     }
 
     // Collect all new posts from different types
     List<Map<String, dynamic>> newPosts = [];
 
     // Process group posts
-    final groupPosts = related['groupPosts'] as Map<String, dynamic>;
-    final groupPostsList =
-        List<Map<String, dynamic>>.from(groupPosts['posts'] as List);
-    hasMoreGroupPosts = groupPosts['hasMore'] as bool;
+    final groupPosts = related['groupPosts'] as Map<String, dynamic>?;
+    if (groupPosts != null) {
+      final groupPostsList =
+          List<Map<String, dynamic>>.from(groupPosts['posts'] as List? ?? []);
+      hasMoreGroupPosts = groupPosts['hasMore'] as bool? ?? false;
 
-    for (var post in groupPostsList) {
-      newPosts.add({
-        ...Map<String, dynamic>.from(post),
-        'postType': 'group',
-        'sortKey': _getSortKey(post),
-      });
+      for (var post in groupPostsList) {
+        newPosts.add({
+          ...Map<String, dynamic>.from(post),
+          'postType': 'group',
+          'sortKey': _getSortKey(post),
+        });
+      }
     }
 
     // Process member personal posts
-    final memberPosts = related['memberPersonalPosts'] as Map<String, dynamic>;
-    final memberPostsList =
-        List<Map<String, dynamic>>.from(memberPosts['posts'] as List);
-    hasMoreMemberPosts = memberPosts['hasMore'] as bool;
+    final memberPosts = related['memberPersonalPosts'] as Map<String, dynamic>?;
+    if (memberPosts != null) {
+      final memberPostsList =
+          List<Map<String, dynamic>>.from(memberPosts['posts'] as List? ?? []);
+      hasMoreMemberPosts = memberPosts['hasMore'] as bool? ?? false;
 
-    for (var post in memberPostsList) {
-      newPosts.add({
-        ...Map<String, dynamic>.from(post),
-        'postType': 'member',
-        'sortKey': _getSortKey(post),
-      });
+      for (var post in memberPostsList) {
+        newPosts.add({
+          ...Map<String, dynamic>.from(post),
+          'postType': 'member',
+          'sortKey': _getSortKey(post),
+        });
+      }
     }
 
     // Process author personal posts
-    final authorPosts = related['authorPersonalPosts'] as Map<String, dynamic>;
-    final authorPostsList =
-        List<Map<String, dynamic>>.from(authorPosts['posts'] as List);
-    hasMoreAuthorPosts = authorPosts['hasMore'] as bool;
+    final authorPosts = related['authorPersonalPosts'] as Map<String, dynamic>?;
+    if (authorPosts != null) {
+      final authorPostsList =
+          List<Map<String, dynamic>>.from(authorPosts['posts'] as List? ?? []);
+      hasMoreAuthorPosts = authorPosts['hasMore'] as bool? ?? false;
 
-    for (var post in authorPostsList) {
-      newPosts.add({
-        ...Map<String, dynamic>.from(post),
-        'postType': 'author',
-        'sortKey': _getSortKey(post),
-      });
+      for (var post in authorPostsList) {
+        newPosts.add({
+          ...Map<String, dynamic>.from(post),
+          'postType': 'author',
+          'sortKey': _getSortKey(post),
+        });
+      }
     }
 
     // Update cursors (they can be null)
@@ -235,6 +252,7 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
 
   Widget _buildPostItem(Map<String, dynamic> post, int index) {
     return Container(
+      key: ValueKey('related-${post['_id'] ?? index}'),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: DynamicPostWidget(
         showAuthor: true,
@@ -915,6 +933,7 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
               shrinkWrap: true, // Important: let it size itself
               physics:
                   const NeverScrollableScrollPhysics(), // Disable internal scrolling
+              addAutomaticKeepAlives: true,
               crossAxisCount: 2,
               mainAxisSpacing: 0,
               crossAxisSpacing: 0,

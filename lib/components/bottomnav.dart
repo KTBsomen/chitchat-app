@@ -93,7 +93,7 @@ class AppBottomNav extends StatelessWidget {
         return;
     }
 
-    Navigator.push(
+    Navigator.pushReplacement(
       context,
       PageTransition(
         isIos: true,
@@ -176,7 +176,8 @@ class AppBottomNav extends StatelessWidget {
     // If center button floats, wrap in a Stack so it protrudes above the bar
     if (showCenterButton && centerButtonFloat) {
       return SizedBox(
-        height: barHeight + (centerBtnSize / 2) + 4,
+        // height: barHeight + (centerBtnSize / 2) + 4,
+        height: barHeight + 1,
         child: Stack(
           clipBehavior: Clip.none,
           children: [

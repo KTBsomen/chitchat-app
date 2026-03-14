@@ -104,11 +104,18 @@ class NotificationStore {
 
   /// Add notifications, deduplicating by id. New ones are marked unread.
   /// Returns the number of genuinely new notifications added.
-  static Future<int> addNotifications(
-      List<Map<String, dynamic>> notifications) async {
+  /// [clearSourceType] if provided, removes all existing notifications of this type
+  /// before adding the new ones. This is useful for syncing API-driven lists
+  /// like group join requests.
+  static Future<int> addNotifications(List<Map<String, dynamic>> notifications,
+      {String? clearSourceType}) async {
     await _ensureCorrectUser();
-    int added = 0;
 
+    if (clearSourceType != null) {
+      _cache.removeWhere((_, v) => v['sourceType'] == clearSourceType);
+    }
+
+    int added = 0;
     for (final notif in notifications) {
       final id = notif['id'] as String?;
       if (id == null) continue;
@@ -126,7 +133,7 @@ class NotificationStore {
       }
     }
 
-    if (added > 0) {
+    if (added > 0 || clearSourceType != null) {
       await _persist();
     }
     return added;
@@ -157,6 +164,16 @@ class NotificationStore {
     _cache.remove(id);
     _dismissed[id] = DateTime.now().toIso8601String();
     await _persist();
+  }
+
+  /// Remove all notifications of a specific source type.
+  static Future<void> removeNotificationsBySourceType(String sourceType) async {
+    await _ensureCorrectUser();
+    final initialCount = _cache.length;
+    _cache.removeWhere((_, v) => v['sourceType'] == sourceType);
+    if (_cache.length != initialCount) {
+      await _persist();
+    }
   }
 
   /// Check if a notification is unread.

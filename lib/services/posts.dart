@@ -206,6 +206,33 @@ class PostService {
     }
   }
 
+  static Future<Map<String, dynamic>> fetchPostById(String postId) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      final response = await http.get(
+        Uri.parse("$baseurl/posts/post/$postId"),
+        headers: token != null ? {"Authorization": "Bearer $token"} : {},
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "data": jsonDecode(response.body),
+        };
+      } else {
+        return {
+          "success": false,
+          "error": "Failed to fetch post",
+        };
+      }
+    } catch (e) {
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
+    }
+  }
+
   static Future<Map<String, dynamic>> deletePost(String postId) async {
     try {
       String? token = await UserService.getAccessToken();

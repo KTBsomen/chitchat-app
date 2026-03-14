@@ -249,7 +249,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
   void shareGroupInvitation() {
     if (groupDetails == null) return;
     SharePlus.instance.share(ShareParams(
-      title: "ChitChat Group Invitation",
+      title: "Invite ur frndcircle",
       text:
           'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}',
       subject: 'Join my group on ChitChat!',
@@ -910,7 +910,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
               switch (value) {
                 case 'share':
                   SharePlus.instance.share(ShareParams(
-                    title: "ChitChat Group Invitation",
+                    title: "Invite ur frndcircle",
                     text:
                         'Join our group ${groupDetails?.groupData['name']}!\n\n https://groups.chitzchat.com/join?group=${groupDetails!.groupId}',
                     subject: 'Join my group on ChitChat!',
@@ -1436,6 +1436,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                               },
                               child: MasonryGridView.builder(
                                 controller: scrollController,
+                                addAutomaticKeepAlives: true,
                                 gridDelegate:
                                     const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
@@ -1451,13 +1452,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   }
                                   final post = posts[index];
                                   if (post?['media'] == null)
-                                    return Container();
+                                    return Container(
+                                        key: ValueKey('post-empty-$index'));
                                   else if (post?['media'].runtimeType ==
                                       String) {
                                     post['media'] = jsonDecode(post['media']);
                                   }
                                   try {
                                     return DynamicPostWidget(
+                                      key: ValueKey('post-${post['_id']}'),
                                       content: post['content'],
                                       media: List<Map<String, dynamic>>.from(
                                           (post['media'] as List<dynamic>)
@@ -1478,7 +1481,8 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                       showMenu: true,
                                     );
                                   } on Exception catch (e) {
-                                    return Container();
+                                    return Container(
+                                        key: ValueKey('post-error-$index'));
                                   }
                                 },
                               ),
@@ -1501,6 +1505,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                               },
                               child: MasonryGridView.builder(
                                 controller: scrollController,
+                                addAutomaticKeepAlives: true,
                                 gridDelegate:
                                     const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 3,
@@ -1584,6 +1589,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                                     BorderRadius.circular(12),
                                                 child: VideoMessageView(
                                                   url: memory.url,
+                                                  height: 200,
                                                   onTap: () {
                                                     Navigator.push(
                                                       context,

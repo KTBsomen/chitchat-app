@@ -691,7 +691,7 @@ class _HomePageState extends State<HomePage> {
 
     // 🔹 Normal feed
     return SliverPadding(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(1),
       sliver: SliverMasonryGrid.count(
         crossAxisCount: 2,
         mainAxisSpacing: 4,

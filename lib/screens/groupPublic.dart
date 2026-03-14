@@ -1140,6 +1140,7 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                             )
                                           : MasonryGridView.builder(
                                               controller: scrollController,
+                                              addAutomaticKeepAlives: true,
                                               gridDelegate:
                                                   const SliverSimpleGridDelegateWithFixedCrossAxisCount(
                                                 crossAxisCount: 2,
@@ -1150,7 +1151,9 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                               itemBuilder: (context, index) {
                                                 final post = posts[index];
                                                 if (post?['media'] == null)
-                                                  return Container();
+                                                  return Container(
+                                                      key: ValueKey(
+                                                          'post-empty-$index'));
                                                 else if (post?['media']
                                                         .runtimeType ==
                                                     String) {
@@ -1159,6 +1162,8 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                                 }
                                                 try {
                                                   return DynamicPostWidget(
+                                                    key: ValueKey(
+                                                        'post-${post['_id']}'),
                                                     content: post['content'],
                                                     media: List<
                                                             Map<String,
@@ -1185,7 +1190,9 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                                     comments: post['comments'],
                                                   );
                                                 } on Exception catch (e) {
-                                                  return Container();
+                                                  return Container(
+                                                      key: ValueKey(
+                                                          'post-error-$index'));
                                                 }
                                               }),
                                 ],
