@@ -390,7 +390,9 @@ class _HomePageState extends State<HomePage> {
                       Text("Your session has expired. Please login again."),
                   actions: [
                     TextButton(
-                      onPressed: () {
+                      onPressed: () async {
+                        await UserService.signOut((b) {});
+
                         Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(

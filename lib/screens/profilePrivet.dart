@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../components/friendcircle.dart';
 
@@ -31,10 +32,24 @@ class PrivetProfilePage extends StatefulWidget {
   State<PrivetProfilePage> createState() => _PrivetProfilePageState();
 }
 
-class _PrivetProfilePageState extends State<PrivetProfilePage> {
+class _PrivetProfilePageState extends State<PrivetProfilePage>
+    with TickerProviderStateMixin {
   FriendCircleGroup? myGroup;
   Map<String, dynamic>? myProfile;
   final ScrollController _scrollController = ScrollController();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+
+  // Animation variables for FriendCircle
+  late AnimationController _friendCircleAnimationController;
+  late Animation<double> _maxVisibleAnimation;
+  late Animation<double> _upperContainerHeightAnimation;
+  late Animation<int> _circleSizeAnimation;
+
+  double currentMaxVisible = 5.0;
+  double currentUpperContainerHeightMultiplier = 0.4;
+  int currentCircleSize = 200;
+
   List<dynamic> posts = [];
   String? next;
   bool isLoadingPost = false;
@@ -94,12 +109,65 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
   @override
   void initState() {
     super.initState();
+
+    // Initialize animation controller
+    _friendCircleAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _maxVisibleAnimation = Tween<double>(
+      begin: 5.0,
+      end: 8.0,
+    ).animate(CurvedAnimation(
+      parent: _friendCircleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _upperContainerHeightAnimation = Tween<double>(
+      begin: 0.4,
+      end: 0.7,
+    ).animate(CurvedAnimation(
+      parent: _friendCircleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _circleSizeAnimation = IntTween(
+      begin: 200,
+      end: 350,
+    ).animate(CurvedAnimation(
+      parent: _friendCircleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
     _getMyprofile();
     _fetchPosts();
     AppVariables.registerState(this);
     AppVariables.addListener<Map<String, dynamic>>("posts", _handlePostUpdate);
     AppVariables.addListener("deleted_posts", _handlePostDelete);
     AppVariables.addListener("profile", _handleProfileUpdate);
+
+    _sheetController.addListener(_onSheetPositionChanged);
+  }
+
+  void _onSheetPositionChanged() {
+    if (!_sheetController.isAttached) return;
+
+    final double currentPosition = _sheetController.size;
+
+    // When sheet is at 0.6 (initial), progress = 0
+    // When sheet is at 0.2 (collapsed), progress = 1
+    // Note: minChildSize in PublicProfile is 0.2, we should probably follow that.
+    final double progress =
+        ((0.6 - currentPosition) / (0.6 - 0.2)).clamp(0.0, 1.0);
+
+    _friendCircleAnimationController.value = progress;
+    setState(() {
+      currentMaxVisible = _maxVisibleAnimation.value;
+      currentUpperContainerHeightMultiplier =
+          _upperContainerHeightAnimation.value;
+      currentCircleSize = _circleSizeAnimation.value;
+    });
   }
 
   void _handlePostDelete(value) {
@@ -135,6 +203,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
     AppVariables.unregisterState(this);
     AppVariables.removeListener("posts", _handlePostUpdate);
     AppVariables.removeListener("profile", _handleProfileUpdate);
+    _friendCircleAnimationController.dispose();
+    _sheetController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -142,48 +212,73 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
   Completer<void> profileReady = Completer();
 
   _getMyprofile() async {
-    final result = await UserService.fetchMyProfile();
+    try {
+      final result = await UserService.fetchMyProfile();
 
-    if (result['success']) {
-      print('Profile fetched successfully:');
-      print(result['data']);
-      myProfile = result['data'];
-      if (mounted) {
-        setState(() {});
-      }
-      if (result['group'] != null) {
-        myGroup = result['group'] as FriendCircleGroup;
+      if (result['success']) {
+        print('Profile fetched successfully:');
+        print(result['data']);
+        myProfile = result['data'];
         if (mounted) {
           setState(() {});
         }
-        print('Group Name: ${myGroup?.groupData['name']}');
-        print('Members:');
-        for (var member in myGroup!.members) {
-          print('  - ${member.additionalData['memberName']}');
+        if (result['group'] != null) {
+          myGroup = result['group'] as FriendCircleGroup;
+          if (mounted) {
+            setState(() {});
+          }
+          print('Group Name: ${myGroup?.groupData['name']}');
+          print('Members:');
+          for (var member in myGroup!.members) {
+            print('  - ${member.additionalData['memberName']}');
+          }
+        } else {
+          print('No group found for this user.');
+          myGroup = FriendCircleGroup(
+            groupId: 'defaultGroup',
+            groupData: {'name': 'Default Group'},
+            members: [],
+          );
         }
       } else {
-        print('No group found for this user.');
         myGroup = FriendCircleGroup(
           groupId: 'defaultGroup',
           groupData: {'name': 'Default Group'},
           members: [],
         );
+        print('Error fetching profile: ${result['error']}');
       }
-    } else {
-      myGroup = FriendCircleGroup(
-        groupId: 'defaultGroup',
-        groupData: {'name': 'Default Group'},
-        members: [],
-      );
-      print('Error fetching profile: ${result['error']}');
-    }
-    profileVersion++;
-    if (!profileReady.isCompleted) {
-      profileReady.complete();
-    }
+      profileVersion++;
+      if (!profileReady.isCompleted) {
+        profileReady.complete();
+      }
 
-    if (mounted) {
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      if (e.toString().contains("User is not authenticated")) {
+        showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+                  title: Text("Session Expired"),
+                  content:
+                      Text("Your session has expired. Please login again."),
+                  actions: [
+                    TextButton(
+                      onPressed: () async {
+                        await UserService.signOut((b) {});
+                        Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => LoginScreen(),
+                            ));
+                      },
+                      child: Text("Login"),
+                    ),
+                  ],
+                ));
+      }
     }
   }
 
@@ -514,42 +609,61 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
             icon: Icons.messenger_outline_rounded,
             type: NotificationIconType.Message,
           ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: Text("Settings"),
-                    content: Text("Do you want to sign out?"),
-                    actions: [
-                      TextButton(
-                        child: Text("Cancel"),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                      TextButton(
-                        child: Text("Sign Out"),
-                        onPressed: () async {
-                          //Navigator.of(context).pop();
-                          await UserService.signOut((x) => {});
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            PageTransition(
-                              type: PageTransitionType.leftToRight,
-                              child: LoginScreen(),
-                            ),
-                            (Route<dynamic> route) => false,
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
+          PopupMenuButton<String>(
+            iconColor: Colors.white,
+            onSelected: (value) {
+              if (value == 'logout') {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: Text("Settings"),
+                      content: Text("Do you want to sign out?"),
+                      actions: [
+                        TextButton(
+                          child: Text("Cancel"),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                        TextButton(
+                          child: Text("Sign Out"),
+                          onPressed: () async {
+                            //Navigator.of(context).pop();
+                            await UserService.signOut((x) => {});
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              PageTransition(
+                                type: PageTransitionType.leftToRight,
+                                child: LoginScreen(),
+                              ),
+                              (Route<dynamic> route) => false,
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+              if (value == 'contact') {
+                launchUrl(Uri.parse(AppVariables.get<String>('contactUrl') ??
+                    "https://chitzchat.com/contact"));
+              }
             },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: ListTile(
+                    leading: Icon(Icons.logout), title: Text('Logout')),
+              ),
+              const PopupMenuItem<String>(
+                value: 'contact',
+                child: ListTile(
+                    leading: Icon(Icons.contact_mail),
+                    title: Text('Contact Us')),
+              ),
+            ],
           ),
         ],
         title: const Text(
@@ -565,7 +679,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
         children: [
           // Top Container for Friend Circle
           Container(
-            height: MediaQuery.of(context).size.height * 0.3,
+            height: MediaQuery.of(context).size.height *
+                currentUpperContainerHeightMultiplier,
             child: Center(
               child: myGroup == null
                   ? CircularProgressIndicator() // Show a loader until the group is available
@@ -603,11 +718,9 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
                         ))
                       : FriendCircle(
                           group: _getBustedGroup(myGroup!),
-                          size: 200,
-                          nodeSize: (myGroup!.members.length > 5
-                              ? myGroup!.members.length * 8.0
-                              : 80.0),
+                          size: currentCircleSize * 1.0,
                           nodeBorderColor: Colors.white24,
+                          maxVisibleMembers: currentMaxVisible,
                           edgeStyle: EdgeStyle(
                             width: 2,
                             outerGlow: 2,
@@ -648,9 +761,10 @@ class _PrivetProfilePageState extends State<PrivetProfilePage> {
           ),
           // DraggableScrollableSheet for the Bottom Container
           DraggableScrollableSheet(
-            initialChildSize: 0.6, // Default open height (50% of the screen)
-            minChildSize: 0.6, // Minimum height (cannot be dragged below 50%)
-            maxChildSize: 1, // Maximum height (90% of the screen)
+            controller: _sheetController,
+            initialChildSize: 0.6, // Default open height
+            minChildSize: 0.2, // Allow dragging down further to expand circle
+            maxChildSize: 1,
             builder: (context, scrollController) {
               scrollController.addListener(() {
                 if (scrollController.position.pixels >=

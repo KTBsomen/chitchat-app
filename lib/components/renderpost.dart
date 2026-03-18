@@ -72,6 +72,7 @@ class DynamicPostWidget extends StatefulWidget {
 class _DynamicPostWidgetState extends State<DynamicPostWidget> {
   List<Comment> comments = [];
   List<Comment> posts = [];
+  int _commentCount = 0;
   Map<String, dynamic> myProfile =
       AppVariables.get<Map<String, dynamic>>('profile') ?? {};
   bool isPanning = false;
@@ -185,7 +186,9 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
         setState(() {
           posts.add(result['data']);
           uploadFinished = true;
+          _commentCount++;
         });
+        this.setState(() {});
         _getComments();
       } else {
         print(result);
@@ -226,6 +229,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     super.initState();
     _initializeProfile();
     AppVariables.registerState(this);
+    _commentCount = widget.comments;
     if (widget.initialCommentId != null &&
         widget.initialCommentId!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -281,11 +285,14 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                 incoming.where((c) => !existingIds.contains(c.Id)).toList();
 
             comments.addAll(uniqueIncoming);
+            _commentCount = comments.length;
             lastCommentId = fetchedComments["lastId"];
             hasMoreComments = fetchedComments["hasMore"];
           } else {
+            if (incoming.length > comments.length) {
+              _commentCount = incoming.length;
+            }
             comments = incoming;
-
             lastCommentId = fetchedComments["lastId"];
             hasMoreComments = fetchedComments["hasMore"];
           }
@@ -327,7 +334,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
             ),
             Positioned.fill(
               child: GestureDetector(
-                onDoubleTap: () {
+                onTap: () {
                   Navigator.of(context).push(
                     PageRouteBuilder(
                       opaque: false,
@@ -389,7 +396,6 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     ScrollController effectiveController =
         scrollController ?? ScrollController();
     _getNotifications();
-    var commentController = TextEditingController();
 
     return Container(
       decoration: BoxDecoration(
@@ -491,7 +497,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                       color: Colors.white),
                                   const SizedBox(width: 4),
                                   Text(
-                                    widget.comments.toString(),
+                                    _commentCount.toString(),
                                     style: const TextStyle(
                                         color: Colors.white, fontSize: 14),
                                   ),
@@ -573,6 +579,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     ScrollController? activeScrollController;
     bool haveScrolledToInitial = false;
     _getComments();
+    var commentController = TextEditingController();
     showModalBottomSheet(
       enableDrag: true,
       context: context,
@@ -629,7 +636,6 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
               maxChildSize: 1,
               builder: (context, scrollController) {
                 activeScrollController = scrollController;
-                var commentController = TextEditingController();
                 return Container(
                   decoration: const BoxDecoration(
                     color: AppColors.background,
@@ -962,7 +968,10 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                                             comments.add(result['data']);
                                             comments =
                                                 comments.reversed.toList();
+                                            _commentCount++;
                                           });
+                                          // Update parent state as well
+                                          this.setState(() {});
                                         } else {
                                           print('Failed to create comment');
                                         }

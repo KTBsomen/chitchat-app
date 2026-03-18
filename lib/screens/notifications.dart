@@ -113,7 +113,7 @@ class NotificationCard extends StatefulWidget {
 class _NotificationCardState extends State<NotificationCard> {
   late int votes;
   late int totalMembers;
-
+  bool isVoted = false;
   @override
   void initState() {
     super.initState();
@@ -122,9 +122,11 @@ class _NotificationCardState extends State<NotificationCard> {
   }
 
   void _handleVote() {
-    if (votes >= totalMembers) return; // Prevent increment beyond total
+    if (votes >= totalMembers || isVoted)
+      return; // Prevent increment beyond total
     setState(() {
       votes += 1;
+      isVoted = true;
     });
     widget.onVote(widget.notification.id);
   }
@@ -309,8 +311,7 @@ class _NotificationCardState extends State<NotificationCard> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildEducationInfo(
-                    'Education Level', requestBody['educationLevel']),
+                _buildEducationInfo(requestBody, requestBody['educationLevel']),
               ],
             ),
           ),
@@ -319,28 +320,31 @@ class _NotificationCardState extends State<NotificationCard> {
     );
   }
 
-  Widget _buildEducationInfo(String label, String? value) {
+  Widget _buildEducationInfo(Map<String, dynamic> requestBody, String? value) {
     if (value == null || value.isEmpty) return const SizedBox.shrink();
+    String name = "";
+    switch (requestBody['educationLevel']) {
+      case 'School':
+        name = requestBody['school'];
+        break;
+      case 'College':
+        name = requestBody['college'];
+        break;
+      case 'University':
+        name = requestBody['university'];
+        break;
+      default:
+        name = 'PassOut';
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.white60,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
           Expanded(
             child: Text(
-              value,
+              name,
               style: const TextStyle(
                 fontSize: 13,
                 color: Color.fromARGB(255, 222, 222, 222),
@@ -367,35 +371,55 @@ class _NotificationCardState extends State<NotificationCard> {
         );
       },
       child: Container(
+        height: 100,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(color: Colors.grey[600]!),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AbsorbPointer(
-            child: DynamicPostWidget(
-              borderRadius: 12,
-              content: widget.notification.requestBody['content'],
-              media: List<Map<String, dynamic>>.from(
-                (widget.notification.requestBody['media'] as List<dynamic>? ??
-                        [])
-                    .map((m) => {
-                          'type': m['type'],
-                          'url': m['url'],
-                        }),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AbsorbPointer(
+                child: DynamicPostWidget(
+                  borderRadius: 12,
+                  content: widget.notification.requestBody['content'],
+                  media: List<Map<String, dynamic>>.from(
+                    (widget.notification.requestBody['media']
+                                as List<dynamic>? ??
+                            [])
+                        .map((m) => {
+                              'type': m['type'],
+                              'url': m['url'],
+                            }),
+                  ),
+                  postId: widget.notification.requestBody['id'] ?? '',
+                  author: widget.notification.requestBody['author'],
+                  group: widget.notification.requestBody['group'] ?? '',
+                  isGroupPost:
+                      widget.notification.requestBody['isGroupPost'] ?? false,
+                  authorName: widget.notification.requestBody['authorName'],
+                  profilePic: widget.notification.requestBody['profilePic'],
+                  likes: widget.notification.requestBody['likes'] ?? 0,
+                  comments: widget.notification.requestBody['comments'] ?? 0,
+                ),
               ),
-              postId: widget.notification.requestBody['id'] ?? '',
-              author: widget.notification.requestBody['author'],
-              group: widget.notification.requestBody['group'] ?? '',
-              isGroupPost:
-                  widget.notification.requestBody['isGroupPost'] ?? false,
-              authorName: widget.notification.requestBody['authorName'],
-              profilePic: widget.notification.requestBody['profilePic'],
-              likes: widget.notification.requestBody['likes'] ?? 0,
-              comments: widget.notification.requestBody['comments'] ?? 0,
             ),
-          ),
+            const Spacer(),
+            Text(
+              "Click to See Post",
+              style: TextStyle(color: const Color.fromARGB(255, 255, 254, 254)),
+            ),
+            const Spacer(),
+            // IconButton(
+            //   icon: const Icon(Icons.delete, color: Colors.grey),
+            //   onPressed: () {
+            //     NotificationStore.removeNotification(
+            //         widget.notification.requestBody['id']);
+            //     setState(() {});
+            //   },
+            // ),
+          ],
         ),
       ),
     );
@@ -1007,16 +1031,35 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     ),
                   )
                 : _buildPlaceholderIcon(notif.type),
-            trailing: isUnread
-                ? Container(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (notif.data?['media'] != null &&
+                    (notif.data!['media'] as List).isNotEmpty &&
+                    (notif.data!['media'] as List).first['type'] == 'image')
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(
+                        (notif.data!['media'] as List).first['url'],
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                if (isUnread)
+                  Container(
                     width: 10,
                     height: 10,
                     decoration: const BoxDecoration(
                       color: Colors.tealAccent,
                       shape: BoxShape.circle,
                     ),
-                  )
-                : null,
+                  ),
+              ],
+            ),
             title: Text(
               notif.title ?? "Notification",
               style: TextStyle(
@@ -1104,10 +1147,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           await NotificationStore.removeNotification(n['id']);
         }
         // Clear from server too
-        if (myGroup != null && myGroup!.groupId != 'defaultGroup') {
-          await NotificationService.clearAllGroupNotificationsFromServer(
-              context, myGroup!.groupId);
-        }
+        // if (myGroup != null && myGroup!.groupId != 'defaultGroup') {
+        //   await NotificationService.clearAllGroupNotificationsFromServer(
+        //       context, myGroup!.groupId);
+        // }
       }
       _loadFromStore();
       NotificationManager.instance.refreshCount();
@@ -1255,16 +1298,35 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     ),
                   )
                 : _buildPlaceholderIcon(notif.type, isGroup: true),
-            trailing: isUnread
-                ? Container(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (notif.data?['media'] != null &&
+                    (notif.data!['media'] as List).isNotEmpty &&
+                    (notif.data!['media'] as List).first['type'] == 'image')
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(
+                        (notif.data!['media'] as List).first['url'],
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                if (isUnread)
+                  Container(
                     width: 10,
                     height: 10,
                     decoration: const BoxDecoration(
                       color: Colors.orangeAccent,
                       shape: BoxShape.circle,
                     ),
-                  )
-                : null,
+                  ),
+              ],
+            ),
             title: Text(
               notif.title ?? "Group Notification",
               style: TextStyle(

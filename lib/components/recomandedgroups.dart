@@ -113,8 +113,8 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
               Container(
                 width: double.infinity,
                 height:
-                    widget.height ?? MediaQuery.of(context).size.height * 0.55,
-                margin: EdgeInsets.only(left: 25, right: 25),
+                    widget.height ?? MediaQuery.of(context).size.height * 0.45,
+                // margin: EdgeInsets.only(left: 15, right: 15),
                 child: isLoading
                     ? Center(
                         child: CircularProgressIndicator(
@@ -138,10 +138,10 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                             },
                             maxScale: 10.0,
                             child: Padding(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(2),
                               child: FriendCircleLayout(
                                 groups: groups,
-                                spacing: 10 * scale,
+                                spacing: 20,
                                 crossAxisCount: 2,
                                 defaultEdgeStyle: EdgeStyle(
                                   color:

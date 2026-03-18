@@ -63,10 +63,10 @@ class _PublicProfilePageState extends State<PublicProfilePage>
 
   // Animation variables for FriendCircle
   late AnimationController _friendCircleAnimationController;
-  late Animation<int> _maxVisibleAnimation;
+  late Animation<double> _maxVisibleAnimation;
   late Animation<double> _upperContainerHeightAnimation;
   late Animation<int> _circleSizeAnimation;
-  int currentMaxVisible = 4; // Initial max visible users
+  double currentMaxVisible = 5.0; // Initial max visible users
   double currentUpperContainerHeightMultiplier = 0.4;
   int currentCircleSize = 200;
   String? _getEducationField(Map<String, dynamic> member) {
@@ -98,9 +98,9 @@ class _PublicProfilePageState extends State<PublicProfilePage>
       vsync: this,
     );
 
-    _maxVisibleAnimation = IntTween(
-      begin: 4,
-      end: 6, // Maximum users to show
+    _maxVisibleAnimation = Tween<double>(
+      begin: 5.0,
+      end: 8.0, // Maximum users to show
     ).animate(CurvedAnimation(
       parent: _friendCircleAnimationController,
       curve: Curves.easeInOut,
@@ -411,11 +411,6 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                 return FriendCircle(
                                   group: userGroup!,
                                   size: currentCircleSize * 1.0,
-                                  nodeSize: (userGroup!.members.length > 5
-                                      ? userGroup!.members.length *
-                                          currentUpperContainerHeightMultiplier *
-                                          25
-                                      : 90.0),
                                   nodeBorderColor: Colors.white24,
                                   maxVisibleMembers: currentMaxVisible,
                                   edgeStyle: EdgeStyle(

@@ -99,7 +99,6 @@ class FriendCircleLayout extends StatelessWidget {
           child: FriendCircle(
             group: group,
             size: size,
-            nodeSize: size * 0.3,
             edgeStyle: defaultEdgeStyle,
             onGroupTap: onGroupTap != null
                 ? () => onGroupTap!(group.groupId, group.groupData)
@@ -122,10 +121,10 @@ class FriendCircleLayout extends StatelessWidget {
 class FriendCircle extends StatelessWidget {
   final FriendCircleGroup group;
   final double size;
-  final double nodeSize;
+  final double? nodeSize;
   final EdgeStyle edgeStyle;
   final Color nodeBorderColor;
-  final int maxVisibleMembers;
+  final double maxVisibleMembers;
   final Function()? onGroupTap;
   final Function(int index)? onMemberTap;
 
@@ -133,20 +132,34 @@ class FriendCircle extends StatelessWidget {
     Key? key,
     required this.group,
     required this.size,
-    required this.nodeSize,
+    this.nodeSize,
     this.edgeStyle = const EdgeStyle(),
     this.nodeBorderColor = Colors.white,
-    this.maxVisibleMembers = 6,
+    this.maxVisibleMembers = 6.0,
     this.onGroupTap,
     this.onMemberTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final total = min(group.members.length, maxVisibleMembers);
+    // Determine how many members to build - up to the ceil of maxVisibleMembers
+    final int buildCount = min(group.members.length, maxVisibleMembers.ceil());
+    final double effectiveMaxVisible =
+        min(group.members.length.toDouble(), maxVisibleMembers);
+
+    // Dynamic node size calculation
+    double effectiveNodeSize = nodeSize ?? (size * 0.3);
+    if (buildCount > 0 && buildCount <= 3) {
+      effectiveNodeSize = size * 0.45;
+    } else if (buildCount > 3 && buildCount <= 5) {
+      effectiveNodeSize = size * 0.35;
+    }
+
+    // painter should use a fixed integer for the ring smoothness
+    final painterCount = buildCount >= 2 ? 10 : 0;
 
     // ✅ Create a single shuffled index list once
-    final shuffledIndices = List.generate(total, (idx) => idx)..shuffle();
+    final shuffledIndices = List.generate(buildCount, (idx) => idx)..shuffle();
 
     return Material(
       color: Colors.transparent,
@@ -164,19 +177,20 @@ class FriendCircle extends StatelessWidget {
               CustomPaint(
                 size: Size(size, size),
                 painter: OuterEdgePainter(
-                  memberCount: total,
+                  memberCount: painterCount,
                   edgeStyle: edgeStyle,
                 ),
               ),
-              // ✅ Use the single shuffledIndices list
+              // ✅ Use indices up to buildCount
               ...List.generate(
-                total,
+                buildCount,
                 (i) {
-                  return _buildNode(i);
+                  return _buildNode(i, effectiveMaxVisible,
+                      effectiveNodeSize); // Pass effective version for angle
                 },
               ),
               if (group.members.length > maxVisibleMembers)
-                _buildExtraCountNode(),
+                _buildExtraCountNode(effectiveNodeSize, effectiveMaxVisible),
             ],
           ),
         ),
@@ -184,51 +198,58 @@ class FriendCircle extends StatelessWidget {
     );
   }
 
-  Widget _buildNode(int index) {
-    final angle =
-        (2 * pi * index) / min(group.members.length, maxVisibleMembers);
+  Widget _buildNode(
+      int index, double effectiveMaxVisible, double effectiveNodeSize) {
+    // Current display total is used for angle calculation to allow sliding
+    final angle = (2 * pi * index) / effectiveMaxVisible;
     final centerOffset = size / 2;
-    final radius = (size - nodeSize) / 2;
+    final radius = (size - effectiveNodeSize) / 2;
+
+    // Calculate individual node opacity for smooth fading
+    final double nodeOpacity = (maxVisibleMembers - index).clamp(0.0, 1.0);
 
     return Positioned(
-      left: centerOffset + radius * cos(angle - pi / 2) - nodeSize / 2,
-      top: centerOffset + radius * sin(angle - pi / 2) - nodeSize / 2,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => onMemberTap?.call(index),
-          borderRadius: BorderRadius.circular(nodeSize / 2),
-          child: Container(
-            width: nodeSize,
-            height: nodeSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: nodeBorderColor,
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  spreadRadius: 1,
+      left: centerOffset + radius * cos(angle - pi / 2) - effectiveNodeSize / 2,
+      top: centerOffset + radius * sin(angle - pi / 2) - effectiveNodeSize / 2,
+      child: Opacity(
+        opacity: nodeOpacity,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => onMemberTap?.call(index),
+            borderRadius: BorderRadius.circular(effectiveNodeSize / 2),
+            child: Container(
+              width: effectiveNodeSize,
+              height: effectiveNodeSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: nodeBorderColor,
+                  width: 2,
                 ),
-              ],
-            ),
-            child: ClipOval(
-              child: Image.network(
-                group.members[index].avatarUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: Icon(
-                      Icons.person,
-                      size: nodeSize * 0.6,
-                      color: Colors.grey[600],
-                    ),
-                  );
-                },
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: Image.network(
+                  group.members[index].avatarUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[300],
+                      child: Icon(
+                        Icons.person,
+                        size: effectiveNodeSize * 0.6,
+                        color: Colors.grey[600],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -237,23 +258,24 @@ class FriendCircle extends StatelessWidget {
     );
   }
 
-  Widget _buildExtraCountNode() {
-    final extraCount = group.members.length - maxVisibleMembers;
-    final angle = (2 * pi * maxVisibleMembers) / maxVisibleMembers;
+  Widget _buildExtraCountNode(
+      double effectiveNodeSize, double effectiveMaxVisible) {
+    final extraCount = group.members.length - maxVisibleMembers.floor();
+    final angle = (2 * pi * maxVisibleMembers) / effectiveMaxVisible;
     final centerOffset = size / 2;
-    final radius = (size - nodeSize) / 2;
+    final radius = (size - effectiveNodeSize) / 2;
 
     return Positioned(
-      left: centerOffset + radius * cos(angle - pi / 2) - nodeSize / 2,
-      top: centerOffset + radius * sin(angle - pi / 2) - nodeSize / 2,
+      left: centerOffset + radius * cos(angle - pi / 2) - effectiveNodeSize / 2,
+      top: centerOffset + radius * sin(angle - pi / 2) - effectiveNodeSize / 2,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => onMemberTap?.call(maxVisibleMembers),
-          borderRadius: BorderRadius.circular(nodeSize / 2),
+          onTap: () => onMemberTap?.call(maxVisibleMembers.floor()),
+          borderRadius: BorderRadius.circular(effectiveNodeSize / 2),
           child: Container(
-            width: nodeSize,
-            height: nodeSize,
+            width: effectiveNodeSize,
+            height: effectiveNodeSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.grey[300],
@@ -273,7 +295,7 @@ class FriendCircle extends StatelessWidget {
               child: Text(
                 '+$extraCount',
                 style: TextStyle(
-                  fontSize: nodeSize * 0.4,
+                  fontSize: effectiveNodeSize * 0.4,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey[600],
                 ),
@@ -319,8 +341,6 @@ class OuterEdgePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    //Fix memberCount so it always show a full circle
-    int memberCount = 10;
     if (memberCount < 2) return;
 
     final center = Offset(size.width / 2, size.height / 2);

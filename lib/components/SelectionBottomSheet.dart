@@ -369,6 +369,12 @@ class _AsyncSelectionBottomSheetState<T>
             child: TextField(
               controller: _searchController,
               autofocus: true,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
               decoration: InputDecoration(
                 hintText: 'Type to search (min 2 characters)...',
                 hintStyle: TextStyle(color: Colors.grey[400]),

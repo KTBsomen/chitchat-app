@@ -550,6 +550,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     fontFamily: 'Poppins',
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
                 subtitle: Text(
@@ -618,6 +619,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 16,
+                    color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -630,6 +632,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,
+                          color: Colors.white,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

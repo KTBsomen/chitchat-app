@@ -28,6 +28,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   int selectedTab = 0;
   final Random _random = Random();
   bool isLoading = false;
+  final TransformationController _transformationController =
+      TransformationController();
 
   // Sample data with positions for map-like layout
   List<dynamic> friendGroups = [];
@@ -86,6 +88,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   void initState() {
     super.initState();
     _loadWatchlistData();
+    _transformationController.value = Matrix4.identity()
+      ..scaleByDouble(0.5, 0.5, 0.5, 1.0);
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -183,6 +193,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     List<Offset> positions = _calculateAllCirclePositions();
     print("===================???${(friendGroups.length ~/ 3)}");
     return InteractiveViewer(
+      transformationController: _transformationController,
       boundaryMargin: const EdgeInsets.all(80),
       minScale: 0.3,
       maxScale: 1,
