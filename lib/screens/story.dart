@@ -225,34 +225,37 @@ class _StoryViewScreenState extends State<StoryViewScreen> {
                           color: Color(0xFF121212),
                           shape: BoxShape.circle,
                         ),
-                        child: Image.network(
-                          widget.storyItems[currentUserIndex].profilePic,
-                          width: 40,
-                          height: 40,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes !=
-                                        null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(Icons.error);
-                          },
-                          // imageBuilder: (context, imageProvider) =>
-                          //     CircleAvatar(
-                          //   radius: 20,
-                          //   backgroundImage: imageProvider,
-                          // ),
-                          // placeholder: (context, url) => const CircleAvatar(
-                          //   radius: 20,
-                          //   backgroundColor: Color(0xFF2A2A2A),
-                          // ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.network(
+                            widget.storyItems[currentUserIndex].profilePic,
+                            width: 40,
+                            height: 40,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes !=
+                                          null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(Icons.error);
+                            },
+                            // imageBuilder: (context, imageProvider) =>
+                            //     CircleAvatar(
+                            //   radius: 20,
+                            //   backgroundImage: imageProvider,
+                            // ),
+                            // placeholder: (context, url) => const CircleAvatar(
+                            //   radius: 20,
+                            //   backgroundColor: Color(0xFF2A2A2A),
+                            // ),
+                          ),
                         ),
                       ),
                     ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:chitchat/screens/StoryListScreen.dart';
 import 'package:chitchat/screens/camera.dart';
 import 'package:chitchat/screens/chat.dart';
@@ -422,9 +423,40 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  Future<bool?> _showExitConfirmationDialog(BuildContext context) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Exit App', style: TextStyle(color: Colors.white)),
+        content: const Text('Do you really want to exit?',
+            style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yes', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) async {
+        if (didPop) return;
+        final bool shouldExit =
+            await _showExitConfirmationDialog(context) ?? false;
+        if (shouldExit && context.mounted) {
+          SystemNavigator.pop();
+        }
+      },
       child: Theme(
         data: ThemeData.dark().copyWith(
           scaffoldBackgroundColor: AppColors.background,

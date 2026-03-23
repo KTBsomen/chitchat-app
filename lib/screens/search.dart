@@ -157,9 +157,11 @@ class _SearchPageState extends State<SearchPage> {
       });
     });
     print(groups);
-    setState(() {
-      isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   _getByName() async {

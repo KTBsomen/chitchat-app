@@ -215,6 +215,7 @@ class UserService {
             final groupData = userProfile['myGroup'];
             final friendCircleGroup =
                 GroupsService.buildFriendCircleGroup(groupData);
+            AppVariables.set('myGroupId', friendCircleGroup.groupId);
 
             return {
               'success': true,

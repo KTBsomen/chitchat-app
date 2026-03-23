@@ -27,6 +27,8 @@ class UserStory {
   final DateTime latestStoryDate;
   // NEW: Map individual story IDs to their respective views
   final Map<String, List<dynamic>> storyViewsMap;
+  // NEW: Track all individual story objects in this merged group
+  final List<UserStory> individualStories;
 
   UserStory({
     required this.id,
@@ -45,10 +47,12 @@ class UserStory {
     List<int>? allStoryDbIndices,
     DateTime? latestStoryDate,
     Map<String, List<dynamic>>? storyViewsMap,
+    List<UserStory>? individualStories,
   })  : allStoryIds = allStoryIds ?? [id],
         allStoryDbIndices = allStoryDbIndices ?? [dbIndex],
         latestStoryDate = latestStoryDate ?? date,
-        storyViewsMap = storyViewsMap ?? {id: views} {
+        storyViewsMap = storyViewsMap ?? {id: views},
+        individualStories = individualStories ?? [] {
     // Initialize viewed state - check if ALL stories in the group are viewed
     _isViewed = isViewed || _areAllStoriesViewed();
   }
@@ -165,8 +169,8 @@ class UserStory {
       visibleTo: json['visibleTo'],
       views: storyViews,
       date: DateTime.parse(json['createdAt']),
-      media: (json['media'] as List)
-          .map((item) => MediaItem.fromJson(item))
+      media: (json['media'] as List? ?? [])
+          .map<MediaItem>((item) => MediaItem.fromJson(item, storyId: storyId))
           .toList(),
       dbIndex: json['dbIndex'] ?? 0,
       allStoryIds: [storyId],
@@ -223,6 +227,9 @@ class StoryService {
     Map<String, UserStory> mergedMap = {};
 
     for (var storyJson in data) {
+      if (storyJson['media'] == null || (storyJson['media'] as List).isEmpty) {
+        continue;
+      }
       UserStory story = UserStory.fromJson(storyJson);
       String key = '${story.user}-${story.visibleTo}';
 
@@ -246,6 +253,7 @@ class StoryService {
         if (!existing.allStoryIds.contains(story.id)) {
           existing.allStoryIds.add(story.id);
           existing.allStoryDbIndices.add(story.dbIndex);
+          existing.individualStories.add(story); // Add unmerged story
         }
 
         // Merge views into the storyViewsMap
@@ -280,6 +288,7 @@ class StoryService {
           allStoryDbIndices: [story.dbIndex],
           latestStoryDate: story.date,
           storyViewsMap: {story.id: story.views},
+          individualStories: [story], // Initial unmerged story
         );
       }
     }
@@ -325,6 +334,9 @@ class StoryService {
 
         for (var e in fetchedStories) {
           e.myStory = true;
+          for (var sub in e.individualStories) {
+            sub.myStory = true;
+          }
         }
         return fetchedStories;
       } else {
@@ -516,6 +528,32 @@ class StoryService {
     } catch (e) {
       print('Error marking story as viewed: $e');
       throw Exception('Failed to mark story as viewed');
+    }
+  }
+
+  static Future<bool> deleteChit(String chitId, int dbIndex) async {
+    String? token = await UserService.getAccessToken();
+    if (token == null) {
+      throw Exception('User is not authenticated. Please log in.');
+    }
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/chits/$chitId?dbIndex=$dbIndex'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        print('Chit deleted successfully');
+        return true;
+      } else {
+        print('Failed to delete chit: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('Error deleting chit: $e');
+      return false;
     }
   }
 }

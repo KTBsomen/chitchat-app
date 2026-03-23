@@ -798,7 +798,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             AppVariables.update("memories", result['data']);
           }
           // Also fetch to ensure everything is synced (cursor, etc.)
-          _fetchMemories(refresh: true);
+          // _fetchMemories(refresh: true);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Memory uploaded successfully!')),

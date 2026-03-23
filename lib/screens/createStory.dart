@@ -2,10 +2,8 @@ import 'dart:convert';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/chat.dart';
-import 'package:chitchat/screens/home.dart';
 import 'package:chitchat/screens/recomandedgroups.dart';
-import 'package:chitchat/services/fileUploader.dart';
-import 'package:chitchat/services/story.dart';
+import 'package:chitchat/services/upload_chit_service.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -32,181 +30,12 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
   bool AllSelected = false;
 
   static String baseUrl =
-      AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
-  // static String? xtoken =
-  //     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZGRiOWRmOWQ1OTE0ZDYwOGEyODk4ZSIsInVzZXJJZCI6IjY3ZGRiOWRmOWQ1OTE0ZDYwOGEyODk4ZSIsImVtYWlsIjoiYWlzaHdhcnlhXzEzN0BleGFtcGxlLmNvbSIsInByb2ZpbGVQaWMiOiJodHRwczovL3JhbmRvbXVzZXIubWUvYXBpL3BvcnRyYWl0cy93b21lbi80My5qcGc_bmF0PWluIiwibmFtZSI6IkFpc2h3YXJ5YSIsInVzZXJuYW1lIjoiYWlzaHdhcnlhXzEzNyIsImJpbyI6IkhpLCBJJ20gQWlzaHdhcnlhLiBFeGNpdGVkIHRvIGNvbm5lY3QhIiwiZWR1Y2F0aW9uTGV2ZWwiOiJVbml2ZXJzaXR5IiwidW5pdmVyc2l0eSI6IkRlbGhpIFVuaXZlcnNpdHkiLCJjb2xsZWdlIjoiSGFuc3JhaiBDb2xsZWdlIiwic2Nob29sIjoiTmF2b2RheWEgVmlkeWFsYXlhIiwic2VtZXN0ZXIiOiJTZW0gMyIsInVzZXJDbGFzcyI6bnVsbCwieWVhciI6bnVsbCwiYmlydGhkYXkiOiIyMDA5LTAyLTA4VDE4OjMwOjAwLjAwMFoiLCJkYkluZGV4IjowLCJpYXQiOjE3NDI1ODQyODd9.Y8L0Pz-UtrXzXFSkAZqgJ3aqaknHeL9Rcvh7UEivQV8";
-
-  // static String? token =
-  //     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsInVzZXJJZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsImVtYWlsIjoicHJhbmF2XzYwNUBleGFtcGxlLmNvbSIsInByb2ZpbGVQaWMiOiJodHRwczovL3JhbmRvbXVzZXIubWUvYXBpL3BvcnRyYWl0cy9tZW4vNTMuanBnP25hdD1pbiIsIm5hbWUiOiJQcmFuYXYiLCJ1c2VybmFtZSI6InByYW5hdl82MDUiLCJiaW8iOiJIaSwgSSdtIFByYW5hdi4gRXhjaXRlZCB0byBjb25uZWN0ISIsImVkdWNhdGlvbkxldmVsIjoiVW5pdmVyc2l0eSIsInVuaXZlcnNpdHkiOiJCYW5hcmFzIEhpbmR1IFVuaXZlcnNpdHkiLCJjb2xsZWdlIjoiSGluZHUgQ29sbGVnZSIsInNjaG9vbCI6Ik5hdm9kYXlhIFZpZHlhbGF5YSIsInNlbWVzdGVyIjoiU2VtIDIiLCJ1c2VyQ2xhc3MiOm51bGwsInllYXIiOm51bGwsImJpcnRoZGF5IjoiMjAwNS0wOS0wMlQxODozMDowMC4wMDBaIiwiZGJJbmRleCI6MCwiaWF0IjoxNzMyMjA2NzE3fQ.RnRHKaY82lze39GppuXsJHxWphfpA8sFkQXKUGCm5OA";
-
-  // static String? token =
-  //     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3NDA3YjgwZmRkODEwZjUzYmU2OGE5NSIsInVzZXJJZCI6IjY3NDA3YjgwZmRkODEwZjUzYmU2OGE5NSIsImVtYWlsIjoiYW5pa2FfMzAwQGV4YW1wbGUuY29tIiwicHJvZmlsZVBpYyI6Imh0dHBzOi8vcmFuZG9tdXNlci5tZS9hcGkvcG9ydHJhaXRzL3dvbWVuLzk0LmpwZz9uYXQ9aW4iLCJuYW1lIjoiQW5pa2EiLCJ1c2VybmFtZSI6ImFuaWthXzMwMCIsImJpbyI6IkhpLCBJJ20gQW5pa2EuIEV4Y2l0ZWQgdG8gY29ubmVjdCEiLCJlZHVjYXRpb25MZXZlbCI6IlBhc3NvdXQiLCJ1bml2ZXJzaXR5IjoiRGVsaGkgVW5pdmVyc2l0eSIsImNvbGxlZ2UiOiJIaW5kdSBDb2xsZWdlIiwic2Nob29sIjoiU2FpbmlrIFNjaG9vbCIsInNlbWVzdGVyIjpudWxsLCJ1c2VyQ2xhc3MiOm51bGwsInllYXIiOiIyMDAyIiwiYmlydGhkYXkiOiIyMDA5LTExLTMwVDE4OjMwOjAwLjAwMFoiLCJkYkluZGV4IjowLCJpYXQiOjE3MzIyNzkxNjh9.gRcD-2161J6ltUhKR7b6C24pd3_6VXc3taO8xZ0kCLE";
-
-  //'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsInVzZXJJZCI6IjY3M2Y2MDdkNmZiYjY4YThjNTM2ODk2NyIsImVtYWlsIjoicHJhbmF2XzYwNUBleGFtcGxlLmNvbSIsInByb2ZpbGVQaWMiOiJodHRwczovL3JhbmRvbXVzZXIubWUvYXBpL3BvcnRyYWl0cy9tZW4vNTMuanBnP25hdD1pbiIsIm5hbWUiOiJQcmFuYXYiLCJ1c2VybmFtZSI6InByYW5hdl82MDUiLCJiaW8iOiJIaSwgSSdtIFByYW5hdi4gRXhjaXRlZCB0byBjb25uZWN0ISIsImVkdWNhdGlvbkxldmVsIjoiVW5pdmVyc2l0eSIsInVuaXZlcnNpdHkiOiJCYW5hcmFzIEhpbmR1IFVuaXZlcnNpdHkiLCJjb2xsZWdlIjoiSGluZHUgQ29sbGVnZSIsInNjaG9vbCI6Ik5hdm9kYXlhIFZpZHlhbGF5YSIsInNlbWVzdGVyIjoiU2VtIDIiLCJ1c2VyQ2xhc3MiOm51bGwsInllYXIiOm51bGwsImJpcnRoZGF5IjoiMjAwNS0wOS0wMlQxODozMDowMC4wMDBaIiwiZGJJbmRleCI6MCwiaWF0IjoxNzMyMjA2NzE3fQ.RnRHKaY82lze39GppuXsJHxWphfpA8sFkQXKUGCm5OA';
+      AppVariables.get<String>('baseurl')?.trim() ?? 'http://localhost:3000';
 
   @override
   void initState() {
     super.initState();
     _fetchMembers();
-  }
-
-// List x= [https://chitchatpublicbucket.s3.ap-south-1.amazonaws.com/uploads/d27e3bba-a4a2-4467-b6e5-87a74c075c27-1743780638348.jpg, https://chitchatpublicbucket.s3.ap-south-1.amazonaws.com/uploads/03bc6208-0e7f-4860-816d-ab1d2fdd509d-1743780638383.jpg, https://chitchatpublicbucket.s3.ap-south-1.amazonaws.com/uploads/b38c5a19-809d-4578-ad0c-84fb06614592-1743780638383.mp4, https://chitchatpublicbucket.s3.ap-south-1.amazonaws.com/uploads/1c408b24-2024-438d-a1c6-624d480ec302-1743780638383.jpg, https://chitchatpublicbucket.s3.ap-south-1.amazonaws.com/uploads/301e104a-7449-4bbd-903e-455268398004-1743780638383.mp4]
-  uploadChits(context) async {
-    String? xtoken = await UserService.getAccessToken();
-
-    String baseurl =
-        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
-    ValueNotifier<FileUploadProgress> _progressNotifier =
-        ValueNotifier<FileUploadProgress>(
-      FileUploadProgress(fileName: 'Uploading...'),
-    );
-
-    S3Uploader uploader = S3Uploader(
-      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
-      progressNotifier: _progressNotifier,
-    );
-    bool uploadFinished = false;
-    bool showErrorText = false;
-    final List<String>? images = widget.files;
-
-    if (images != null && images.isNotEmpty) {
-      // Handle the selected image
-      images.map((e) => print);
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return PopScope(
-            canPop: false,
-
-            // Optional: Handle the attempted pop with onPopInvoked
-            onPopInvokedWithResult: (didPop, res) {
-              // This callback is triggered when a pop is attempted
-              // didPop will be false since canPop is false
-
-              // You could show a snackbar or provide feedback here
-              if (!didPop) {
-                setState(() {
-                  showErrorText = true;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text(
-                          'Please use the close button to dismiss this dialog')),
-                );
-              }
-            },
-            child: StatefulBuilder(
-              builder: (BuildContext context, StateSetter setState) {
-                return AlertDialog(
-                  title: Column(
-                    children: [
-                      const Text(
-                        'Uploading Chits...',
-                        style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            fontFamily: 'Poppins'),
-                      ),
-                      const SizedBox(height: 10),
-                      if (showErrorText)
-                        const Text(
-                          'Do not close this dialog until the upload is complete.',
-                          style: TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Poppins'),
-                        ),
-                    ],
-                  ),
-                  content:
-                      UploadProgressWidget(progressNotifier: _progressNotifier),
-                  actions: <Widget>[
-                    TextButton(
-                      child: const Text('OK'),
-                      onPressed: () {
-                        if (uploadFinished == true) {
-                          Navigator.of(context).pop();
-                          Navigator.pushReplacement(
-                              context,
-                              PageTransition(
-                                  type: PageTransitionType.leftToRight,
-                                  child: const HomePage()));
-                        } else {
-                          if (showErrorText == true) {
-                            Navigator.of(context).pop();
-                          } else {
-                            setState(() {
-                              showErrorText = true;
-                            });
-                          }
-                        }
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          );
-        },
-      );
-      List<String> files =
-          await uploader.uploadFiles(files: images, compressionParams: {
-        'width': 600,
-        'quality': 95,
-      });
-      print(files);
-      _progressNotifier.value = _progressNotifier.value.copyWith(
-        stage: UploadStage.uploading,
-        customStageText: "Processing...",
-        customStageTextDetail: "saving on server...",
-      );
-      Map<String, dynamic> result = await StoryService.CreateStory(
-        members: _selectedMemberIds.toList(),
-        files: files,
-        myGroupId: myGroupId,
-        sendToAll: AllSelected,
-      ).catchError((error) {
-        print(error);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this chits",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-        return {'success': false, 'error': error.toString()};
-      });
-      if (result['success']) {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.completed,
-          customStageText: "Uploaded Successfully",
-          customStageTextDetail: "You are set! now you can close this dialog",
-        );
-        setState(() {
-          // posts.add(result['data']);
-          uploadFinished = true;
-        });
-        Navigator.of(context).pop();
-        Navigator.pushReplacement(
-            context,
-            PageTransition(
-                type: PageTransitionType.leftToRight, child: const HomePage()));
-      } else {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this chits",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-      }
-    }
   }
 
   Future<void> _fetchMembers() async {
@@ -216,13 +45,18 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
     });
     String? userId = await UserService.getUserId();
     if (userId == null) {
-      throw Exception('User ID is null');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'User ID is null';
+        });
+      }
+      return;
     }
     String? xtoken = await UserService.getAccessToken();
 
     try {
-      print("baseUrl: $baseUrl");
-      print("token: $xtoken");
       final response = await http.get(
         Uri.parse('$baseUrl/chits/members/$userId'),
         headers: {'Authorization': 'Bearer $xtoken'},
@@ -230,7 +64,6 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        print("jsonData: $jsonData");
         final membersList = (jsonData['usersOwnGroupMembers']?['myGroup']
                 ?['members'] as List?) ??
             [];
@@ -244,33 +77,36 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
         final uniqueMembers = <String, Member>{};
 
         for (var memberData in [...membersList, ...watchList]) {
-          final member = Member(
-            id: memberData['memberId'],
-            name: memberData['memberName'],
-            profilePic: memberData['memberProfilePic'],
-          );
-          uniqueMembers[member.id] = member;
+          final memberId = memberData['memberId'];
+          if (memberId != null) {
+            final member = Member(
+              id: memberId,
+              name: memberData['memberName'] ?? 'Unknown',
+              profilePic: memberData['memberProfilePic'] ?? '',
+            );
+            uniqueMembers[member.id] = member;
+          }
         }
 
-        setState(() {
-          _members = uniqueMembers.values.toList();
-          // myGroupId =
-          //     (jsonData['usersOwnGroupMembers']?['myGroup']?["_id"]) ?? '';
-          // if (myGroupId.isEmpty) {
-          //   throw Exception('You dont have a group so you cannot post a chit.');
-          // }
-
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _members = uniqueMembers.values.toList();
+            myGroupId =
+                (jsonData['usersOwnGroupMembers']?['myGroup']?["_id"]) ?? '';
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('Failed to load members: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = e.toString();
+        });
+      }
     }
   }
 
@@ -285,8 +121,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
   }
 
   Future<void> _submitSelection() async {
-    print(widget.files);
-    if (_selectedMemberIds.isEmpty) {
+    if (_selectedMemberIds.isEmpty && !AllSelected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select at least one member'),
@@ -306,37 +141,16 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
       );
       return;
     }
-    if (myGroupId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You dont have a group so you cannot post a chit.'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    uploadChits(context);
-    // Call the callback with selected member IDs
-    onMemberSelection(_selectedMemberIds.toList());
-  }
 
-  void onMemberSelection(List<String> selectedMemberIds) {
-    // Handle the selected member IDs
-    // You can use the selectedMemberIds list to perform further actions
-    // For example, you can navigate to a new screen or perform some other operation
-    // based on the selected members.
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => CreateStoryPage(
-    //       selectedMemberIds: selectedMemberIds,
-    //       myGroupId: myGroupId,
-    //     ),
-    //   ),
-    // );
-
-    print(selectedMemberIds);
+    // Use the upload service
+    UploadChitService.upload(
+      context: context,
+      filePaths: widget.files,
+      type: ChitType.story,
+      members: _selectedMemberIds.toList(),
+      sendToAll: AllSelected,
+      groupId: myGroupId,
+    );
   }
 
   @override
@@ -358,7 +172,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                 Checkbox(
                   activeColor: Colors.green,
                   materialTapTargetSize: MaterialTapTargetSize.padded,
-                  value: _selectedMemberIds.length == _members.length,
+                  value: _members.isNotEmpty && _selectedMemberIds.length == _members.length,
                   onChanged: (bool? value) {
                     setState(() {
                       if (value == true) {
@@ -449,7 +263,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
             const SizedBox(height: 16),
             Text(
               'Error: $_errorMessage',
-              style: const TextStyle(fontSize: 16, color: Colors.red),
+              style: const TextStyle(fontSize: 14, color: Colors.red),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -465,7 +279,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
                   child: const Text(
                     "Create or Join A Group 🚀",
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.bold,
                     ),
@@ -498,7 +312,7 @@ class _MemberSelectionPageState extends State<MemberSelectionPage> {
       return const Center(
         child: Text(
           'No members found in your group',
-          style: TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16, color: Colors.white),
         ),
       );
     }

@@ -25,6 +25,7 @@ class MyStoryViewScreen extends StatefulWidget {
 class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
   final StoryController controller = StoryController();
   int currentStoryIndex = 0;
+  String? currentChitId;
 
   void goToNextStory() async {
     if (currentStoryIndex < widget.storyItems.length - 1) {
@@ -37,6 +38,10 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
   @override
   void initState() {
     super.initState();
+    // Initialize currentChitId with the first media item of the first story
+    if (widget.storyItems.isNotEmpty && widget.storyItems[0].media.isNotEmpty) {
+      currentChitId = widget.storyItems[0].media[0].storyId;
+    }
   }
 
   List<StoryItem> _loadStories(int index) {
@@ -121,6 +126,20 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
             inline: false,
             repeat: false,
             onComplete: goToNextStory,
+            onStoryShow: (item, index) {
+              if (index < currentStory.media.length) {
+                final newChitId = currentStory.media[index].storyId;
+                if (newChitId != currentChitId) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        currentChitId = newChitId;
+                      });
+                    }
+                  });
+                }
+              }
+            },
             onVerticalSwipeComplete: (direction) {
               if (direction == Direction.down) {
                 Navigator.pop(context);
@@ -236,11 +255,24 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
           if (currentStory.myStory)
             DraggableScrollableSheet(
               initialChildSize: 0.1,
-              minChildSize: 0.08,
+              minChildSize: 0.1,
               maxChildSize: 0.5,
               expand: true,
               builder: (context, scrollController) {
-                final views = currentStory.views;
+                // Get views for the specific current chit
+                final rawViews = currentChitId != null
+                    ? currentStory.storyViewsMap[currentChitId] ?? []
+                    : currentStory.views;
+
+                // Make views unique by user ID or username
+                final Map<String, dynamic> uniqueViewsMap = {};
+                for (var v in rawViews) {
+                  final key = v['username'] ?? v['user'] ?? '';
+                  if (!uniqueViewsMap.containsKey(key)) {
+                    uniqueViewsMap[key] = v;
+                  }
+                }
+                final views = uniqueViewsMap.values.toList();
                 return Container(
                   decoration: BoxDecoration(
                     color: AppColors.bottomSheetBackground.withOpacity(0.92),
@@ -249,26 +281,16 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
                     border: Border.all(
                         color: AppColors.bottomSheetBorder, width: 0.5),
                   ),
-                  child: Column(
-                    children: [
-                      SingleChildScrollView(
-                        controller: scrollController,
-                        child: Column(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: views.length + 1, // +1 for the header
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        // Header section
+                        return Column(
                           children: [
-                            Container(
-                              width: 40,
-                              height: 5,
-                              margin: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[700],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
+                              padding: const EdgeInsets.fromLTRB(16, 1, 8, 1),
                               child: Row(
                                 children: [
                                   const Icon(
@@ -282,54 +304,134 @@ class _MyStoryViewScreenState extends State<MyStoryViewScreen> {
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 13,
                                     ),
                                   ),
+                                  const Spacer(),
+                                  // Drag handle inside the row
+                                  Container(
+                                    width: 36,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[700],
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (currentChitId != null)
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.redAccent,
+                                        size: 22,
+                                      ),
+                                      onPressed: () => _confirmDelete(
+                                          context, currentChitId!),
+                                    ),
                                 ],
                               ),
                             ),
                             const Divider(color: Colors.grey, height: 1),
                           ],
+                        );
+                      }
+
+                      // Viewers list item
+                      final user = views[index - 1];
+                      return ListTile(
+                        trailing: Icon(
+                          Icons.circle,
+                          color: currentStory.getColor(),
+                          size: 8,
                         ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          controller: scrollController,
-                          itemCount: views.length,
-                          itemBuilder: (context, index) {
-                            final user = views[index];
-                            return ListTile(
-                              trailing: Icon(
-                                Icons.circle,
-                                color: currentStory.getColor(),
-                                size: 8,
-                              ),
-                              leading: CircleAvatar(
-                                backgroundImage:
-                                    NetworkImage(user['profilePic'] ?? ''),
-                                backgroundColor: Colors.grey[800],
-                              ),
-                              title: Text(
-                                user['username'] ?? 'Unknown',
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              subtitle: user['viewedAt'] != null
-                                  ? Text(
-                                      _timeAgo(user['viewedAt']),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 11,
-                                      ),
-                                    )
-                                  : null,
-                            );
-                          },
+                        leading: CircleAvatar(
+                          backgroundImage:
+                              NetworkImage(user['profilePic'] ?? ''),
+                          backgroundColor: Colors.grey[800],
                         ),
-                      ),
-                    ],
+                        title: Text(
+                          user['username'] ?? 'Unknown',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: user['viewedAt'] != null
+                            ? Text(
+                                _timeAgo(user['viewedAt']),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                ),
+                              )
+                            : null,
+                      );
+                    },
                   ),
                 );
               },
             ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, String chitId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title:
+            const Text('Delete Story', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this story?',
+            style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+          ),
+          TextButton(
+            onPressed: () async {
+              // Capture the messenger before any async gaps or pops
+              final messenger = ScaffoldMessenger.of(context);
+              final parentContext = context;
+              
+              // Find the correct dbIndex for this chitId
+              int dbIdx = 0;
+              try {
+                final story = widget.storyItems
+                    .firstWhere((s) => s.allStoryIds.contains(chitId));
+                int idIdx = story.allStoryIds.indexOf(chitId);
+                if (idIdx != -1 && idIdx < story.allStoryDbIndices.length) {
+                  dbIdx = story.allStoryDbIndices[idIdx];
+                }
+              } catch (e) {
+                // Fallback to first story's dbIndex if not found
+                dbIdx = widget.storyItems[0].dbIndex;
+              }
+
+              final success = await StoryService.deleteChit(chitId, dbIdx);
+              if (success) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Story deleted successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                if (mounted) {
+                  Navigator.pop(parentContext, true); // Pop screen
+                }
+              } else {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to delete story (Server Error 500)'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            },
+            child:
+                const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
         ],
       ),
     );

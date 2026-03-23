@@ -179,6 +179,7 @@ class GroupsService {
       );
 
       if (response.statusCode == 201) {
+        await UserService.fetchMyProfile(invalidate: true);
         return {'success': true, 'data': jsonDecode(response.body)};
       } else {
         return {
@@ -299,6 +300,7 @@ class GroupsService {
       );
 
       if (response.statusCode == 200) {
+        await UserService.fetchMyProfile(invalidate: true);
         return {'success': true, 'data': jsonDecode(response.body)};
       } else {
         return {
@@ -361,6 +363,7 @@ class GroupsService {
       );
 
       if (response.statusCode == 200) {
+        await UserService.fetchMyProfile(invalidate: true);
         return {'success': true, 'data': jsonDecode(response.body)};
       } else {
         return {

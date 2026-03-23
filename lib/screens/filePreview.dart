@@ -7,24 +7,17 @@ import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/chat.dart';
 import 'package:chitchat/screens/createStory.dart';
-import 'package:chitchat/screens/home.dart';
-import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
-import 'package:chitchat/services/posts.dart';
-import 'package:chitchat/services/story.dart';
+import 'package:chitchat/services/upload_chit_service.dart';
 import 'package:chitchat/services/user.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:page_transition/page_transition.dart';
-import 'package:video_editor/video_editor.dart';
-import 'package:video_player/video_player.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:vs_media_picker/vs_media_picker.dart';
 import 'package:vs_story_designer/vs_story_designer.dart';
-import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:easy_video_editor/easy_video_editor.dart';
+import 'package:video_editor/video_editor.dart';
+import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 
 abstract class FileFormat {
@@ -108,12 +101,12 @@ class UnknownFileFormat extends FileFormat {
 
 class FilePreviewPage extends StatefulWidget {
   final List<PickedAssetModel> files;
-  bool? isGroupPost = false;
-  bool? isPost = false;
-  String? myGroupId = "";
-  bool? isMemory = false;
+  final bool? isGroupPost;
+  final bool? isPost;
+  final String? myGroupId;
+  final bool? isMemory;
 
-  FilePreviewPage(
+  const FilePreviewPage(
       {super.key,
       required this.files,
       this.isGroupPost = false,
@@ -125,16 +118,9 @@ class FilePreviewPage extends StatefulWidget {
   State<FilePreviewPage> createState() => _FilePreviewPageState();
 }
 
-Set<String> _selectedMemberIds = {};
-bool AllSelected = true;
-String myGroupId = '';
-List<Member> _members = [];
-bool _isLoading = true;
-bool _hasError = false;
-
-String _errorMessage = '';
-
 class _FilePreviewPageState extends State<FilePreviewPage> {
+  String myGroupId = '';
+
   int _currentIndex = 0;
   late List<File> editedFiles;
   late List<PickedAssetModel> _files;
@@ -144,65 +130,28 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
   PageController _pageController = PageController(initialPage: 0);
 
   Future<void> _fetchMembers() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
     String? userId = await UserService.getUserId();
-    if (userId == null) {
-      throw Exception('User ID is null');
-    }
+    if (userId == null) return;
     String? xtoken = await UserService.getAccessToken();
 
     try {
-      print("baseUrl: $baseUrl");
-      print("token: $xtoken");
       final response = await http.get(
         Uri.parse('$baseUrl/chits/members/$userId'),
         headers: {'Authorization': 'Bearer $xtoken'},
       );
 
       if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        print("jsonData: $jsonData");
-        final membersList = (jsonData['usersOwnGroupMembers']['myGroup']
-                ?['members'] as List?) ??
-            [];
-        final watchList = (jsonData['membersOfUserWatchList']?['results']?[0]
-                ?['members'] as List?) ??
-            [];
-
-        // Remove duplicate members by ID
-        final uniqueMembers = <String, Member>{};
-
-        for (var memberData in [...membersList, ...watchList]) {
-          final member = Member(
-            id: memberData['memberId'],
-            name: memberData['memberName'],
-            profilePic: memberData['memberProfilePic'],
-          );
-          uniqueMembers[member.id] = member;
-        }
-
+        final jsonData = jsonDecode(response.body);
         setState(() {
-          _members = uniqueMembers.values.toList();
           myGroupId =
               (jsonData['usersOwnGroupMembers']?['myGroup']?["_id"]) ?? '';
-          if (myGroupId.isEmpty) {
-            throw Exception('You dont have a group so you cannot post a chit.');
-          }
-
-          _isLoading = false;
+          AppVariables.set('myGroupId', myGroupId);
         });
       } else {
-        throw Exception('Failed to load members: ${response.statusCode}');
+        print('Failed to load members: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = e.toString();
-      });
+      print(e);
     }
   }
 
@@ -221,299 +170,6 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
   }
 
 //ImageEditor(image: file.readAsBytesSync())
-  uploadChits(context) async {
-    String? xtoken = await UserService.getAccessToken();
-
-    String baseurl =
-        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
-
-    ValueNotifier<FileUploadProgress> _progressNotifier =
-        ValueNotifier<FileUploadProgress>(
-      FileUploadProgress(fileName: 'Uploading...'),
-    );
-
-    S3Uploader uploader = S3Uploader(
-      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
-      progressNotifier: _progressNotifier,
-    );
-    bool uploadFinished = false;
-    bool showErrorText = false;
-    Map<String, dynamic> result =
-        AppVariables.get<Map<String, dynamic>>("posts") ?? {};
-    final List<String>? images = editedFiles.map((f) => f.path).toList();
-
-    if (images != null && images.isNotEmpty) {
-      // Handle the selected image
-      images.map((e) => print);
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return PopScope(
-            canPop: false,
-
-            // Optional: Handle the attempted pop with onPopInvoked
-            onPopInvokedWithResult: (didPop, res) {
-              // This callback is triggered when a pop is attempted
-              // didPop will be false since canPop is false
-
-              // You could show a snackbar or provide feedback here
-              if (!didPop) {
-                setState(() {
-                  showErrorText = true;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(
-                          'Please use the close button to dismiss this dialog')),
-                );
-              }
-            },
-            child: StatefulBuilder(
-              builder: (BuildContext context, StateSetter setState) {
-                return AlertDialog(
-                  title: Column(
-                    children: [
-                      Text(
-                        'Uploading...',
-                        style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            fontFamily: 'Poppins'),
-                      ),
-                      const SizedBox(height: 10),
-                      if (showErrorText)
-                        Text(
-                          'Do not close this dialog until the upload is complete.',
-                          style: const TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Poppins'),
-                        ),
-                    ],
-                  ),
-                  content:
-                      UploadProgressWidget(progressNotifier: _progressNotifier),
-                  actions: <Widget>[
-                    TextButton(
-                      child: const Text('OK'),
-                      onPressed: () {
-                        if (uploadFinished == true) {
-                          Navigator.of(context).pop();
-                          Navigator.of(context).pop(result["data"]);
-                        } else {
-                          setState(() {
-                            showErrorText = true;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          );
-        },
-      );
-      List<String> files =
-          await uploader.uploadFiles(files: images, compressionParams: {
-        'width': 600,
-        'quality': 95,
-      });
-      print(files);
-      _progressNotifier.value = _progressNotifier.value.copyWith(
-        stage: UploadStage.uploading,
-        customStageText: "Processing...",
-        customStageTextDetail: "saving on server...",
-      );
-      result = await PostService.createPost(
-        files: files,
-        myGroupId: widget.myGroupId ?? '',
-        isGroupPost: widget.isGroupPost ?? false,
-      ).catchError((error) {
-        print(error);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload these ",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-      });
-      if (result['success']) {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.completed,
-          customStageText: "Uploaded Successfully",
-          customStageTextDetail: "You are set! now you can close this dialog",
-        );
-        setState(() {
-          if (widget.isGroupPost == true) {
-            AppVariables.update("group_posts", result['data']);
-          } else {
-            AppVariables.update("posts", result['data']);
-          }
-          uploadFinished = true;
-        });
-      } else {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this chits",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-      }
-    }
-  }
-
-  uploadMemory(context) async {
-    String? xtoken = await UserService.getAccessToken();
-
-    String baseurl =
-        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
-
-    ValueNotifier<FileUploadProgress> _progressNotifier =
-        ValueNotifier<FileUploadProgress>(
-      FileUploadProgress(fileName: 'Uploading...'),
-    );
-
-    S3Uploader uploader = S3Uploader(
-      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
-      progressNotifier: _progressNotifier,
-    );
-    bool uploadFinished = false;
-    bool showErrorText = false;
-    final List<String>? images = editedFiles.map((f) => f.path).toList();
-
-    if (images != null && images.isNotEmpty) {
-      // Handle the selected image
-      images.map((e) => print);
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return PopScope(
-            canPop: false,
-
-            // Optional: Handle the attempted pop with onPopInvoked
-            onPopInvokedWithResult: (didPop, res) {
-              // This callback is triggered when a pop is attempted
-              // didPop will be false since canPop is false
-
-              // You could show a snackbar or provide feedback here
-              if (!didPop) {
-                setState(() {
-                  showErrorText = true;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(
-                          'Please use the close button to dismiss this dialog')),
-                );
-              }
-            },
-            child: StatefulBuilder(
-              builder: (BuildContext context, StateSetter setState) {
-                return AlertDialog(
-                  title: Column(
-                    children: [
-                      Text(
-                        'Uploading...',
-                        style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            fontFamily: 'Poppins'),
-                      ),
-                      const SizedBox(height: 10),
-                      if (showErrorText)
-                        Text(
-                          'Do not close this dialog until the upload is complete.',
-                          style: const TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Poppins'),
-                        ),
-                    ],
-                  ),
-                  content:
-                      UploadProgressWidget(progressNotifier: _progressNotifier),
-                  actions: <Widget>[
-                    TextButton(
-                      child: const Text('OK'),
-                      onPressed: () {
-                        if (uploadFinished == true) {
-                          Navigator.of(context).pop();
-                          Navigator.of(context).pop();
-                        } else {
-                          setState(() {
-                            showErrorText = true;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          );
-        },
-      );
-      List<String> files =
-          await uploader.uploadFiles(files: images, compressionParams: {
-        'width': 600,
-        'quality': 95,
-      });
-      print(files);
-      _progressNotifier.value = _progressNotifier.value.copyWith(
-        stage: UploadStage.uploading,
-        customStageText: "Processing...",
-        customStageTextDetail: "saving on server...",
-      );
-      Map<String, dynamic> result = await PostService.createMemories(
-        files: files,
-        myGroupId: widget.myGroupId ?? '',
-      ).catchError((error) {
-        print(error);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this memory",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-      });
-      if (result['success']) {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.completed,
-          customStageText: "Uploaded Successfully",
-          customStageTextDetail: "You are set! now you can close this dialog",
-        );
-        setState(() {
-          // posts.add(result['data']);
-          AppVariables.update("memories", result['data']);
-          uploadFinished = true;
-        });
-      } else {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this memory",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-      }
-    }
-  }
 
   void _editFile(File file, int index) async {
     if (_isImage(file)) {
@@ -653,9 +309,17 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
-              // Upload editedFiles list
+              // Upload editedFiles list using centralized UploadChitService
               if (widget.isMemory == true) {
-                uploadMemory(context);
+                UploadChitService.upload(
+                  context: context,
+                  filePaths: editedFiles.map((f) => f.path).toList(),
+                  type: ChitType.memory,
+                  groupId: (widget.myGroupId != null &&
+                          widget.myGroupId!.isNotEmpty)
+                      ? widget.myGroupId
+                      : myGroupId,
+                );
               } else if (widget.isPost != null && widget.isPost != true) {
                 print(
                     "Files to upload: ${editedFiles.map((f) => f.path).toList()}");
@@ -667,14 +331,18 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
                     useSafeArea: true,
                     builder: (_) => _OptionSelector(
                         uri: editedFiles.map((f) => f.path).toList()));
-                // Navigator.pushReplacement(
-                //     context,
-                //     MaterialPageRoute(
-                //       builder: (context) => MemberSelectionPage(
-                //           files: editedFiles.map((f) => f.path).toList()),
-                //     ));
               } else {
-                uploadChits(context);
+                UploadChitService.upload(
+                  context: context,
+                  filePaths: editedFiles.map((f) => f.path).toList(),
+                  type: widget.isGroupPost == true
+                      ? ChitType.groupPost
+                      : ChitType.post,
+                  groupId: (widget.myGroupId != null &&
+                          widget.myGroupId!.isNotEmpty)
+                      ? widget.myGroupId
+                      : myGroupId,
+                );
               }
             },
             child: const Text("Next"),
@@ -960,13 +628,7 @@ class _VideoEditorState extends State<VideoEditor> {
     super.dispose();
   }
 
-  void _showErrorSnackBar(String message) =>
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+
 
   Future<void> trimVideo({
     required String inputPath,
@@ -1018,9 +680,9 @@ class _VideoEditorState extends State<VideoEditor> {
         return;
       }
       if (widget.totalFiles > 1 ||
-          widget.isPost! ||
-          widget.isGroupPost! ||
-          widget.isMemory!) {
+          widget.isPost == true ||
+          widget.isGroupPost == true ||
+          widget.isMemory == true) {
         Navigator.pop(context, execute.outputPath);
         return;
       }
@@ -1032,32 +694,10 @@ class _VideoEditorState extends State<VideoEditor> {
         useSafeArea: true,
         builder: (_) => _OptionSelector(uri: [execute.outputPath]),
       );
-    }).catchError((e) {
-      _showErrorSnackBar('Error trimming video: $e');
     });
   }
 
-  void _exportCover() async {
-    final config = CoverFFmpegVideoEditorConfig(_controller);
-    final execute = await config.getExecuteConfig();
-    if (execute == null) {
-      _showErrorSnackBar("Error on cover exportation initialization.");
-      return;
-    }
 
-    // await ExportService.runFFmpegCommand(
-    //   execute,
-    //   onError: (e, s) => _showErrorSnackBar("Error on cover exportation :("),
-    //   onCompleted: (cover) {
-    //     if (!mounted) return;
-
-    //     showDialog(
-    //       context: context,
-    //       builder: (_) => CoverResultPopup(cover: cover),
-    //     );
-    //   },
-    // );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1344,32 +984,7 @@ class _VideoEditorState extends State<VideoEditor> {
     ];
   }
 
-  Widget _coverSelection() {
-    return SingleChildScrollView(
-      child: Center(
-        child: Container(
-          margin: const EdgeInsets.all(15),
-          child: CoverSelection(
-            controller: _controller,
-            size: height + 10,
-            quantity: 12,
-            selectedCoverBuilder: (cover, size) {
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  cover,
-                  Icon(
-                    Icons.check_circle,
-                    color: const CoverSelectionStyle().selectedBorderColor,
-                  )
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
+
 }
 
 class _OptionSelector extends StatefulWidget {
@@ -1386,154 +1001,15 @@ class _OptionSelectorState extends State<_OptionSelector> {
   FriendCircleGroup? groupDetails;
 
   uploadChits(context) async {
-    String? xtoken = await UserService.getAccessToken();
-
-    String baseurl =
-        AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
-    ValueNotifier<FileUploadProgress> _progressNotifier =
-        ValueNotifier<FileUploadProgress>(
-      FileUploadProgress(fileName: 'Uploading...'),
+    String? fetchedGid = AppVariables.get<String>('myGroupId');
+    UploadChitService.upload(
+      context: context,
+      filePaths: widget.uri,
+      type: ChitType.story,
+      members: [],
+      sendToAll: true,
+      groupId: (fetchedGid != null && fetchedGid.isNotEmpty) ? fetchedGid : '',
     );
-
-    S3Uploader uploader = S3Uploader(
-      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
-      progressNotifier: _progressNotifier,
-    );
-    bool uploadFinished = false;
-    bool showErrorText = false;
-    final List<String> images = widget.uri;
-
-    if (images.isNotEmpty) {
-      // Handle the selected image
-      images.map((e) => print);
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return PopScope(
-            canPop: false,
-
-            // Optional: Handle the attempted pop with onPopInvoked
-            onPopInvokedWithResult: (didPop, res) {
-              // This callback is triggered when a pop is attempted
-              // didPop will be false since canPop is false
-
-              // You could show a snackbar or provide feedback here
-              if (!didPop) {
-                setState(() {
-                  showErrorText = true;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(
-                          'Please use the close button to dismiss this dialog')),
-                );
-              }
-            },
-            child: StatefulBuilder(
-              builder: (BuildContext context, StateSetter setState) {
-                return AlertDialog(
-                  title: Column(
-                    children: [
-                      Text(
-                        'Uploading Chits...',
-                        style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            fontFamily: 'Poppins'),
-                      ),
-                      const SizedBox(height: 10),
-                      if (showErrorText)
-                        Text(
-                          'Do not close this dialog until the upload is complete.',
-                          style: const TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Poppins'),
-                        ),
-                    ],
-                  ),
-                  content:
-                      UploadProgressWidget(progressNotifier: _progressNotifier),
-                  actions: <Widget>[
-                    TextButton(
-                      child: const Text('OK'),
-                      onPressed: () {
-                        if (uploadFinished == true) {
-                          Navigator.pushReplacement(
-                              context,
-                              PageTransition(
-                                  type: PageTransitionType.leftToRight,
-                                  child: HomePage()));
-                        } else {
-                          if (showErrorText == true) {
-                            Navigator.of(context).pop();
-                          } else {
-                            setState(() {
-                              showErrorText = true;
-                            });
-                          }
-                        }
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          );
-        },
-      );
-      List<String> files =
-          await uploader.uploadFiles(files: images, compressionParams: {
-        'width': 600,
-        'quality': 95,
-      });
-      print(files);
-      _progressNotifier.value = _progressNotifier.value.copyWith(
-        stage: UploadStage.uploading,
-        customStageText: "Processing...",
-        customStageTextDetail: "saving on server...",
-      );
-      Map<String, dynamic> result = await StoryService.CreateStory(
-        members: _members.map((m) => m.id).toList(),
-        files: files,
-        myGroupId: myGroupId,
-        sendToAll: AllSelected,
-      ).catchError((error) {
-        print(error);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this chits",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-      });
-      if (result['success']) {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.completed,
-          customStageText: "Uploaded Successfully",
-          customStageTextDetail: "You are set! now you can close this dialog",
-        );
-        setState(() {
-          // posts.add(result['data']);
-          uploadFinished = true;
-        });
-      } else {
-        print(result);
-        _progressNotifier.value = _progressNotifier.value.copyWith(
-          stage: UploadStage.failed,
-          customStageTextDetail: "can't upload this chits",
-        );
-        setState(() {
-          uploadFinished = true;
-        });
-      }
-    }
   }
 
   @override
@@ -1600,9 +1076,7 @@ class _OptionSelectorState extends State<_OptionSelector> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => MemberSelectionPage(
-                            files: widget.uri is List<String>
-                                ? widget.uri
-                                : [widget.uri.toString()]),
+                            files: widget.uri),
                       ));
                 },
               ),

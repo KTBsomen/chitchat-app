@@ -3,7 +3,7 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/camera.dart';
 import 'package:chitchat/screens/filePreview.dart';
-import 'package:chitchat/screens/mystoryviewscreen.dart';
+import 'package:chitchat/screens/mychitlistscreen.dart';
 import 'package:chitchat/services/story.dart';
 import 'package:flutter/material.dart';
 import 'package:vs_media_picker/vs_media_picker.dart';
@@ -394,12 +394,13 @@ class _StoryListScreenState extends State<StoryListScreen> {
                             ],
                           ),
                           onTap: () {
+                            // Find the first merged story which contains all individual stories for this category
+                            final mergedStory = stories.first;
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => MyStoryViewScreen(
-                                  storyItems: stories,
-                                  initialIndex: '0',
+                                builder: (context) => MyChitListScreen(
+                                  individualStories: mergedStory.individualStories,
                                   category: category,
                                 ),
                               ),
