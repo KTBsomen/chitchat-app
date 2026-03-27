@@ -148,11 +148,11 @@ class FriendCircle extends StatelessWidget {
         min(group.members.length.toDouble(), maxVisibleMembers);
 
     // Dynamic node size calculation
-    double effectiveNodeSize = nodeSize ?? (size * 0.3);
+    double effectiveNodeSize = nodeSize ?? (size * 0.27);
     if (buildCount > 0 && buildCount <= 3) {
-      effectiveNodeSize = size * 0.45;
+      effectiveNodeSize = size * 0.40;
     } else if (buildCount > 3 && buildCount <= 5) {
-      effectiveNodeSize = size * 0.35;
+      effectiveNodeSize = size * 0.32;
     }
 
     // painter should use a fixed integer for the ring smoothness

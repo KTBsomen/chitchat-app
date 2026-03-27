@@ -36,6 +36,7 @@ class DynamicPostWidget extends StatefulWidget {
   final bool? showAuthor;
   final bool? showCount;
   final bool? showMenu;
+  final bool? showMenuInPreview;
   final bool? public;
   final Function? onRefresh;
   final bool isFullPage;
@@ -58,6 +59,7 @@ class DynamicPostWidget extends StatefulWidget {
     this.showCount = false,
     this.public = true,
     this.showMenu = false,
+    this.showMenuInPreview = false,
     this.onRefresh,
     this.isGroupPost,
     this.isFullPage = false,
@@ -449,7 +451,14 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                 ),
                 //likes comments
                 if (widget.public == false)
-                  SliverToBoxAdapter(child: _buildVotingSection())
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        _buildPrivateHeader(),
+                        _buildVotingSection(),
+                      ],
+                    ),
+                  )
                 else
                   RelatedPostsWidget(
                     postId: widget.postId,
@@ -1041,6 +1050,52 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     print("valuenotier==== ${votesNotifier.value}, sucess =$success");
   }
 
+  Widget _buildPrivateHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundImage: widget.profilePic != null
+                    ? NetworkImage(widget.profilePic!)
+                    : null,
+                child: widget.profilePic == null
+                    ? const Icon(Icons.person, size: 18, color: Colors.white)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                widget.authorName ?? "",
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          if (widget.showMenu == true)
+            GestureDetector(
+              onTap: () => _openMore(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.more_vert, color: Colors.white),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+
   Widget _buildVotingSection() {
     return ValueListenableBuilder<List<NotificationModel>>(
       valueListenable: notificationsNotifier,
@@ -1317,64 +1372,33 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // if (isFromCurrentUser)
-                //   ListTile(
-                //     leading: Icon(Icons.edit, color: Colors.blue),
-                //     title: Text("Edit"),
-                //     onTap: () {
-                //       Navigator.pop(context);
-                //       _showEditMessagePopup(message);
-                //     },
-                //   ),
-                ListTile(
-                  leading: Icon(Icons.delete, color: Colors.red),
-                  title: Text("Delete"),
-                  onTap: () {
-                    // Navigator.pop(context);
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (BuildContext context) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      },
-                    );
-
-                    PostService.deletePost(widget.postId).then((result) {
-                      Navigator.of(context).pop(); // Close loader
-                      if (result['success'] == true) {
-                        // Notify listeners to remove the post from UI
-                        AppVariables.update('deleted_posts', widget.postId);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              backgroundColor: Colors.green,
-                              content: Text('Post deleted successfully!')),
-                        );
-                        Navigator.of(context)
-                            .pop(); // Optionally close the dialog or screen
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              backgroundColor: Colors.red,
-                              content: Text(result['message'] ??
-                                  'Failed to delete post')),
-                        );
-                        Navigator.of(context)
-                            .pop(); // Optionally close the dialog or screen
-                      }
-                    }).catchError((e) {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            backgroundColor: Colors.red,
-                            content: Text(
-                                'An error occurred while deleting the post')),
-                      );
-                    });
-                    // Handle pin action
-                  },
-                ),
+                if (widget.author == myProfile['_id']) ...[
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text("Delete"),
+                    onTap: () {
+                      Navigator.pop(context); // Close dialog
+                      _showDeleteConfirmation(context);
+                    },
+                  ),
+                ] else ...[
+                  ListTile(
+                    leading: const Icon(Icons.report, color: Colors.orange),
+                    title: const Text("Report Post"),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showReportDialog(context, "post");
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.block, color: Colors.red),
+                    title: const Text("Block User"),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showBlockConfirmation(context);
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -1534,9 +1558,7 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                       ),
                     ),
                   )),
-            if (widget.showMenu != null &&
-                widget.showMenu == true &&
-                widget.public == false)
+            if (widget.showMenu == true && (widget.showMenuInPreview ?? false))
               Positioned(
                   bottom: 5,
                   right: 5,
@@ -1551,9 +1573,9 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
                         color: Colors.black.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
-                          const Icon(Icons.more_vert, color: Colors.white),
+                          Icon(Icons.more_vert, color: Colors.white),
                         ],
                       ),
                     ),
@@ -1590,6 +1612,186 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     //     ),
     //   );
   }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Post"),
+          content: const Text("Are you sure you want to delete this post?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close confirmation
+                _deletePost(context);
+              },
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deletePost(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          const Center(child: CircularProgressIndicator()),
+    );
+
+    final navigator = Navigator.of(context);
+    PostService.deletePost(widget.postId).then((result) {
+      if (!mounted) return;
+      navigator.pop(); // Close loader using captured navigator
+      if (result['success'] == true) {
+        AppVariables.update('deleted_posts', widget.postId);
+        _showStatusDialog(navigator.context, 'Success', 'Post deleted successfully!', isError: false);
+      } else {
+        _showStatusDialog(navigator.context, 'Error', result['error'] ?? 'Failed to delete post', isError: true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        navigator.pop();
+        _showStatusDialog(navigator.context, 'Error', 'An error occurred while deleting the post', isError: true);
+      }
+    });
+  }
+
+  void _showReportDialog(BuildContext context, String type) {
+    final List<String> reasons = [
+      "Spam",
+      "Inappropriate Content",
+      "Harassment",
+      "False Information",
+      "Other"
+    ];
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Report $type"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: reasons.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(reasons[index]),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _submitReport(context, reasons[index]);
+                  },
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _submitReport(BuildContext context, String reason) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          const Center(child: CircularProgressIndicator()),
+    );
+
+    final navigator = Navigator.of(context);
+    PostService.reportPost(postId: widget.postId, reason: reason).then((result) {
+      if (!mounted) return;
+      navigator.pop(); // Close loader using captured navigator
+      if (result['success']) {
+        _showStatusDialog(navigator.context, 'Report Result', 'Report submitted. Thank you for your feedback.', isError: false);
+      } else {
+        _showStatusDialog(navigator.context, 'Report failed', 'Failed to submit report. Please try again.', isError: true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        navigator.pop();
+        _showStatusDialog(navigator.context, 'Error', 'An error occurred while submitting report.', isError: true);
+      }
+    });
+  }
+
+  void _showStatusDialog(BuildContext context, String title, String message, {required bool isError}) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title, style: TextStyle(color: isError ? Colors.red : Colors.green)),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBlockConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Block User"),
+          content: const Text(
+              "Are you sure you want to block this user? You will no longer see their posts or messages."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _blockUser(context);
+              },
+              child: const Text("Block", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _blockUser(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          const Center(child: CircularProgressIndicator()),
+    );
+
+    final navigator = Navigator.of(context);
+    UserService.blockUser(userId: widget.author).then((result) {
+      if (!mounted) return;
+      navigator.pop(); // Close loader using captured navigator
+      if (result['success']) {
+        _showStatusDialog(navigator.context, 'Success', 'User blocked.', isError: false);
+      } else {
+        _showStatusDialog(navigator.context, 'Error', 'Failed to block user.', isError: true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        navigator.pop();
+        _showStatusDialog(navigator.context, 'Error', 'An error occurred while blocking user.', isError: true);
+      }
+    });
+  }
 }
 
 class PostList extends StatelessWidget {
@@ -1605,6 +1807,7 @@ class PostList extends StatelessWidget {
       itemBuilder: (context, index) {
         final post = posts[index];
         return DynamicPostWidget(
+          showMenu: true,
           content: post['content'],
           media: List<Map<String, String>>.from(post['media'].map((m) => {
                 'type': m['type'],

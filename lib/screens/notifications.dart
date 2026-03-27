@@ -382,6 +382,7 @@ class _NotificationCardState extends State<NotificationCard> {
               borderRadius: BorderRadius.circular(12),
               child: AbsorbPointer(
                 child: DynamicPostWidget(
+                  showMenu: true,
                   borderRadius: 12,
                   content: widget.notification.requestBody['content'],
                   media: List<Map<String, dynamic>>.from(

@@ -411,4 +411,83 @@ class UserService {
       return {'success': false, 'error': e.toString()};
     }
   }
+
+  static Future<Map<String, dynamic>> blockUser({
+    required String userId,
+  }) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      final response = await http.post(
+        Uri.parse('$baseurl/user/$userId/block'),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      );
+      return {
+        "success": response.statusCode == 200 || response.statusCode == 201
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteAccount() async {
+    try {
+      String? token = await UserService.getAccessToken();
+      final response = await http.delete(
+        Uri.parse('$baseurl/user/account'),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      );
+      return {"success": response.statusCode == 200};
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> unblockUser({
+    required String userId,
+  }) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      final response = await http.post(
+        Uri.parse('$baseurl/user/$userId/unblock'),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      );
+      return {
+        "success": response.statusCode == 200 || response.statusCode == 201
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchBlockedUsers() async {
+    try {
+      String? token = await UserService.getAccessToken();
+      final response = await http.get(
+        Uri.parse('$baseurl/user/blocked'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "data": jsonDecode(response.body),
+        };
+      } else {
+        return {
+          "success": false,
+          "error": "Failed to fetch blocked users",
+        };
+      }
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
 }

@@ -1460,6 +1460,7 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                   }
                                   try {
                                     return DynamicPostWidget(
+                                      showMenu: true,
                                       key: ValueKey('post-${post['_id']}'),
                                       content: post['content'],
                                       media: List<Map<String, dynamic>>.from(
@@ -1478,7 +1479,6 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                                       public: post['public'],
                                       comments: post['comments'],
                                       onRefresh: updatePublicPostStatus,
-                                      showMenu: true,
                                     );
                                   } on Exception catch (e) {
                                     return Container(

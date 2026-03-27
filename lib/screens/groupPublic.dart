@@ -1188,6 +1188,7 @@ class _GroupPublicViewScreenState extends State<GroupPublicViewScreen>
                                                             false,
                                                     likes: post['likes'],
                                                     comments: post['comments'],
+                                                    showMenu: true,
                                                   );
                                                 } on Exception catch (e) {
                                                   return Container(

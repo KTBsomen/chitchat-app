@@ -255,6 +255,7 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
       key: ValueKey('related-${post['_id'] ?? index}'),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: DynamicPostWidget(
+        showMenu: true,
         showAuthor: true,
         showCount: true,
         borderRadius: 12,

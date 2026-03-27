@@ -341,7 +341,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
-    if (profileDetails!['myGroup'] == null) {
+    if (profileDetails != null && profileDetails!['myGroup'] == null) {
       _dialogShown = true;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -748,7 +748,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }).catchError((error) {
         print('Error deleting message: $error');
       });
-      if (!isFromMQTT) {
+      if (!isFromMQTT && !message.isOneTime) {
         mqtt.publish(
           jsonEncode({
             'type': 'unsend',
@@ -1393,7 +1393,8 @@ class _ChatScreenState extends State<ChatScreen> {
           if ((messageType == MessageType.image ||
                   messageType == MessageType.video) &&
               groupDetails != null &&
-              !_memorySentUrls.contains(url)) {
+              !_memorySentUrls.contains(url) &&
+              !isOneTime) {
             _memorySentUrls.add(url);
             PostService.createMemories(
               files: [url],

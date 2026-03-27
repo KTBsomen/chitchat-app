@@ -205,6 +205,25 @@ class FCMHandler {
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
+  /// Stores notification data when the app is opened from a terminated/background
+  /// state so that navigation can happen after the app is fully initialized.
+  static Map<String, dynamic>? _pendingNotificationData;
+
+  /// Call this after the app is fully initialized (profile loaded, navigator ready)
+  /// to navigate to ChatScreen if the app was opened via a notification.
+  static void consumePendingNotification() {
+    if (_pendingNotificationData != null) {
+      final data = _pendingNotificationData!;
+      _pendingNotificationData = null;
+      try {
+        navigatorKey.currentState?.push(
+            MaterialPageRoute(builder: (context) => ChatScreen(data: data)));
+      } catch (e) {
+        print('Pending notification navigation failed: $e');
+      }
+    }
+  }
+
   static Future<void> initialize() async {
     // Request FCM / platform notification permissions
     final settings = await FirebaseMessaging.instance.requestPermission(
@@ -276,12 +295,37 @@ class FCMHandler {
     initCallKitListener();
 
     FirebaseMessaging.onMessage.listen(_onMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_onTap);
+    FirebaseMessaging.onMessageOpenedApp.listen((message) async {
+      // Save for deferred navigation — navigator/profile may not be ready
+      final Map<String, dynamic> data = (message.data.isNotEmpty)
+          ? Map<String, dynamic>.from(message.data)
+          : (message.notification?.body != null
+              ? _tryParseNotificationBody(message.notification!.body!)
+              : <String, dynamic>{});
+      if (data['type'] == 'text') {
+        _pendingNotificationData = data;
+        consumePendingNotification();
+      } else {
+        await _onTap(message);
+      }
+    });
     FirebaseMessaging.instance
         .getInitialMessage()
         .then((RemoteMessage? message) async {
       if (message != null) {
-        await _onTap(message);
+        // App opened from terminated state — save data for deferred navigation
+        final Map<String, dynamic> data = (message.data.isNotEmpty)
+            ? Map<String, dynamic>.from(message.data)
+            : (message.notification?.body != null
+                ? _tryParseNotificationBody(message.notification!.body!)
+                : <String, dynamic>{});
+        if (data['type'] == 'text') {
+          _pendingNotificationData = data;
+          // Don't navigate now — main.dart will call consumePendingNotification()
+          // after profile is loaded and navigator is ready.
+        } else {
+          await _onTap(message);
+        }
       }
     });
     // onBackgroundMessage requires a top-level function; register it below.

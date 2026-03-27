@@ -789,4 +789,26 @@ class PostService {
       };
     }
   }
+
+  static Future<Map<String, dynamic>> reportPost({
+    required String postId,
+    required String reason,
+  }) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      final response = await http.post(
+        Uri.parse('$baseurl/posts/$postId/report'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({"reason": reason}),
+      );
+      return {
+        "success": response.statusCode == 200 || response.statusCode == 201
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
 }

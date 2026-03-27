@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/appbar.dart';
 import 'package:chitchat/components/bottomnav.dart';
@@ -48,7 +50,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
 
   double currentMaxVisible = 5.0;
   double currentUpperContainerHeightMultiplier = 0.4;
-  int currentCircleSize = 200;
+  int currentCircleSize = 180;
 
   List<dynamic> posts = [];
   String? next;
@@ -133,8 +135,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
     ));
 
     _circleSizeAnimation = IntTween(
-      begin: 200,
-      end: 350,
+      begin: 180,
+      end: 315,
     ).animate(CurvedAnimation(
       parent: _friendCircleAnimationController,
       curve: Curves.easeInOut,
@@ -148,6 +150,9 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
     AppVariables.addListener("profile", _handleProfileUpdate);
 
     _sheetController.addListener(_onSheetPositionChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onSheetPositionChanged();
+    });
   }
 
   void _onSheetPositionChanged() {
@@ -650,6 +655,15 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                 launchUrl(Uri.parse(AppVariables.get<String>('contactUrl') ??
                     "https://chitzchat.com/contact"));
               }
+              if (value == 'privacy') {
+                launchUrl(Uri.parse("https://chitzchat.com/privacy"));
+              }
+              if (value == 'delete_account') {
+                _showDeleteAccountConfirmation(context);
+              }
+              if (value == 'blocked_users') {
+                _showBlockedUsersList(context);
+              }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
               const PopupMenuItem<String>(
@@ -662,6 +676,25 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                 child: ListTile(
                     leading: Icon(Icons.contact_mail),
                     title: Text('Contact Us')),
+              ),
+              const PopupMenuItem<String>(
+                value: 'privacy',
+                child: ListTile(
+                    leading: Icon(Icons.privacy_tip),
+                    title: Text('Privacy Policy')),
+              ),
+              const PopupMenuItem<String>(
+                value: 'blocked_users',
+                child: ListTile(
+                    leading: Icon(Icons.block),
+                    title: Text('Blocked Users')),
+              ),
+              const PopupMenuItem<String>(
+                value: 'delete_account',
+                child: ListTile(
+                    leading: Icon(Icons.delete_forever, color: Colors.red),
+                    title: Text('Delete Account',
+                        style: TextStyle(color: Colors.red))),
               ),
             ],
           ),
@@ -1091,5 +1124,242 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
         ],
       ),
     );
+  }
+
+  void _showDeleteAccountConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Account"),
+          content: const Text(
+              "Are you sure you want to delete your account? This action is permanent and cannot be undone. All your data will be removed."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteAccount(context);
+              },
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteAccount(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          const Center(child: CircularProgressIndicator()),
+    );
+
+    final navigator = Navigator.of(context);
+    UserService.deleteAccount().then((result) {
+      if (!mounted) return;
+      if (result['success']) {
+        UserService.signOut((loading) {}).then((_) {
+          if (!mounted) return;
+          navigator.pop(); // Close loader using captured navigator
+          navigator.pushAndRemoveUntil(
+            PageTransition(
+              type: PageTransitionType.leftToRight,
+              child: LoginScreen(),
+            ),
+            (route) => false,
+          );
+        }).catchError((e) {
+          if (mounted) {
+            navigator.pop();
+            _showStatusDialog(navigator.context, 'Error', 'Error signing out after deletion: $e', isError: true);
+          }
+        });
+      } else {
+        navigator.pop(); // Close loader using captured navigator
+        _showStatusDialog(navigator.context, 'Error', result['error'] ?? 'Failed to delete account.', isError: true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        navigator.pop(); // Close loader using captured navigator
+        _showStatusDialog(navigator.context, 'Error', 'An unexpected error occurred: $e', isError: true);
+      }
+    });
+  }
+
+  void _showStatusDialog(BuildContext context, String title, String message, {required bool isError}) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title, style: TextStyle(color: isError ? Colors.red : Colors.green)),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBlockedUsersList(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.7,
+              decoration: const BoxDecoration(
+                color: Color.fromARGB(255, 20, 20, 50),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      "Blocked Users",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontFamily: "Poppins",
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: FutureBuilder<Map<String, dynamic>>(
+                      future: UserService.fetchBlockedUsers(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasError ||
+                            snapshot.data?['success'] == false) {
+                          return Center(
+                            child: Text(
+                              snapshot.data?['error'] ??
+                                  "Failed to load blocked users",
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          );
+                        }
+
+                        final dynamic rawData = snapshot.data?['data'];
+                        List blockedUsers = [];
+                        if (rawData is List) {
+                          blockedUsers = rawData;
+                        } else if (rawData is Map &&
+                            rawData.containsKey('blockedUsers')) {
+                          blockedUsers = rawData['blockedUsers'] is List
+                              ? rawData['blockedUsers']
+                              : [];
+                        }
+
+                        if (blockedUsers.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              "No blocked users",
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          itemCount: blockedUsers.length,
+                          itemBuilder: (context, index) {
+                            final user = blockedUsers[index];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: user['profilePic'] != null
+                                    ? CachedNetworkImageProvider(
+                                        user['profilePic'])
+                                    : null,
+                                child: user['profilePic'] == null
+                                    ? const Icon(Icons.person)
+                                    : null,
+                              ),
+                              title: Text(
+                                user['name'] ??
+                                    user['username'] ??
+                                    "Unknown User",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              subtitle: Text(
+                                "@${user['username'] ?? ''}",
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 12),
+                              ),
+                              trailing: TextButton(
+                                onPressed: () => _unblockUser(
+                                    context,
+                                    user['_id'],
+                                    () => setModalState(() {})),
+                                child: const Text("Unblock",
+                                    style: TextStyle(color: Colors.red)),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _unblockUser(
+      BuildContext context, String userId, VoidCallback onUnblocked) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          const Center(child: CircularProgressIndicator()),
+    );
+
+    final navigator = Navigator.of(context);
+    UserService.unblockUser(userId: userId).then((result) {
+      if (!mounted) return;
+      navigator.pop(); // Close loader
+      if (result['success']) {
+        onUnblocked();
+        _showStatusDialog(navigator.context, 'Success',
+            'User unblocked successfully!', isError: false);
+      } else {
+        _showStatusDialog(navigator.context, 'Error',
+            result['error'] ?? 'Failed to unblock user.', isError: true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        navigator.pop();
+        _showStatusDialog(navigator.context, 'Error',
+            'An error occurred while unblocking user.', isError: true);
+      }
+    });
   }
 }

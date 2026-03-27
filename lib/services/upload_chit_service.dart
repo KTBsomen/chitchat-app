@@ -82,15 +82,21 @@ class UploadChitService {
                     onPressed: () {
                       if (uploadFinished) {
                         Navigator.of(dialogContext).pop();
-                        // Navigate to HomePage and clear stack
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          PageTransition(
-                            type: PageTransitionType.leftToRight,
-                            child: const HomePage(),
-                          ),
-                          (route) => false,
-                        );
+                        if (type == ChitType.post) {
+                          // For personal posts, just pop back to the profile page.
+                          // The post is already added locally via AppVariables listener.
+                          Navigator.of(context).pop();
+                        } else {
+                          // For group posts, memories, stories — navigate to HomePage
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.leftToRight,
+                              child: const HomePage(),
+                            ),
+                            (route) => false,
+                          );
+                        }
                       } else {
                         setState(() {
                           showErrorText = true;

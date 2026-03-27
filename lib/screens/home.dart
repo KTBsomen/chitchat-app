@@ -763,6 +763,7 @@ class _HomePageState extends State<HomePage> {
               isGroupPost: post['isGroupPost'] ?? false,
               authorName: post['authorName'],
               profilePic: post['profilePic'],
+              showMenu: true,
               likes: post['likes'],
               comments: post['comments'],
             ),

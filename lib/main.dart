@@ -117,6 +117,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   isIos: true,
                   type: PageTransitionType.leftToRight,
                   child: HomePage()));
+          // App is fully initialized — consume any pending FCM notification
+          // (e.g. user tapped a notification that launched the app from killed state)
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            FCMHandler.consumePendingNotification();
+          });
         }
       } else {
         setState(() {

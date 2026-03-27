@@ -68,7 +68,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   late Animation<int> _circleSizeAnimation;
   double currentMaxVisible = 5.0; // Initial max visible users
   double currentUpperContainerHeightMultiplier = 0.4;
-  int currentCircleSize = 200;
+  int currentCircleSize = 180;
   String? _getEducationField(Map<String, dynamic> member) {
     // Get the enum value
     final level = member['educationLevel'] as String?;
@@ -115,8 +115,8 @@ class _PublicProfilePageState extends State<PublicProfilePage>
     ));
 
     _circleSizeAnimation = IntTween(
-      begin: 200,
-      end: 350,
+      begin: 180,
+      end: 315,
     ).animate(CurvedAnimation(
       parent: _friendCircleAnimationController,
       curve: Curves.easeInOut,
@@ -138,6 +138,9 @@ class _PublicProfilePageState extends State<PublicProfilePage>
 
     // Listen to sheet drag changes
     _sheetController.addListener(_onSheetPositionChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onSheetPositionChanged();
+    });
   }
 
   void _onSheetPositionChanged() {
@@ -878,6 +881,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                       profilePic: post['profilePic'],
                                       likes: post['likes'],
                                       comments: post['comments'],
+                                      showMenu: true,
                                     );
                                   } on Exception catch (e) {
                                     return Container(
