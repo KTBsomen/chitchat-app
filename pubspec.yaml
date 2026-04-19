@@ -40,9 +40,13 @@ dependencies:
   image_editor_plus: ^1.0.6
   gallery_saver_plus: ^3.2.4
   chatview:
-    path: ../../../chatview
+    git:
+      url: https://github.com/KTBsomen/chatview.git
+    # path: ../../../chatview
   deep_link_router:
-    path: ../../../deep_link_router
+    git:
+      url: https://github.com/KTBsomen/deep_link_router.git
+    # path: ../../../deep_link_router
   mqtt_client: ^10.5.1
   flutterdb: ^0.0.4
   jitsi_meet_flutter_sdk: ^10.0.0

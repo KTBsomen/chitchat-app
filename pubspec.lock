@@ -173,10 +173,12 @@ packages:
   chatview:
     dependency: "direct main"
     description:
-      path: "../../../chatview"
-      relative: true
-    source: path
-    version: "2.4.0"
+      path: "."
+      ref: HEAD
+      resolved-ref: "0f22b7acde0257d40e43d6d544013abef6edc225"
+      url: "https://github.com/KTBsomen/chatview.git"
+    source: git
+    version: "4.0.0"
   chewie:
     dependency: transitive
     description:
@@ -284,9 +286,11 @@ packages:
   deep_link_router:
     dependency: "direct main"
     description:
-      path: "../../../deep_link_router"
-      relative: true
-    source: path
+      path: "."
+      ref: HEAD
+      resolved-ref: d7b23717c6041978ad26fbcb925b9693a4a21eb4
+      url: "https://github.com/KTBsomen/deep_link_router.git"
+    source: git
     version: "0.0.3"
   dio:
     dependency: "direct main"
