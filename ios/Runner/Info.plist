@@ -45,5 +45,91 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- ============================================================ -->
+	<!-- CAMERA: Required by camerawesome, image_picker, jitsi_meet   -->
+	<!-- ============================================================ -->
+	<key>NSCameraUsageDescription</key>
+	<string>Chitchat needs access to your camera to take photos and videos for posts, stories, and profile pictures.</string>
+
+	<!-- ============================================================ -->
+	<!-- MICROPHONE: Required by camerawesome (video recording),      -->
+	<!-- jitsi_meet (calls), chatview (voice messages)                -->
+	<!-- ============================================================ -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Chitchat needs access to your microphone to record audio messages, video calls, and video recordings.</string>
+
+	<!-- ============================================================ -->
+	<!-- PHOTO LIBRARY: Required by image_picker, gallery_saver_plus, -->
+	<!-- photo_manager, vs_media_picker, vs_story_designer            -->
+	<!-- ============================================================ -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Chitchat needs access to your photo library to select photos and videos for posts, stories, and messages.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Chitchat needs permission to save photos and videos to your photo library.</string>
+
+	<!-- ============================================================ -->
+	<!-- LOCATION: Required by geolocator, flutter_map,               -->
+	<!-- camerawesome (Exif GPS)                                       -->
+	<!-- ============================================================ -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Chitchat needs access to your location to show nearby content and enable location-based features.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Chitchat needs access to your location to provide location-based services even when the app is in the background.</string>
+
+	<!-- ============================================================ -->
+	<!-- FACE ID: Required by some security/auth features if used     -->
+	<!-- ============================================================ -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Chitchat may use Face ID for secure authentication.</string>
+
+	<!-- ============================================================ -->
+	<!-- BACKGROUND MODES: Required by firebase_messaging,            -->
+	<!-- flutter_callkit_incoming (VoIP), just_audio, jitsi_meet      -->
+	<!-- ============================================================ -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+		<string>voip</string>
+	</array>
+
+	<!-- ============================================================ -->
+	<!-- GOOGLE SIGN-IN: Reversed client ID for OAuth redirect        -->
+	<!-- The iosClientId from firebase_options.dart is:                -->
+	<!-- 1075161631917-d5npdk2m3mu2klt1pb4vflsue4hnagu5.apps.googleusercontent.com -->
+	<!-- Reversed: com.googleusercontent.apps.1075161631917-d5npdk2m3mu2klt1pb4vflsue4hnagu5 -->
+	<!-- ============================================================ -->
+	<key>GIDClientID</key>
+	<string>1075161631917-d5npdk2m3mu2klt1pb4vflsue4hnagu5.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1075161631917-d5npdk2m3mu2klt1pb4vflsue4hnagu5</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- ============================================================ -->
+	<!-- JITSI MEET: Status bar handling                               -->
+	<!-- ============================================================ -->
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+
+	<!-- ============================================================ -->
+	<!-- URL LAUNCHER: Allow common URL schemes                       -->
+	<!-- ============================================================ -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>tel</string>
+		<string>mailto</string>
+	</array>
 </dict>
 </plist>

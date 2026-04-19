@@ -23,7 +23,9 @@ import 'package:oktoast/oktoast.dart';
 import 'package:deep_link_router/deep_link_router.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'screens/chat.dart';
+
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<ModalRoute<void>> routeObserver =
@@ -52,6 +54,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
   bool showSplashScreen = true;
+  bool isAccountPendingDeletion = false;
 
   void setLoading(bool loading) {
     setState(() {
@@ -101,10 +104,15 @@ class _LoginScreenState extends State<LoginScreen> {
           }
           await PresenceManager().init();
         } else {
+          bool isDeletionPending = result['error'] == 'ACCOUNT_PENDING_DELETION' ||
+              (result['isDeletionPending'] ?? false);
           await UserService.signOut((x) => {});
-          setState(() {
-            showSplashScreen = false;
-          });
+          if (mounted) {
+            setState(() {
+              showSplashScreen = false;
+              isAccountPendingDeletion = isDeletionPending;
+            });
+          }
           return;
         }
         Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
@@ -162,7 +170,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             UserService.signInWithGoogle(setLoading).then((_) {
                               UserService.isLoggedIn().then((value) {
                                 if (value) {
-                                  setState(() => showSplashScreen = true);
+                                  setState(() {
+                                    showSplashScreen = true;
+                                    isAccountPendingDeletion = false;
+                                  });
                                   Future.delayed(Duration(seconds: 1), () {
                                     Navigator.pushReplacement(
                                         context,
@@ -173,7 +184,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                             child: HomePage()));
                                   });
                                 } else {
-                                  setState(() => showSplashScreen = false);
+                                  setState(() {
+                                    showSplashScreen = false;
+                                    isAccountPendingDeletion = false;
+                                  });
                                   Navigator.pushReplacement(
                                       context,
                                       PageTransition(
@@ -183,20 +197,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                 }
                               });
                             }).catchError((error) {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text('Sign-In Error'),
-                                  content: Text(
-                                      'Failed to sign in with Google: $error'),
-                                  actions: [
-                                    TextButton(
-                                        child: Text('OK'),
-                                        onPressed: () =>
-                                            Navigator.of(context).pop()),
-                                  ],
-                                ),
-                              );
+                              if (error
+                                  .toString()
+                                  .contains('ACCOUNT_PENDING_DELETION')) {
+                                setState(() {
+                                  isAccountPendingDeletion = true;
+                                });
+                              } else {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text('Sign-In Error'),
+                                    content: Text(
+                                        'Failed to sign in with Google: $error'),
+                                    actions: [
+                                      TextButton(
+                                          child: Text('OK'),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop()),
+                                    ],
+                                  ),
+                                );
+                              }
                             });
                           },
                     onAdminLogin: () {
@@ -208,6 +230,68 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: AdminLoginPage()));
                     },
                   ),
+                  if (isAccountPendingDeletion)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 172, 45, 36),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              "Your account is being deleted so you cannot login to your account.",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () async {
+                                final url =
+                                    Uri.parse("https://chitzchat.com/#contact");
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url);
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 4),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.white70),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  "Contact Us",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   if (isLoading)
                     Container(
                       color: Colors.white,

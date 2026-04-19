@@ -653,7 +653,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
               }
               if (value == 'contact') {
                 launchUrl(Uri.parse(AppVariables.get<String>('contactUrl') ??
-                    "https://chitzchat.com/contact"));
+                    "https://chitzchat.com/#contact"));
               }
               if (value == 'privacy') {
                 launchUrl(Uri.parse("https://chitzchat.com/privacy"));
@@ -1131,9 +1131,9 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Delete Account"),
+          title: const Text("Request Account Deletion"),
           content: const Text(
-              "Are you sure you want to delete your account? This action is permanent and cannot be undone. All your data will be removed."),
+              "Are you sure you want to request account deletion? Once requested, you will be logged out and unable to login. An admin will manually remove your account and all related data (posts, comments, etc.)."),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -1144,7 +1144,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                 Navigator.pop(context);
                 _deleteAccount(context);
               },
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+              child: const Text("Request Deletion",
+                  style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -1167,13 +1168,20 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
         UserService.signOut((loading) {}).then((_) {
           if (!mounted) return;
           navigator.pop(); // Close loader using captured navigator
-          navigator.pushAndRemoveUntil(
-            PageTransition(
-              type: PageTransitionType.leftToRight,
-              child: LoginScreen(),
-            ),
-            (route) => false,
-          );
+          _showStatusDialog(
+              navigator.context,
+              'Request Sent',
+              'Your deletion request has been sent. Admin will manually remove your account and all related data soon.',
+              isError: false);
+          Future.delayed(const Duration(seconds: 3), () {
+            navigator.pushAndRemoveUntil(
+              PageTransition(
+                type: PageTransitionType.leftToRight,
+                child: LoginScreen(),
+              ),
+              (route) => false,
+            );
+          });
         }).catchError((e) {
           if (mounted) {
             navigator.pop();

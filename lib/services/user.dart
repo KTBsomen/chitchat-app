@@ -121,7 +121,15 @@ class UserService {
         AppVariables.update("fcmToken", token);
         await FCMService.uploadFcmToken(token!);
         await fetchMyProfile();
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
+      } else if (response.statusCode == 403) {
+        final data = jsonDecode(response.body);
+        await UserService.signOut(onLoading);
+
+        if (data['code'] == 'account_pending_deletion') {
+          throw Exception('ACCOUNT_PENDING_DELETION');
+        }
+        throw Exception(data['message'] ?? 'Access denied');
+      } else if (response.statusCode == 401) {
         await UserService.signOut(onLoading);
         throw Exception('Invalid Token try to login again');
       } else if (response.statusCode == 404) {
@@ -204,6 +212,17 @@ class UserService {
           // Response schema 1
           final userProfile = responseData['user'];
           print(userProfile);
+
+          // Check for account deletion flags
+          if (userProfile['deleted'] == true ||
+              userProfile['deleteRequestedAt'] != null) {
+            return {
+              'success': false,
+              'error': 'ACCOUNT_PENDING_DELETION',
+              'isDeletionPending': true,
+            };
+          }
+
           AppVariables.update('profile', userProfile);
 
           AppVariables.update(

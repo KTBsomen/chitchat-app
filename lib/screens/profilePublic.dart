@@ -54,6 +54,7 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   bool isLoadingGroup = true;
   bool isInWatchList = false;
   bool isWatchListLoading = false;
+  bool isUserNotFound = false;
 
   // Like state management
   final Map<String, bool> likeStatus = {};
@@ -225,6 +226,9 @@ class _PublicProfilePageState extends State<PublicProfilePage>
         );
       }
     } else {
+      setState(() {
+        isUserNotFound = true;
+      });
       userGroup = FriendCircleGroup(
         groupId: 'defaultGroup',
         groupData: {'name': 'Default Group'},
@@ -391,74 +395,78 @@ class _PublicProfilePageState extends State<PublicProfilePage>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Center(
-                  child: userGroup == null
-                      ? CircularProgressIndicator() // Show a loader until the group is available
-                      : userGroup!.members.length == 0
-                          ? Center(
-                              child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "😔 No Groups Found ",
-                                  style: TextStyle(
-                                      fontSize: 25,
-                                      fontFamily: 'Poppins',
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white),
-                                ),
-                              ],
-                            ))
-                          : AnimatedBuilder(
-                              animation: _maxVisibleAnimation,
-                              builder: (context, child) {
-                                return FriendCircle(
-                                  group: userGroup!,
-                                  size: currentCircleSize * 1.0,
-                                  nodeBorderColor: Colors.white24,
-                                  maxVisibleMembers: currentMaxVisible,
-                                  edgeStyle: EdgeStyle(
-                                    width: 2,
-                                    outerGlow: 2,
-                                    outerGlowColor: Colors.white,
-                                    gradientColors: [
-                                      Color.fromARGB(255, 198, 101, 10),
-                                      Color.fromARGB(255, 255, 179, 0),
-                                      Color.fromARGB(255, 96, 4, 194)
-                                    ],
-                                  ),
-                                  onGroupTap: () {
-                                    print(
-                                        "Group tapped! ${userGroup!.groupId}");
-                                    Navigator.push(
-                                      context,
-                                      PageTransition(
-                                        type: PageTransitionType.rightToLeft,
-                                        child: GroupPublicViewScreen(
-                                          groupId: userGroup!.groupId,
-                                        ),
+                  child: isUserNotFound
+                      ? SizedBox.shrink() // UI is handled by the bottom sheet or a global overlay
+                      : userGroup == null
+                          ? CircularProgressIndicator() // Show a loader until the group is available
+                          : userGroup!.members.length == 0
+                              ? Center(
+                                  child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      "😔 No Groups Found ",
+                                      style: TextStyle(
+                                          fontSize: 25,
+                                          fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white),
+                                    ),
+                                  ],
+                                ))
+                              : AnimatedBuilder(
+                                  animation: _maxVisibleAnimation,
+                                  builder: (context, child) {
+                                    return FriendCircle(
+                                      group: userGroup!,
+                                      size: currentCircleSize * 1.0,
+                                      nodeBorderColor: Colors.white24,
+                                      maxVisibleMembers: currentMaxVisible,
+                                      edgeStyle: EdgeStyle(
+                                        width: 2,
+                                        outerGlow: 2,
+                                        outerGlowColor: Colors.white,
+                                        gradientColors: [
+                                          Color.fromARGB(255, 198, 101, 10),
+                                          Color.fromARGB(255, 255, 179, 0),
+                                          Color.fromARGB(255, 96, 4, 194)
+                                        ],
                                       ),
+                                      onGroupTap: () {
+                                        print(
+                                            "Group tapped! ${userGroup!.groupId}");
+                                        Navigator.push(
+                                          context,
+                                          PageTransition(
+                                            type:
+                                                PageTransitionType.rightToLeft,
+                                            child: GroupPublicViewScreen(
+                                              groupId: userGroup!.groupId,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      onMemberTap: (index) {
+                                        if (index < userGroup!.members.length) {
+                                          print(
+                                              "Member ${userGroup!.members[index].id} tapped!");
+                                          Navigator.push(
+                                            context,
+                                            PageTransition(
+                                              type: PageTransitionType
+                                                  .rightToLeft,
+                                              child: GroupPublicViewScreen(
+                                                groupId: userGroup!.groupId,
+                                              ),
+                                            ),
+                                          );
+                                        } else {
+                                          print("Invalid member tapped!");
+                                        }
+                                      },
                                     );
                                   },
-                                  onMemberTap: (index) {
-                                    if (index < userGroup!.members.length) {
-                                      print(
-                                          "Member ${userGroup!.members[index].id} tapped!");
-                                      Navigator.push(
-                                        context,
-                                        PageTransition(
-                                          type: PageTransitionType.rightToLeft,
-                                          child: GroupPublicViewScreen(
-                                            groupId: userGroup!.groupId,
-                                          ),
-                                        ),
-                                      );
-                                    } else {
-                                      print("Invalid member tapped!");
-                                    }
-                                  },
-                                );
-                              },
-                            ),
+                                ),
                 ),
                 if (userGroup != null && userGroup!.members.isNotEmpty)
                   Padding(
@@ -609,8 +617,44 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                       color: AppColors.bottomSheetBorder, width: 0.5),
                 ),
                 padding: const EdgeInsets.all(16),
-                child: userProfile == null
-                    ? Center(child: CircularProgressIndicator())
+                child: isUserNotFound
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_off, size: 80, color: Colors.grey),
+                            SizedBox(height: 20),
+                            Text(
+                              "User doesn't exist",
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Poppins'),
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              "The user you're looking for was not found.",
+                              style:
+                                  TextStyle(color: Colors.grey, fontSize: 16),
+                            ),
+                            SizedBox(height: 30),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              child: Text("Go Back",
+                                  style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      )
+                    : userProfile == null
+                        ? Center(child: CircularProgressIndicator())
                     : SingleChildScrollView(
                         controller: scrollController,
                         child: Column(
