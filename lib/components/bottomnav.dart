@@ -175,28 +175,30 @@ class AppBottomNav extends StatelessWidget {
 
     // If center button floats, wrap in a Stack so it protrudes above the bar
     if (showCenterButton && centerButtonFloat) {
-      return SizedBox(
-        // height: barHeight + (centerBtnSize / 2) + 4,
-        height: barHeight + 1,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(left: 0, right: 0, bottom: 0, child: bar),
-            Positioned(
-              bottom: barHeight - (centerBtnSize / 2) + 2,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _floatingCenterButton(
-                    context, centerBtnColor, centerBtnSize),
+      return SafeArea(
+        child: SizedBox(
+          // height: barHeight + (centerBtnSize / 2) + 4,
+          height: barHeight + 1,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(left: 0, right: 0, bottom: 0, child: bar),
+              Positioned(
+                bottom: barHeight - (centerBtnSize / 2) + 2,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: _floatingCenterButton(
+                      context, centerBtnColor, centerBtnSize),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
-    return bar;
+    return SafeArea(child: bar);
   }
 
   // ── Individual nav icon ─────────────────────────────────────────────
