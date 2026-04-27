@@ -427,7 +427,9 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
         likeCountForMember[user['_id']] = user['likes'];
       }
     }
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void toggleLike(String userid) async {

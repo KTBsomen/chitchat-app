@@ -167,13 +167,23 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
                                 onMemberTap: (groupId, memberId, memberData) {
                                   print(
                                       'Member $memberId in group $groupId tapped with data: $memberData');
+                                  // Navigator.push(
+                                  //   context,
+                                  //   PageTransition(
+                                  //     type: PageTransitionType.rightToLeft,
+                                  //     child: PublicProfilePage(
+                                  //         dbIndex:
+                                  //             memberData['dbIndex'].toString(),
+                                  //         uid: memberId),
+                                  //   ),
+                                  // );
                                   Navigator.push(
                                     context,
                                     PageTransition(
                                       type: PageTransitionType.rightToLeft,
-                                      child: PublicProfilePage(
-                                          dbIndex: memberData['dbIndex'],
-                                          uid: memberId),
+                                      child: GroupPublicViewScreen(
+                                        groupId: groupId,
+                                      ),
                                     ),
                                   );
                                 },

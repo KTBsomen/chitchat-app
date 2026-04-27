@@ -410,9 +410,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _getMyStories({bool? invalidate}) async {
     final response = await StoryService.getMyStories(invalidate: invalidate);
-    setState(() {
-      myStories = StoryService.sortStories(response);
-    });
+    if (mounted) {
+      setState(() {
+        myStories = StoryService.sortStories(response);
+      });
+    }
   }
 
   @override

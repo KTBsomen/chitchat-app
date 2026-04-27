@@ -84,6 +84,7 @@ class S3Uploader {
     Map<String, dynamic>? compressionParams,
     bool showResizingProgress = true,
     bool showPresignedUrlProgress = false,
+    CancelToken? cancelToken,
   }) async {
     // Create progress tracker
     progressNotifier.value = progressNotifier.value.copyWith(
@@ -97,6 +98,14 @@ class S3Uploader {
 
       // Step 1: Resize Images
       for (int i = 0; i < files.length; i++) {
+        // Check for cancellation
+        if (cancelToken?.isCancelled ?? false) {
+          throw DioException(
+            requestOptions: RequestOptions(path: ''),
+            type: DioExceptionType.cancel,
+          );
+        }
+
         final file = files[i];
         final resolvedFile = await _resolveFile(file);
         final mimeType = lookupMimeType(resolvedFile.path);
@@ -143,9 +152,9 @@ class S3Uploader {
               (file) => lookupMimeType(file.path) ?? 'application/octet-stream')
           .toList();
       if (sendingKeys && keys != null && keys.isNotEmpty) {
-        presignedUrls = await _fetchPresignedUrls(keys);
+        presignedUrls = await _fetchPresignedUrls(keys, cancelToken);
       } else {
-        presignedUrls = await _fetchPresignedUrls(contentTypes);
+        presignedUrls = await _fetchPresignedUrls(contentTypes, cancelToken);
       }
 
       // Step 3: Upload to S3
@@ -161,7 +170,8 @@ class S3Uploader {
         final url = presignedUrls[i];
 
         // Create a task for each upload operation
-        final uploadTask = _uploadFileToS3(file, url, (progress, total) {
+        final uploadTask =
+            _uploadFileToS3(file, url, cancelToken, (progress, total) {
           progressNotifier.value = progressNotifier.value.copyWith(
             currentFileIndex: i + 1,
             stageProgress: progress / total,
@@ -169,6 +179,7 @@ class S3Uploader {
         }).catchError((e) {
           // Handle any error specific to this file upload
           print("Error uploading file: $e");
+          throw e; // Rethrow to catch in the main try-catch
         });
 
         // Add the task to the list
@@ -188,11 +199,18 @@ class S3Uploader {
 
       return uploadedUrls;
     } catch (e) {
-      // Update progress to failed state
-      progressNotifier.value = progressNotifier.value.copyWith(
-        stage: UploadStage.failed,
-        errorMessage: e.toString(),
-      );
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        progressNotifier.value = progressNotifier.value.copyWith(
+          stage: UploadStage.failed,
+          errorMessage: "Upload cancelled",
+        );
+      } else {
+        // Update progress to failed state
+        progressNotifier.value = progressNotifier.value.copyWith(
+          stage: UploadStage.failed,
+          errorMessage: e.toString(),
+        );
+      }
       rethrow;
     }
   }
@@ -267,13 +285,15 @@ class S3Uploader {
   }
 
   /// Fetch pre-signed URLs
-  Future<List<String>> _fetchPresignedUrls(List<String> contentTypes) async {
+  Future<List<String>> _fetchPresignedUrls(List<String> contentTypes,
+      [CancelToken? cancelToken]) async {
     final response = await dio.post(
       presignedUrlEndpoint,
       data: {'files': contentTypes},
       options: Options(
         contentType: Headers.jsonContentType,
       ),
+      cancelToken: cancelToken,
     );
 
     if (response.statusCode == 200) {
@@ -290,6 +310,7 @@ class S3Uploader {
   Future<String> _uploadFileToS3(
     File file,
     String presignedUrl,
+    CancelToken? cancelToken,
     Function(double, double)? progressCallback,
   ) async {
     try {
@@ -317,6 +338,7 @@ class S3Uploader {
             'Content-Length': fileLength.toString(), // Explicit content length
           },
         ),
+        cancelToken: cancelToken,
         onSendProgress: (sent, total) {
           progressCallback?.call(sent.toDouble(), total.toDouble());
         },
@@ -331,12 +353,16 @@ class S3Uploader {
             "Failed to upload file: ${response.statusCode} ${response.statusMessage}");
       }
     } on DioException catch (dioError) {
+      if (dioError.type == DioExceptionType.cancel) {
+        throw dioError;
+      }
       final errorMessage = dioError.response?.statusMessage ?? dioError.message;
       throw Exception("DioError during file upload: $errorMessage");
     } catch (e) {
       throw Exception("Error uploading file: $e");
     }
   }
+
 }
 
 /// Reusable Upload Progress Widget

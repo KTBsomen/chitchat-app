@@ -306,15 +306,19 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
       next = result['data']['next'];
       posts.addAll(result['data']['posts']);
       // AppVariables.update("posts", posts);
-      setState(() {
-        isLoadingPost = false;
-        hasMore = next != null;
-      });
+      if (mounted) {
+        setState(() {
+          isLoadingPost = false;
+          hasMore = next != null;
+        });
+      }
     } else {
       print(result);
-      setState(() {
-        isLoadingPost = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoadingPost = false;
+        });
+      }
     }
   }
 
@@ -686,8 +690,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
               const PopupMenuItem<String>(
                 value: 'blocked_users',
                 child: ListTile(
-                    leading: Icon(Icons.block),
-                    title: Text('Blocked Users')),
+                    leading: Icon(Icons.block), title: Text('Blocked Users')),
               ),
               const PopupMenuItem<String>(
                 value: 'delete_account',
@@ -1068,10 +1071,10 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                                 itemCount: posts.length,
                                 itemBuilder: (context, index) {
                                   final post = posts[index];
-                                  if (post?['media'] == null)
+                                  if (post?['media'] == null) {
                                     return Container(
                                         key: ValueKey('post-empty-$index'));
-                                  else if (post?['media'].runtimeType ==
+                                  } else if (post?['media'].runtimeType ==
                                       String) {
                                     post['media'] = jsonDecode(post['media']);
                                   }
@@ -1168,9 +1171,7 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
         UserService.signOut((loading) {}).then((_) {
           if (!mounted) return;
           navigator.pop(); // Close loader using captured navigator
-          _showStatusDialog(
-              navigator.context,
-              'Request Sent',
+          _showStatusDialog(navigator.context, 'Request Sent',
               'Your deletion request has been sent. Admin will manually remove your account and all related data soon.',
               isError: false);
           Future.delayed(const Duration(seconds: 3), () {
@@ -1185,27 +1186,35 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
         }).catchError((e) {
           if (mounted) {
             navigator.pop();
-            _showStatusDialog(navigator.context, 'Error', 'Error signing out after deletion: $e', isError: true);
+            _showStatusDialog(navigator.context, 'Error',
+                'Error signing out after deletion: $e',
+                isError: true);
           }
         });
       } else {
         navigator.pop(); // Close loader using captured navigator
-        _showStatusDialog(navigator.context, 'Error', result['error'] ?? 'Failed to delete account.', isError: true);
+        _showStatusDialog(navigator.context, 'Error',
+            result['error'] ?? 'Failed to delete account.',
+            isError: true);
       }
     }).catchError((e) {
       if (mounted) {
         navigator.pop(); // Close loader using captured navigator
-        _showStatusDialog(navigator.context, 'Error', 'An unexpected error occurred: $e', isError: true);
+        _showStatusDialog(
+            navigator.context, 'Error', 'An unexpected error occurred: $e',
+            isError: true);
       }
     });
   }
 
-  void _showStatusDialog(BuildContext context, String title, String message, {required bool isError}) {
+  void _showStatusDialog(BuildContext context, String title, String message,
+      {required bool isError}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(title, style: TextStyle(color: isError ? Colors.red : Colors.green)),
+          title: Text(title,
+              style: TextStyle(color: isError ? Colors.red : Colors.green)),
           content: Text(message),
           actions: [
             TextButton(
@@ -1259,8 +1268,10 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                     child: FutureBuilder<Map<String, dynamic>>(
                       future: UserService.fetchBlockedUsers(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
                         }
                         if (snapshot.hasError ||
                             snapshot.data?['success'] == false) {
@@ -1319,10 +1330,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                                     color: Colors.white70, fontSize: 12),
                               ),
                               trailing: TextButton(
-                                onPressed: () => _unblockUser(
-                                    context,
-                                    user['_id'],
-                                    () => setModalState(() {})),
+                                onPressed: () => _unblockUser(context,
+                                    user['_id'], () => setModalState(() {})),
                                 child: const Text("Unblock",
                                     style: TextStyle(color: Colors.red)),
                               ),
@@ -1356,17 +1365,20 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
       navigator.pop(); // Close loader
       if (result['success']) {
         onUnblocked();
-        _showStatusDialog(navigator.context, 'Success',
-            'User unblocked successfully!', isError: false);
+        _showStatusDialog(
+            navigator.context, 'Success', 'User unblocked successfully!',
+            isError: false);
       } else {
         _showStatusDialog(navigator.context, 'Error',
-            result['error'] ?? 'Failed to unblock user.', isError: true);
+            result['error'] ?? 'Failed to unblock user.',
+            isError: true);
       }
     }).catchError((e) {
       if (mounted) {
         navigator.pop();
         _showStatusDialog(navigator.context, 'Error',
-            'An error occurred while unblocking user.', isError: true);
+            'An error occurred while unblocking user.',
+            isError: true);
       }
     });
   }

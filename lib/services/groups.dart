@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart' as dio;
 
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/services/fcm.dart';
@@ -159,36 +160,42 @@ class GroupsService {
 
   static Future<Map<String, dynamic>> createGroup(
     String groupNames,
-    String groupPics,
-  ) async {
+    String groupPics, {
+    dio.CancelToken? cancelToken,
+  }) async {
     try {
-      final url = Uri.parse('$baseurl/groups');
+      final url = '$baseurl/groups';
       String? token = await UserService.getAccessToken();
 
-      final response = await http.post(
+      final dioInstance = dio.Dio();
+      final response = await dioInstance.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
+        data: {
           'name': groupNames,
           'description': 'This is a new group',
           'GroupProfilePic': groupPics,
-        }),
+        },
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+        cancelToken: cancelToken,
       );
 
       if (response.statusCode == 201) {
         await UserService.fetchMyProfile(invalidate: true);
-        return {'success': true, 'data': jsonDecode(response.body)};
+        return {'success': true, 'data': response.data};
       } else {
         return {
           'success': false,
-          'error':
-              jsonDecode(response.body)['message'] ?? 'Unknown error occurred',
+          'error': response.data['message'] ?? 'Unknown error occurred',
         };
       }
     } catch (e) {
+      if (e is dio.DioException && e.type == dio.DioExceptionType.cancel) {
+        return {'success': false, 'error': 'Creation cancelled'};
+      }
       return {'success': false, 'error': e.toString()};
     }
   }

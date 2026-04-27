@@ -686,8 +686,9 @@ class _SearchPageState extends State<SearchPage> {
                   context,
                   PageTransition(
                     type: PageTransitionType.rightToLeft,
-                    child: PublicProfilePage(
-                        dbIndex: memberData['dbIndex'], uid: memberId),
+                    child: GroupPublicViewScreen(
+                      groupId: groupId,
+                    ),
                   ),
                 );
               },
