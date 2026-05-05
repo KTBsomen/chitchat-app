@@ -221,7 +221,11 @@ class S3Uploader {
     progressCallback?.call(0.0);
 
     final bytes = await file.readAsBytes();
-    final image = img.decodeImage(bytes);
+    var image = img.decodeImage(bytes);
+    if (image == null) throw Exception("Failed to decode image.");
+
+    // Fix orientation before resizing
+    image = img.bakeOrientation(image);
 
     if (image != null) {
       // Maintain aspect ratio
@@ -255,11 +259,15 @@ class S3Uploader {
         image,
         width: newWidth,
         height: newHeight,
+        interpolation: img.Interpolation.average,
       );
 
       // Compress the image
-      final compressedBytes =
-          img.encodeJpg(resizedImage, quality: params['quality'] ?? 90);
+      final compressedBytes = img.encodeJpg(
+        resizedImage,
+        quality: params['quality'] ?? 90,
+        chroma: img.JpegChroma.yuv444,
+      );
 
       progressCallback?.call(0.8);
 

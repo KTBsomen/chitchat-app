@@ -150,9 +150,13 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
     }
 
     // Store group data
+    //print('DEBUG: _processResponse groupDetails: ${related["groupDetails"]}');
     if (related["groupDetails"] != null) {
       group = GroupsService.buildFriendCircleGroup(
           related["groupDetails"] as Map<String, dynamic>);
+      //print('DEBUG: group initialized: ${group?.groupData["name"]}');
+    } else {
+      //print('DEBUG: groupDetails is NULL');
     }
 
     // Collect all new posts from different types
@@ -289,16 +293,112 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
 
   Widget _buildEmptyState() {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.only(left: 10, right: 10),
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.start,
-            children: [_buildUserInfo()],
+            children: [
+              widget.isGroupPost != null && widget.isGroupPost!
+                  ? _buildUserInfoForGroup()
+                  : _buildUserInfo(),
+              const Spacer(),
+              if (widget.showMoreButton != null)
+                GestureDetector(
+                  onTap: () {
+                    widget.showMoreButton?.call();
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.more_vert, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                )
+            ],
           ),
           widget.middleItem,
+          if (group != null)
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  PageTransition(
+                    type: PageTransitionType.rightToLeft,
+                    child: GroupPublicViewScreen(
+                      groupId: group!.groupId,
+                    ),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10, right: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("<-- explore my group -->",
+                                  style: TextStyle(color: Colors.white))
+                            ],
+                          ),
+                          SizedBox(
+                            height: 15,
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                group!.groupData["name"].length > 25
+                                    ? '${group!.groupData["name"].substring(0, 22)}...'
+                                    : group!.groupData["name"],
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundImage: group!
+                              .groupData["GroupProfilePic"].isNotEmpty
+                          ? NetworkImage(group!.groupData['GroupProfilePic'])
+                          : null,
+                      child: group!.groupData["GroupProfilePic"].isEmpty
+                          ? Text(
+                              group!.groupData["name"].isNotEmpty
+                                  ? group!.groupData["name"][0].toUpperCase()
+                                  : 'G',
+                              style: const TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.bold),
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Icon(
             Icons.post_add,
             size: 64,
@@ -321,6 +421,9 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
               color: Colors.grey[500],
             ),
           ),
+          SizedBox(
+            height: 100,
+          )
         ],
       ),
     );
@@ -413,15 +516,25 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
   }
 
   Widget _buildUserInfo() {
+    //print('DEBUG: _buildUserInfo for authorId: ${widget.authorId}');
+    //print('DEBUG: group is null? ${group == null}');
+    if (group != null) {
+      //print('DEBUG: group members count: ${group!.members.length}');
+      // //print('DEBUG: group members IDs: ${group!.members.map((m) => m.id).toList()}');
+    }
+
     FriendCircleMember authorMember = group != null
         ? group!.members.firstWhere(
             (element) => element.id == widget.authorId,
-            orElse: () => FriendCircleMember(
-              avatarUrl:
-                  "https://unsplash.it/200/200?random&${widget.authorId.hashCode}",
-              id: "",
-              additionalData: {},
-            ),
+            orElse: () {
+              //print('DEBUG: authorId NOT found in group members');
+              return FriendCircleMember(
+                avatarUrl:
+                    "https://unsplash.it/200/200?random&${widget.authorId.hashCode}",
+                id: "",
+                additionalData: {},
+              );
+            },
           )
         : FriendCircleMember(
             avatarUrl:
@@ -430,8 +543,11 @@ class _RelatedPostsWidgetState extends State<RelatedPostsWidget> {
             additionalData: {},
           );
 
+    //print('DEBUG: authorMember.additionalData: ${authorMember.additionalData}');
     String? educationField = _getEducationField(authorMember.additionalData);
+    //print('DEBUG: educationField: $educationField');
     String displayEducation = _formatEducationTextTwoLine(educationField);
+    //print('DEBUG: displayEducation: $displayEducation');
 
     return GestureDetector(
       onTap: () {

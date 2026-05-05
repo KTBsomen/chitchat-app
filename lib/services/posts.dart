@@ -502,12 +502,16 @@ class PostService {
       );
 
       if (response.statusCode == 200) {
+        //print('DEBUG: fetchRelatedPosts SUCCESS for postId: $postId');
+        //print('DEBUG: response body: ${response.body}');
         return {
           "success": true,
           "data": json.decode(response.body),
         };
       } else {
-        print('Failed to load posts: ${response.statusCode}');
+        print(
+            'DEBUG: fetchRelatedPosts FAILED for postId: $postId, statusCode: ${response.statusCode}');
+        //print('DEBUG: response body: ${response.body}');
         return {
           "success": false,
           "error": "Failed to fetch posts",

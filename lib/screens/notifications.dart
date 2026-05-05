@@ -1222,7 +1222,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                         ),
                       ),
                     ),
-                  ..._basicGroupNotifications.map((n) {
+                  ..._basicGroupNotifications.reversed.map((n) {
                     final id = n['id'] as String? ?? '';
                     final isUnread = n['isRead'] == false;
                     final appNotif = AppNotification.fromStoreMap(n);

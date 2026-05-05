@@ -209,19 +209,25 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
   Future<void> _initializeProfile() async {
     final storedProfile =
         AppVariables.get<Map<String, dynamic>>('profile') ?? {};
+    //print('DEBUG: storedProfile: $storedProfile');
 
     if (storedProfile.isNotEmpty) {
       setState(() {
         myProfile = storedProfile;
         isLoading = false;
       });
+      //print('DEBUG: myProfile initialized from storedProfile: ${myProfile["_id"]}');
     } else {
+      //print('DEBUG: storedProfile is empty, fetching from UserService');
       final fetchedProfile = await UserService.fetchMyProfile();
       if (fetchedProfile['success']) {
         setState(() {
           myProfile = fetchedProfile['data'];
           isLoading = false;
         });
+        //print('DEBUG: myProfile initialized from fetchedProfile: ${myProfile["_id"]}');
+      } else {
+        //print('DEBUG: failed to fetch profile: ${fetchedProfile["error"]}');
       }
     }
   }
@@ -1095,7 +1101,6 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     );
   }
 
-
   Widget _buildVotingSection() {
     return ValueListenableBuilder<List<NotificationModel>>(
       valueListenable: notificationsNotifier,
@@ -1409,6 +1414,9 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
 
   @override
   Widget build(BuildContext context) {
+    //print('DEBUG: DynamicPostWidget build - postId: ${widget.postId}');
+    //print('DEBUG: widget.showMenu: ${widget.showMenu}');
+    //print('DEBUG: widget.public: ${widget.public}');
     if (widget.isFullPage) {
       return _buildDetailedView(null);
     }
@@ -1652,14 +1660,20 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
       navigator.pop(); // Close loader using captured navigator
       if (result['success'] == true) {
         AppVariables.update('deleted_posts', widget.postId);
-        _showStatusDialog(navigator.context, 'Success', 'Post deleted successfully!', isError: false);
+        _showStatusDialog(
+            navigator.context, 'Success', 'Post deleted successfully!',
+            isError: false);
       } else {
-        _showStatusDialog(navigator.context, 'Error', result['error'] ?? 'Failed to delete post', isError: true);
+        _showStatusDialog(navigator.context, 'Error',
+            result['error'] ?? 'Failed to delete post',
+            isError: true);
       }
     }).catchError((e) {
       if (mounted) {
         navigator.pop();
-        _showStatusDialog(navigator.context, 'Error', 'An error occurred while deleting the post', isError: true);
+        _showStatusDialog(navigator.context, 'Error',
+            'An error occurred while deleting the post',
+            isError: true);
       }
     });
   }
@@ -1708,28 +1722,37 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
     );
 
     final navigator = Navigator.of(context);
-    PostService.reportPost(postId: widget.postId, reason: reason).then((result) {
+    PostService.reportPost(postId: widget.postId, reason: reason)
+        .then((result) {
       if (!mounted) return;
       navigator.pop(); // Close loader using captured navigator
       if (result['success']) {
-        _showStatusDialog(navigator.context, 'Report Result', 'Report submitted. Thank you for your feedback.', isError: false);
+        _showStatusDialog(navigator.context, 'Report Result',
+            'Report submitted. Thank you for your feedback.',
+            isError: false);
       } else {
-        _showStatusDialog(navigator.context, 'Report failed', 'Failed to submit report. Please try again.', isError: true);
+        _showStatusDialog(navigator.context, 'Report failed',
+            'Failed to submit report. Please try again.',
+            isError: true);
       }
     }).catchError((e) {
       if (mounted) {
         navigator.pop();
-        _showStatusDialog(navigator.context, 'Error', 'An error occurred while submitting report.', isError: true);
+        _showStatusDialog(navigator.context, 'Error',
+            'An error occurred while submitting report.',
+            isError: true);
       }
     });
   }
 
-  void _showStatusDialog(BuildContext context, String title, String message, {required bool isError}) {
+  void _showStatusDialog(BuildContext context, String title, String message,
+      {required bool isError}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(title, style: TextStyle(color: isError ? Colors.red : Colors.green)),
+          title: Text(title,
+              style: TextStyle(color: isError ? Colors.red : Colors.green)),
           content: Text(message),
           actions: [
             TextButton(
@@ -1781,14 +1804,18 @@ class _DynamicPostWidgetState extends State<DynamicPostWidget> {
       if (!mounted) return;
       navigator.pop(); // Close loader using captured navigator
       if (result['success']) {
-        _showStatusDialog(navigator.context, 'Success', 'User blocked.', isError: false);
+        _showStatusDialog(navigator.context, 'Success', 'User blocked.',
+            isError: false);
       } else {
-        _showStatusDialog(navigator.context, 'Error', 'Failed to block user.', isError: true);
+        _showStatusDialog(navigator.context, 'Error', 'Failed to block user.',
+            isError: true);
       }
     }).catchError((e) {
       if (mounted) {
         navigator.pop();
-        _showStatusDialog(navigator.context, 'Error', 'An error occurred while blocking user.', isError: true);
+        _showStatusDialog(navigator.context, 'Error',
+            'An error occurred while blocking user.',
+            isError: true);
       }
     });
   }
