@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 
+import 'package:chitchat/screens/instant_match_screen.dart';
 import 'package:page_transition/page_transition.dart';
 
 class WatchlistPage extends StatefulWidget {
@@ -136,59 +137,95 @@ class _WatchlistPageState extends State<WatchlistPage> {
       extendBody: true,
       bottomNavigationBar: AppBottomNav(highlightIndex: 2),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Custom Tab Header
-            Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () => setState(() => selectedTab = 0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Text(
-                        'my watchlist',
-                        style: TextStyle(
-                          color: selectedTab == 0 ? Colors.white : Colors.grey,
-                          fontSize: 16,
-                          fontWeight: selectedTab == 0
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+            Column(
+              children: [
+                // Custom Tab Header
+                Container(
+                  alignment: Alignment.center,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => setState(() => selectedTab = 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: Text(
+                            'my watchlist',
+                            style: TextStyle(
+                              color:
+                                  selectedTab == 0 ? Colors.white : Colors.grey,
+                              fontSize: 16,
+                              fontWeight: selectedTab == 0
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                  GestureDetector(
-                    onTap: () => setState(() => selectedTab = 1),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Text(
-                        'for you',
-                        style: TextStyle(
-                          color: selectedTab == 1 ? Colors.white : Colors.grey,
-                          fontSize: 16,
-                          fontWeight: selectedTab == 1
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+                      const SizedBox(width: 40),
+                      GestureDetector(
+                        onTap: () => setState(() => selectedTab = 1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: Text(
+                            'for you',
+                            style: TextStyle(
+                              color:
+                                  selectedTab == 1 ? Colors.white : Colors.grey,
+                              fontSize: 16,
+                              fontWeight: selectedTab == 1
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            // Tab Content
-            Expanded(
-              child:
-                  selectedTab == 0 ? _buildWatchlistTab() : _buildForYouTab(),
+                // Tab Content
+                Expanded(
+                  child: selectedTab == 0
+                      ? _buildWatchlistTab()
+                      : _buildForYouTab(),
+                ),
+              ],
+            ),
+            
+            // Instant Match Entry Point
+            Positioned(
+              top: 10,
+              right: 15,
+              child: IconButton(
+                icon: ShaderMask(
+                  shaderCallback: (Rect bounds) {
+                    return const LinearGradient(
+                      colors: [Colors.blueAccent, Colors.purpleAccent],
+                    ).createShader(bounds);
+                  },
+                  child: const Icon(Icons.flash_on, color: Colors.white, size: 28),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    PageTransition(
+                      isIos: true,
+                      type: PageTransitionType.rightToLeft,
+                      child: const InstantMatchScreen(),
+                      curve: Curves.fastEaseInToSlowEaseOut,
+                      duration: const Duration(milliseconds: 500),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),

@@ -61,6 +61,7 @@ dependencies:
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
   url_launcher: ^6.3.2
+  socket_io_client: ^3.1.4
 
 dev_dependencies:
   flutter_test:

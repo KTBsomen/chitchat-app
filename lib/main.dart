@@ -26,7 +26,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'screens/chat.dart';
 
-
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
@@ -88,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
       print("DeepLinkRouter initialization error: $e");
     }
 
-    // AppVariables.update('baseurl', 'https://5xlxdw5g-3000.inc1.devtunnels.ms');
+    // AppVariables.update('baseurl', 'https://jdhd235g-3000.asse.devtunnels.ms');
     AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
 
     UserService.isLoggedIn().then((value) async {
@@ -104,8 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
           }
           await PresenceManager().init();
         } else {
-          bool isDeletionPending = result['error'] == 'ACCOUNT_PENDING_DELETION' ||
-              (result['isDeletionPending'] ?? false);
+          bool isDeletionPending =
+              result['error'] == 'ACCOUNT_PENDING_DELETION' ||
+                  (result['isDeletionPending'] ?? false);
           await UserService.signOut((x) => {});
           if (mounted) {
             setState(() {
