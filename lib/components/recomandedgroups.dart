@@ -40,14 +40,17 @@ class _RecomandedgroupsState extends State<Recomandedgroups> {
     setState(() {
       isLoading = true;
     });
-    groups = await GroupsService.getRecommendedGroups().catchError((error) {
+    try {
+      PaginatedGroupResult result =
+          await GroupsService.getRecommendedGroups();
+      groups = result.groups;
+      print(groups);
+    } catch (error) {
       print(error);
       setState(() {
-        isLoading = false;
         isLoadingError = true;
       });
-    });
-    print(groups);
+    }
     setState(() {
       isLoading = false;
     });

@@ -22,6 +22,7 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
   StreamSubscription? _messageSubscription;
   StreamSubscription? _typingSubscription;
   StreamSubscription? _readStatusSubscription;
+  StreamSubscription? _errorSubscription;
 
   bool _partnerIsTyping = false;
   Timer? _typingTimer;
@@ -74,6 +75,23 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
       }
     });
 
+    _errorSubscription = _service.errorStream.listen((errMsg) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errMsg,
+              style: const TextStyle(fontFamily: 'Poppins', color: Colors.white),
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    });
+
     // Show gender selection bottom sheet on start
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showGenderSelection();
@@ -86,6 +104,7 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
     _messageSubscription?.cancel();
     _typingSubscription?.cancel();
     _readStatusSubscription?.cancel();
+    _errorSubscription?.cancel();
     _typingTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();

@@ -87,8 +87,8 @@ class _LoginScreenState extends State<LoginScreen> {
       print("DeepLinkRouter initialization error: $e");
     }
 
-    // AppVariables.update('baseurl', 'https://jdhd235g-3000.asse.devtunnels.ms');
-    AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
+    AppVariables.update('baseurl', 'https://jdhd235g-3000.asse.devtunnels.ms');
+    // AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
 
     UserService.isLoggedIn().then((value) async {
       if (value) {

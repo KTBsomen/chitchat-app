@@ -29,6 +29,9 @@ class InstantMatchService {
   final _readStatusController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get readStatusStream => _readStatusController.stream;
 
+  final _errorController = StreamController<String>.broadcast();
+  Stream<String> get errorStream => _errorController.stream;
+
   void init() async {
     if (socket != null && socket!.connected) return;
 
@@ -37,12 +40,20 @@ class InstantMatchService {
     
     if (baseUrl == null || token == null) return;
 
-    // Use the full baseUrl. Socket.IO will append /socket.io/ by default.
-    String socketUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    Uri uri = Uri.parse(baseUrl);
+    int port = uri.port != 0 ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    String socketUrl = '${uri.scheme}://${uri.host}:$port';
+
+    String path = uri.path;
+    if (path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+    String socketPath = path.isEmpty ? '/socket.io' : '$path/socket.io';
 
     socket = IO.io(socketUrl, IO.OptionBuilder()
         .setTransports(['websocket'])
         .setAuth({'token': token})
+        .setPath(socketPath)
         .enableAutoConnect()
         .build());
 
@@ -91,11 +102,28 @@ class InstantMatchService {
       _updateState(MatchState.ended);
     });
 
-    socket!.onConnectError((err) => print('Connect Error: $err'));
-    socket!.onError((err) => print('Socket Error: $err'));
+    socket!.onConnectError((err) {
+      print('Connect Error: $err');
+      _errorController.add('Failed to connect to matchmaking server.');
+      _updateState(MatchState.idle);
+    });
+    
+    socket!.onError((err) {
+      print('Socket Error: $err');
+      _errorController.add('A connection error occurred.');
+      _updateState(MatchState.idle);
+    });
+
+    socket!.on('error', (data) {
+      print('Error from server: $data');
+      String errMsg = (data is Map) ? (data['message'] ?? 'An error occurred') : data.toString();
+      _errorController.add(errMsg);
+      _updateState(MatchState.idle);
+    });
   }
 
   void startMatching(String lookingFor) {
+    _updateState(MatchState.searching);
     if (socket == null) return;
     socket!.emit('join_match', {'lookingFor': lookingFor});
   }
@@ -145,5 +173,6 @@ class InstantMatchService {
     _messageController.close();
     _typingController.close();
     _readStatusController.close();
+    _errorController.close();
   }
 }

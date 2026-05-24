@@ -149,14 +149,18 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       isLoading = true;
     });
-    groups = await GroupsService.getRecommendedGroups().catchError((error) {
+    try {
+      final result = await GroupsService.getRecommendedGroups();
+      groups = result.groups;
+      print(groups);
+    } catch (error) {
       print(error);
-      setState(() {
-        isLoading = false;
-        isLoadingError = true;
-      });
-    });
-    print(groups);
+      if (mounted) {
+        setState(() {
+          isLoadingError = true;
+        });
+      }
+    }
     if (mounted) {
       setState(() {
         isLoading = false;
@@ -168,17 +172,23 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       isLoading = true;
     });
-    groups = await GroupsService.getRecommendedGroups().catchError((error) {
+    try {
+      final result = await GroupsService.getRecommendedGroups();
+      groups = result.groups;
+      print(groups);
+    } catch (error) {
       print(error);
+      if (mounted) {
+        setState(() {
+          isLoadingError = true;
+        });
+      }
+    }
+    if (mounted) {
       setState(() {
         isLoading = false;
-        isLoadingError = true;
       });
-    });
-    print(groups);
-    setState(() {
-      isLoading = false;
-    });
+    }
   }
 
   @override

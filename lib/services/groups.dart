@@ -49,11 +49,24 @@ class GroupsService {
     );
   }
 
-  static Future<List<FriendCircleGroup>> getRecommendedGroups() async {
+  static Future<PaginatedGroupResult> getRecommendedGroups({
+    String? cursor,
+    int limit = 20,
+  }) async {
     String? token = await UserService.getAccessToken();
 
+    final queryParams = <String, String>{
+      'limit': limit.toString(),
+    };
+    if (cursor != null && cursor.isNotEmpty) {
+      queryParams['cursor'] = cursor;
+    }
+
+    final uri = Uri.parse('$baseurl/recommend/groups')
+        .replace(queryParameters: queryParams);
+
     final response = await http.get(
-      Uri.parse('$baseurl/recommend/groups'),
+      uri,
       headers: {
         "content-type": "application/json",
         'Authorization': 'Bearer $token',
@@ -61,48 +74,66 @@ class GroupsService {
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      print(data);
-      return data.map((item) {
-        // Parsing individual group
-        return FriendCircleGroup(
-          groupId: item["_id"],
-          groupData: {
-            'name': item["name"],
-            'description': item["description"],
-            'GroupProfilePic': item["GroupProfilePic"],
-            'createdBy': item["createdBy"],
-            'createdAt': item["createdAt"],
-            'dbIndex': item["dbIndex"],
-          },
-          members: (item["members"] as List<dynamic>)
-              .map((member) {
-                // Parsing individual member
-                return FriendCircleMember(
-                  id: member["memberId"],
-                  avatarUrl: member["memberProfilePic"],
-                  additionalData: {
-                    'memberName': member["memberName"],
-                    'memberBio': member["memberBio"],
-                    'educationLevel': member["educationLevel"],
-                    'school': member["school"],
-                    'college': member["college"],
-                    'university': member["university"],
-                    'semester': member["semester"],
-                    'year': member["year"],
-                    'userClass': member["userClass"],
-                    'dbIndex': member["dbIndex"] ?? 0,
-                  },
-                );
-              })
-              .toList()
-              .cast<FriendCircleMember>(), // Ensure proper casting
-        );
-      }).toList();
+      final Map<String, dynamic> body = json.decode(response.body);
+      final List<dynamic> data = body['groups'] ?? [];
+      final String? nextCursor = body['nextCursor'];
+      final bool hasMore = body['hasMore'] ?? false;
+
+      final groups = data.map((item) => buildFriendCircleGroup(item)).toList();
+
+      return PaginatedGroupResult(
+        groups: groups,
+        nextCursor: nextCursor,
+        hasMore: hasMore,
+      );
     } else {
       throw Exception('Failed to load groups: ${response.statusCode}');
     }
   }
+
+  static Future<PaginatedGroupResult> getCampusLoungeGroups({
+    String? cursor,
+    int limit = 20,
+  }) async {
+    String? token = await UserService.getAccessToken();
+
+    final queryParams = <String, String>{
+      'limit': limit.toString(),
+    };
+    if (cursor != null && cursor.isNotEmpty) {
+      queryParams['cursor'] = cursor;
+    }
+
+    final uri = Uri.parse('$baseurl/recommend/campus-lounge')
+        .replace(queryParameters: queryParams);
+
+    final response = await http.get(
+      uri,
+      headers: {
+        "content-type": "application/json",
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> body = json.decode(response.body);
+      final List<dynamic> data = body['groups'] ?? [];
+      final String? nextCursor = body['nextCursor'];
+      final bool hasMore = body['hasMore'] ?? false;
+
+      final groups = data.map((item) => buildFriendCircleGroup(item)).toList();
+
+      return PaginatedGroupResult(
+        groups: groups,
+        nextCursor: nextCursor,
+        hasMore: hasMore,
+      );
+    } else {
+      throw Exception(
+          'Failed to load campus lounge groups: ${response.statusCode}');
+    }
+  }
+
 
   static Future<List<FriendCircleGroup>> getGroupDetails(
       {required String gid}) async {
@@ -453,4 +484,16 @@ class UserBio {
       editedBy: json['editedBy'],
     );
   }
+}
+
+class PaginatedGroupResult {
+  final List<FriendCircleGroup> groups;
+  final String? nextCursor;
+  final bool hasMore;
+
+  PaginatedGroupResult({
+    required this.groups,
+    this.nextCursor,
+    this.hasMore = false,
+  });
 }
