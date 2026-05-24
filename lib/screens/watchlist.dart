@@ -213,8 +213,8 @@ class _WatchlistPageState extends State<WatchlistPage> {
                     children: [
                       Expanded(
                         child: GenzButton(
-                          title: 'Campus Lounge',
-                          subtitle: 'Public Chat',
+                          title: 'Lounge',
+                          subtitle: 'Campus Chat',
                           glowColor: const Color(0xFF00FF9D), // neon green
                           icon: const Icon(
                             Icons.chat_bubble_outline_rounded,
@@ -239,8 +239,8 @@ class _WatchlistPageState extends State<WatchlistPage> {
                           width: 14), // Spacing aligned with the middle shrink
                       Expanded(
                         child: GenzButton(
-                          title: 'Anonymous Chat',
-                          subtitle: 'Private Chat',
+                          title: 'Anonymous',
+                          subtitle: 'Randomly Chat',
                           glowColor: const Color(0xFFC084FC), // neon purple
                           icon: CustomPaint(
                             size: const Size(20, 20),

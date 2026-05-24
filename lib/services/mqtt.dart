@@ -129,9 +129,9 @@ class MQTTService {
       throw Exception(
           'Topic is not set. Please set a topic before publishing.');
     } else {
-      String? _topic = topic!.split('/')[0];
+      String publishTopic = topic!.replaceAll('/+', '/$clientId');
       _client!.publishMessage(
-          "$_topic/$clientId", MqttQos.atLeastOnce, builder.payload!);
+          publishTopic, MqttQos.atLeastOnce, builder.payload!);
     }
   }
 }

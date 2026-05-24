@@ -88,7 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     mqtt = MQTTService(
       broker: '13.204.86.50',
-      // broker: '192.168.139.222',
+      // broker: '192.168.0.114',
       clientId: ((await UserService.getUserId()).toString().substring(0, 20)),
       onConnected: _onConnected,
       onDisconnected: _onDisconnected,
