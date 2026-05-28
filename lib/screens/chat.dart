@@ -173,7 +173,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _typingUserIdProfilePic = '';
   ValueNotifier<String> typingUserIdProfilePic = ValueNotifier('');
-  void _handleMessage(String message) {
+  void _handleMessage(String message, {String? topic}) {
     // Deduplicate and store locally
     //  LocalMessageStore.instance.saveMessageIfUnique(topic, message);
     // Handle the message as needed
@@ -583,8 +583,11 @@ class _ChatScreenState extends State<ChatScreen> {
     await Future.delayed(const Duration(milliseconds: 500));
     _chatController.addReplySuggestions([
       const SuggestionItemData(text: 'Thanks.'),
-      const SuggestionItemData(text: 'Thank you very much.'),
-      const SuggestionItemData(text: 'Great.')
+      const SuggestionItemData(text: 'Great.'),
+      const SuggestionItemData(text: 'Ok.'),
+      const SuggestionItemData(text: 'Yes.'),
+      const SuggestionItemData(text: 'No.'),
+      const SuggestionItemData(text: 'Maybe.'),
     ]);
   }
 

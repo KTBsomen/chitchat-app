@@ -14,7 +14,7 @@ class MQTTService {
   final void Function() onDisconnected;
   final void Function(String) onSubscribed;
   final void Function(String?) onUnSubscribed;
-  final void Function(String) onMessageReceived;
+  final void Function(String, {String? topic}) onMessageReceived;
 
   MQTTService({
     required this.broker,
@@ -98,7 +98,7 @@ class MQTTService {
             print('📩 Message received: $message from $_topic');
             await ChatServices.incrementMessageNotificationCount();
             dispatchCustomEvent(0, "messageNotificationCountUpdate");
-            onMessageReceived(message);
+            onMessageReceived(message, topic: _topic);
           }
         } catch (e) {
           print('🚨 Failed to decode message: $e');
@@ -122,7 +122,7 @@ class MQTTService {
       _client != null &&
       _client!.connectionStatus?.state == MqttConnectionState.connected;
 
-  void publish(String message) {
+  void publish(String message, {MqttQos qos = MqttQos.atLeastOnce}) {
     final builder = MqttClientPayloadBuilder()..addUTF8String(message);
     if (topic == null) {
       print('Topic is not set. Please set a topic before publishing.');
@@ -130,8 +130,7 @@ class MQTTService {
           'Topic is not set. Please set a topic before publishing.');
     } else {
       String publishTopic = topic!.replaceAll('/+', '/$clientId');
-      _client!.publishMessage(
-          publishTopic, MqttQos.atLeastOnce, builder.payload!);
+      _client!.publishMessage(publishTopic, qos, builder.payload!);
     }
   }
 }
