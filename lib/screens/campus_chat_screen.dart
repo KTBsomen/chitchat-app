@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:chatview/chatview.dart';
 import 'package:chitchat/appstate/variables.dart';
+import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/services/mqtt.dart';
 import 'package:chitchat/screens/campus_members_screen.dart';
 import 'package:chitchat/services/user.dart';
+import 'package:chitchat/services/posts.dart';
 import 'package:flutter/material.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:http/http.dart' as http;
@@ -39,6 +42,10 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
   bool _hasMore = true;
   bool _isLoadingHistory = false;
   bool _initialLoadDone = false;
+
+  late final UploadService uploadService;
+  final Set<String> _memorySentUrls = {};
+  final ValueNotifier<String> typingUserIdProfilePic = ValueNotifier('');
 
   String get _educationLevel {
     return profileDetails?["educationLevel"] ?? "University";
@@ -164,12 +171,19 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeUploadService();
 
     _chatController = ChatController(
       initialMessageList: [],
       scrollController: ScrollController(),
-      onReaction: (reaction) {},
-      onReactionRemoved: (reaction) {},
+      onReaction: (reaction) {
+        debugPrint('Message Reacted${reaction.toString()}');
+        _setReaction(reaction, false);
+      },
+      onReactionRemoved: (reaction) {
+        debugPrint('Message Reacted Removed ${reaction.toString()}');
+        _setReaction(reaction, false);
+      },
       currentUser: ChatUser(
         id: profileDetails?["_id"] ?? "unknown",
         name: profileDetails?["name"] ?? "Unknown",
@@ -180,6 +194,12 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
 
     // Load initial history from DB, then connect MQTT for realtime
     _loadInitialHistory();
+  }
+
+  void _initializeUploadService() async {
+    uploadService = UploadService(
+        baseUrl: "https://chitzchat.com/api/storage/api/v1/upload-url",
+        apiKey: (await UserService.getAccessToken()) ?? '');
   }
 
   Future<void> _loadInitialHistory() async {
@@ -209,7 +229,6 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
 
     mqtt = MQTTService(
       broker: '13.204.86.50',
-      // broker: "10.136.13.222",
       clientId:
           (userId.toString().substring(0, min(20, userId.toString().length))),
       onConnected: _onConnected,
@@ -284,34 +303,263 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
     print('📌 Subscribed to campus chat: $topic');
   }
 
+  Message? _findMessage(Message message) {
+    try {
+      return _chatController.initialMessageList
+          .firstWhere((m) => m.id == message.id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _setReaction(Message reactions, bool isFromMQTT) async {
+    try {
+      Message? mtu = _findMessage(reactions);
+      if (mtu != null) {
+        setState(() {
+          mtu.reaction = reactions.reaction;
+        });
+      }
+      if (!isFromMQTT) {
+        mqtt.publish(
+          jsonEncode({
+            'type': 'reaction',
+            'message': reactions.toJson(),
+          }),
+        );
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  void _openMore(Message message, bool isFromCurrentUser) {
+    if (message.messageType != MessageType.text) {
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isFromCurrentUser &&
+                    message.messageType == MessageType.text)
+                  ListTile(
+                    leading: const Icon(Icons.edit, color: Colors.blue),
+                    title: const Text("Edit"),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showEditMessagePopup(message);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditMessagePopup(Message message) {
+    final TextEditingController controller =
+        TextEditingController(text: message.message);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Message'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final newMessage = message.copyWith(message: controller.text);
+              Navigator.of(context).pop();
+              _editMessage(newMessage);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editMessage(Message message, {bool isFromMQTT = false}) {
+    print('editing message: ${message.message}');
+    if (message.createdAt
+        .isBefore(DateTime.now().subtract(const Duration(days: 2)))) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Editing Not Allowed'),
+          content: const Text(
+              'You can only Edit messages sent within the last 2 days.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Ok'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final mtu = _findMessage(message);
+      if (mtu != null) {
+        mtu.message = message.message;
+      }
+      _chatController.removeReplySuggestions();
+
+      if (!isFromMQTT) {
+        mqtt.publish(
+          jsonEncode({
+            'type': 'edit',
+            'message': message.toJson(),
+          }),
+        );
+      }
+    }
+    setState(() {});
+  }
+
+  void unsendMessage(Message message, {bool isFromMQTT = false}) {
+    print('Unsend message: ${message.message}');
+    if (message.createdAt
+        .isBefore(DateTime.now().subtract(const Duration(days: 2)))) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Unsend Not Allowed'),
+          content: const Text(
+              'You can only unsend messages sent within the last 2 days.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final mtu = _findMessage(message);
+                if (mtu != null) {
+                  _chatController.initialMessageList.remove(mtu);
+                }
+                _chatController.removeReplySuggestions();
+                Navigator.of(context).pop();
+              },
+              child: const Text('Delete for me'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final mtu = _findMessage(message);
+      if (mtu != null) {
+        _chatController.initialMessageList.remove(mtu);
+      }
+      _chatController.removeReplySuggestions();
+
+      if (!isFromMQTT && !message.isOneTime) {
+        mqtt.publish(
+          jsonEncode({
+            'type': 'unsend',
+            'message': message.toJson(),
+          }),
+        );
+      }
+    }
+    setState(() {});
+  }
+
+  void _markAsRead(Message message, {bool isFromMQTT = false}) {
+    final Message? messageToUpdate = _findMessage(message);
+    if (messageToUpdate != null) {
+      messageToUpdate.setStatus = MessageStatus.read;
+    }
+    if (!isFromMQTT) {
+      mqtt.publish(
+        jsonEncode({
+          'type': 'read',
+          'status': "read",
+          'sentBy': _chatController.currentUser.id,
+          'groupId': _campusTopic,
+          'message': message.toJson(),
+        }),
+      );
+    }
+  }
+
   void _handleMessage(String message, {String? topic}) {
     try {
-      var data = jsonDecode(message);
-
-      // Ignore typing / read receipts / unsends for simplicity in global chat
-      if (data['type'] == 'typing' ||
-          data['type'] == 'read' ||
-          data['type'] == 'unsend' ||
-          data['type'] == 'edit') {
+      if (message.contains('"type":"typing"')) {
+        var data = jsonDecode(message);
+        if (data['status'] == "TypeWriterStatus.typing") {
+          String typingUserId = data['sentBy'];
+          final matchingUsers = _chatController.otherUsers
+              .where((user) => user.id == typingUserId);
+          typingUserIdProfilePic.value = matchingUsers.isNotEmpty
+              ? matchingUsers.first.profilePhoto ?? ''
+              : '';
+          _chatController.setTypingIndicator = true;
+          setState(() {});
+        } else {
+          typingUserIdProfilePic.value = '';
+          _chatController.setTypingIndicator = false;
+          setState(() {});
+        }
+        return;
+      }
+      if (message.contains('"type":"unsend"')) {
+        var data = jsonDecode(message);
+        Message messageToUnsend = Message.fromJson(data['message']);
+        if (messageToUnsend.createdAt
+            .isBefore(DateTime.now().subtract(const Duration(days: 2)))) {
+          print("message is older than 2 days so not unsending");
+          return;
+        }
+        unsendMessage(messageToUnsend, isFromMQTT: true);
+        return;
+      }
+      if (message.contains('"type":"read"')) {
+        var data = jsonDecode(message);
+        Message seenMessage = Message.fromJson(data['message']);
+        _markAsRead(seenMessage, isFromMQTT: true);
+        return;
+      }
+      if (message.contains('"type":"reaction"')) {
+        var data = jsonDecode(message);
+        Message seenMessage = Message.fromJson(data['message']);
+        _setReaction(seenMessage, true);
+        return;
+      }
+      if (message.contains('"type":"edit"')) {
+        var data = jsonDecode(message);
+        Message messageToEdit = Message.fromJson(data['message']);
+        if (messageToEdit.createdAt
+            .isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
+          print("message is older than 1 days so not editing.");
+          return;
+        }
+        _editMessage(messageToEdit, isFromMQTT: true);
         return;
       }
 
+      var data = jsonDecode(message);
       Message msg = Message.fromJson(data);
       msg.setStatus = MessageStatus.delivered;
-      // Avoid duplicating our own messages if we receive them back
       if (msg.sentBy == _chatController.currentUser.id) return;
 
-      // Check if user exists in otherUsers, if not add them temporarily
-      bool userExists =
-          _chatController.otherUsers.any((u) => u.id == msg.sentBy);
-      if (!userExists) {
-        _chatController.otherUsers.add(ChatUser(
-          id: msg.sentBy,
-          name: data['senderName'] ?? "Student",
-          profilePhoto: data['senderPic'],
-        ));
-      }
-
+      _registerOtherUser(data);
       if (mounted) {
         _chatController.addMessage(msg);
       }
@@ -363,43 +611,108 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
     }
   }
 
-  void _onSendTap(List<String> messages, ReplyMessage replyMessage,
-      MessageType messageType, bool isOneTime) {
-    if (messages.isEmpty) return;
-    for (final message in messages) {
-      final msg = Message(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        message: message,
-        createdAt: DateTime.now(),
-        sentBy: _chatController.currentUser.id,
-        replyMessage: replyMessage,
-        messageType: messageType,
-        uploadProgress: ValueNotifier(1.0),
-        onRetry: onRetryTap,
-      );
+  Future<void> _onSendTap(List<String> filePaths, ReplyMessage replyMessage,
+      MessageType messageType, bool isOneTime,
+      {String? id}) async {
+    if (filePaths.isEmpty) return;
 
-      _chatController.addMessage(msg);
+    for (final path in filePaths) {
+      final file = File(path);
 
-      // Add sender info so others can display it without DB lookup
-      final payload = msg.toJson();
-      payload['senderName'] = _chatController.currentUser.name;
-      payload['senderPic'] = _chatController.currentUser.profilePhoto;
+      final message = Message(
+          id: id ?? '${DateTime.now().millisecondsSinceEpoch}',
+          createdAt: DateTime.now(),
+          message: path,
+          reaction: Reaction(reactions: [], reactedUserIds: []),
+          sentBy: _chatController.currentUser.id,
+          replyMessage: replyMessage,
+          messageType: messageType,
+          uploadProgress: ValueNotifier(0.0),
+          onRetry: onRetryTap,
+          isOneTime: isOneTime);
 
-      if (isConnected) {
-        try {
-          mqtt.publish(jsonEncode(payload), qos: MqttQos.atMostOnce);
-          msg.setStatus = MessageStatus.delivered;
-        } catch (e) {
-          print('Failed to publish message: $e');
-          msg.setStatus = MessageStatus.undelivered;
-          messageQueue.add(msg);
-        }
+      _chatController.addMessage(message);
+      if (messageType == MessageType.video ||
+          messageType == MessageType.image ||
+          messageType == MessageType.voice) {
+        // Start upload and track progress
+        message.setStatus = MessageStatus.uploading;
+        await uploadService
+            .uploadFile(
+          file: file,
+          path: 'uploads/chat',
+          progressNotifier: message.uploadProgress,
+        )
+            .then((uploadResponse) {
+          // Update message URL with final public URL after upload completes
+          message.message = uploadResponse.publicUrl;
+          setState(() {});
+
+          final payload = message.toJson();
+          payload['senderName'] = _chatController.currentUser.name;
+          payload['senderPic'] = _chatController.currentUser.profilePhoto;
+
+          if (isConnected) {
+            try {
+              mqtt.publish(jsonEncode(payload));
+              message.setStatus = MessageStatus.delivered;
+            } catch (e) {
+              print('Failed to publish message: $e');
+              message.setStatus = MessageStatus.undelivered;
+              messageQueue.add(message);
+            }
+          } else {
+            message.setStatus = MessageStatus.undelivered;
+            messageQueue.add(message);
+          }
+
+          // Auto-add media to memories (fire-and-forget, skip duplicates)
+          final url = uploadResponse.publicUrl;
+          final myGroupId = AppVariables.get<String>('myGroupId');
+          if ((messageType == MessageType.image ||
+                  messageType == MessageType.video) &&
+              myGroupId != null &&
+              !_memorySentUrls.contains(url) &&
+              !isOneTime) {
+            _memorySentUrls.add(url);
+            PostService.createMemories(
+              files: [url],
+              myGroupId: myGroupId,
+            ).then((result) {
+              if (result['success']) {
+                print('[MEMORY] Auto-saved chat media as memory');
+              } else {
+                print('[MEMORY] Failed: ${result['error']}');
+                _memorySentUrls.remove(url); // allow retry
+              }
+            });
+          }
+        }).catchError((error) {
+          print('Upload failed: $error');
+          message.setStatus = MessageStatus.error;
+        });
       } else {
-        msg.setStatus = MessageStatus.undelivered;
-        messageQueue.add(msg);
+        final payload = message.toJson();
+        payload['senderName'] = _chatController.currentUser.name;
+        payload['senderPic'] = _chatController.currentUser.profilePhoto;
+
+        if (isConnected) {
+          try {
+            mqtt.publish(jsonEncode(payload));
+            message.setStatus = MessageStatus.delivered;
+          } catch (e) {
+            print('Failed to publish message: $e');
+            messageQueue.add(message);
+            message.setStatus = MessageStatus.undelivered;
+          }
+        } else {
+          message.setStatus = MessageStatus.undelivered;
+          messageQueue.add(message);
+        }
       }
     }
-    setState(() {});
+
+    _chatController.scrollToLastMessage(doit: true);
   }
 
   @override
@@ -505,17 +818,27 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
         ),
         chatController: _chatController,
         onSendTap: _onSendTap,
-        chatViewState:
-            ChatViewState.hasMessages, // Start with empty state or has messages
-        appBar: const SizedBox.shrink(), // We use Scaffold's AppBar
+        chatViewState: ChatViewState.hasMessages,
+        appBar: const SizedBox.shrink(),
         chatBackgroundConfig: ChatBackgroundConfiguration(
           backgroundColor: AppColors.background,
         ),
         sendMessageConfig: SendMessageConfiguration(
           textFieldBackgroundColor: const Color(0xFF1E1E2C),
           defaultSendButtonColor: Colors.tealAccent,
-          textFieldConfig: const TextFieldConfiguration(
-            textStyle: TextStyle(color: Colors.white),
+          textFieldConfig: TextFieldConfiguration(
+            textStyle: const TextStyle(color: Colors.white),
+            compositionThresholdTime: const Duration(seconds: 1),
+            onMessageTyping: (status) {
+              mqtt.publish(
+                jsonEncode({
+                  'type': 'typing',
+                  'status': status.toString(),
+                  'sentBy': _chatController.currentUser.id,
+                  'groupId': _campusTopic,
+                }),
+              );
+            },
           ),
           replyDialogColor: const Color(0xFF1E1E2C),
           replyTitleColor: Colors.tealAccent,
@@ -530,10 +853,13 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
           inComingChatBubbleConfig: ChatBubble(
             color: const Color(0xFF2A2A3D),
             textStyle: const TextStyle(color: Colors.white, fontSize: 16),
+            onMessageRead: (message) {
+              _markAsRead(message);
+            },
           ),
         ),
-        messageConfig: const MessageConfiguration(
-          messageReactionConfig: MessageReactionConfiguration(
+        messageConfig: MessageConfiguration(
+          messageReactionConfig: const MessageReactionConfiguration(
             backgroundColor: Color(0xFF2A2A3D),
             borderColor: Colors.tealAccent,
             reactedUserCountTextStyle: TextStyle(color: Colors.white),
@@ -547,10 +873,34 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
               ),
             ),
           ),
+          imageMessageConfig: ImageMessageConfiguration(
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+            onTap: (Message message) {
+              debugPrint(message.message);
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  opaque: false,
+                  barrierDismissible: true,
+                  pageBuilder: (BuildContext context, _, __) {
+                    return ZoomableImagePopup(
+                      imageUrl: message.message,
+                      onClose: () => Navigator.of(context).pop(),
+                    );
+                  },
+                ),
+              );
+              if (message.isOneTime) {
+                unsendMessage(message);
+              }
+            },
+            shareIconConfig: ShareIconConfiguration(
+              defaultIconBackgroundColor: Color(0xFF1E1E2C),
+              defaultIconColor: Colors.tealAccent,
+            ),
+          ),
         ),
         profileCircleConfig: ProfileCircleConfiguration(
-          profileImageUrl: ValueNotifier(
-              'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png'),
+          profileImageUrl: typingUserIdProfilePic,
         ),
         repliedMessageConfig: const RepliedMessageConfiguration(
           backgroundColor: Color(0xFF1E1E2C),
@@ -560,9 +910,13 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
         swipeToReplyConfig: const SwipeToReplyConfiguration(
           replyIconColor: Colors.tealAccent,
         ),
-        replyPopupConfig: const ReplyPopupConfiguration(
-          backgroundColor: Color(0xFF1E1E2C),
-          buttonTextStyle: TextStyle(color: Colors.white),
+        replyPopupConfig: ReplyPopupConfiguration(
+          backgroundColor: const Color(0xFF1E1E2C),
+          buttonTextStyle: const TextStyle(color: Colors.white),
+          onUnsendTap: unsendMessage,
+          onMoreTap: (message, sentByCurrentUser) {
+            _openMore(message, sentByCurrentUser);
+          },
         ),
       ),
     );
