@@ -1,7 +1,7 @@
 name: chitchat
 description: "Social media for Gen Z"
 publish_to: 'none'
-version: 1.0.0
+version: 2.0.0+2
 
 environment:
   sdk: ^3.5.4
