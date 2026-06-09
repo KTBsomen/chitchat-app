@@ -7,6 +7,7 @@ import 'package:chatview/chatview.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
+import 'package:chitchat/constants/theams.dart';
 import 'package:chitchat/services/mqtt.dart';
 import 'package:chitchat/screens/campus_members_screen.dart';
 import 'package:chitchat/services/user.dart';
@@ -23,6 +24,9 @@ class CampusChatScreen extends StatefulWidget {
 }
 
 class _CampusChatScreenState extends State<CampusChatScreen> {
+  final AppTheme theme = DarkTheme();
+  final bool isDarkTheme = true;
+
   final Map<String, dynamic>? profileDetails =
       AppVariables.get<Map<String, dynamic>>('profile');
 
@@ -500,6 +504,10 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
   }
 
   void _handleMessage(String message, {String? topic}) {
+    if (topic != null && !topic.startsWith(_campusTopic)) {
+      print("Ignoring personal/other group message from topic: $topic (current campus topic: $_campusTopic)");
+      return;
+    }
     try {
       if (message.contains('"type":"typing"')) {
         var data = jsonDecode(message);
@@ -744,12 +752,12 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
     final instName = _getInstitutionNameFromProfile() ?? "Your Campus";
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 1,
+        backgroundColor: theme.appBarColor,
+        elevation: theme.elevation ?? 1,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios, color: theme.backArrowColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: GestureDetector(
@@ -768,8 +776,8 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
             children: [
               Text(
                 instName,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: theme.appBarTitleTextStyle,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Poppins',
@@ -821,13 +829,30 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
         chatViewState: ChatViewState.hasMessages,
         appBar: const SizedBox.shrink(),
         chatBackgroundConfig: ChatBackgroundConfiguration(
-          backgroundColor: AppColors.background,
+          messageTimeIconColor: theme.messageTimeIconColor,
+          messageTimeTextStyle: TextStyle(color: theme.messageTimeTextColor),
+          defaultGroupSeparatorConfig: DefaultGroupSeparatorConfiguration(
+            textStyle: TextStyle(
+              color: theme.chatHeaderColor,
+              fontSize: 17,
+            ),
+          ),
+          backgroundColor: theme.backgroundColor,
         ),
         sendMessageConfig: SendMessageConfiguration(
-          textFieldBackgroundColor: const Color(0xFF1E1E2C),
-          defaultSendButtonColor: Colors.tealAccent,
+          imagePickerIconsConfig: ImagePickerIconsConfiguration(
+            cameraIconColor: theme.cameraIconColor,
+            galleryIconColor: theme.galleryIconColor,
+          ),
+          replyMessageColor: theme.replyMessageColor,
+          defaultSendButtonColor: theme.sendButtonColor,
+          replyDialogColor: theme.replyDialogColor,
+          replyTitleColor: theme.replyTitleColor,
+          textFieldBackgroundColor: theme.textFieldBackgroundColor,
+          closeIconColor: theme.closeIconColor,
           textFieldConfig: TextFieldConfiguration(
-            textStyle: const TextStyle(color: Colors.white),
+            maxLines: 10,
+            textStyle: TextStyle(color: theme.textFieldTextColor),
             compositionThresholdTime: const Duration(seconds: 1),
             onMessageTyping: (status) {
               mqtt.publish(
@@ -840,36 +865,88 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
               );
             },
           ),
-          replyDialogColor: const Color(0xFF1E1E2C),
-          replyTitleColor: Colors.tealAccent,
-          replyMessageColor: Colors.white,
-          closeIconColor: Colors.white,
+          micIconColor: theme.replyMicIconColor,
+          voiceRecordingConfiguration: VoiceRecordingConfiguration(
+            bitRate: 64000,
+            backgroundColor: theme.waveformBackgroundColor,
+            recorderIconColor: theme.recordIconColor,
+            waveStyle: WaveStyle(
+              showMiddleLine: false,
+              waveColor: theme.waveColor ?? Colors.white,
+              extendWaveform: true,
+            ),
+          ),
         ),
         chatBubbleConfig: ChatBubbleConfiguration(
           outgoingChatBubbleConfig: ChatBubble(
-            color: Colors.teal.shade700,
+            linkPreviewConfig: LinkPreviewConfiguration(
+              backgroundColor: theme.linkPreviewOutgoingChatColor,
+              bodyStyle: theme.outgoingChatLinkBodyStyle,
+              titleStyle: theme.outgoingChatLinkTitleStyle,
+            ),
+            receiptsWidgetConfig: const ReceiptsWidgetConfig(
+              showReceiptsIn: ShowReceiptsIn.all,
+            ),
+            color: theme.outgoingChatBubbleColor,
             textStyle: const TextStyle(color: Colors.white, fontSize: 16),
           ),
           inComingChatBubbleConfig: ChatBubble(
-            color: const Color(0xFF2A2A3D),
-            textStyle: const TextStyle(color: Colors.white, fontSize: 16),
+            linkPreviewConfig: LinkPreviewConfiguration(
+              linkStyle: TextStyle(
+                color: theme.inComingChatBubbleTextColor,
+                decoration: TextDecoration.underline,
+              ),
+              backgroundColor: theme.linkPreviewIncomingChatColor,
+              bodyStyle: theme.incomingChatLinkBodyStyle,
+              titleStyle: theme.incomingChatLinkTitleStyle,
+            ),
+            textStyle: TextStyle(color: theme.inComingChatBubbleTextColor, fontSize: 16),
             onMessageRead: (message) {
               _markAsRead(message);
             },
+            senderNameTextStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
+            color: theme.inComingChatBubbleColor,
           ),
         ),
+        replyPopupConfig: ReplyPopupConfiguration(
+          backgroundColor: theme.replyPopupColor,
+          buttonTextStyle: TextStyle(color: theme.replyPopupButtonColor),
+          topBorderColor: theme.replyPopupTopBorderColor,
+          onUnsendTap: unsendMessage,
+          onMoreTap: (message, sentByCurrentUser) {
+            _openMore(message, sentByCurrentUser);
+          },
+        ),
+        reactionPopupConfig: ReactionPopupConfiguration(
+          shadow: BoxShadow(
+            color: isDarkTheme ? Colors.black54 : Colors.grey.shade400,
+            blurRadius: 20,
+          ),
+          backgroundColor: theme.reactionPopupColor,
+        ),
         messageConfig: MessageConfiguration(
-          messageReactionConfig: const MessageReactionConfiguration(
-            backgroundColor: Color(0xFF2A2A3D),
-            borderColor: Colors.tealAccent,
-            reactedUserCountTextStyle: TextStyle(color: Colors.white),
-            reactionCountTextStyle: TextStyle(color: Colors.white),
+          messageReactionConfig: MessageReactionConfiguration(
+            backgroundColor: theme.messageReactionBackGroundColor,
+            borderColor: theme.messageReactionBackGroundColor,
+            reactedUserCountTextStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
+            reactionCountTextStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
             reactionsBottomSheetConfig: ReactionsBottomSheetConfiguration(
-              backgroundColor: Color(0xFF1E1E2C),
-              reactedUserTextStyle: TextStyle(color: Colors.white),
+              backgroundColor: theme.backgroundColor,
+              reactedUserTextStyle: TextStyle(
+                color: theme.inComingChatBubbleTextColor,
+              ),
               reactionWidgetDecoration: BoxDecoration(
-                color: Color(0xFF2A2A3D),
-                shape: BoxShape.circle,
+                color: theme.inComingChatBubbleColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: isDarkTheme
+                        ? Colors.black12
+                        : Colors.grey.shade200,
+                    offset: const Offset(0, 20),
+                    blurRadius: 40,
+                  )
+                ],
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
@@ -894,29 +971,47 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
               }
             },
             shareIconConfig: ShareIconConfiguration(
-              defaultIconBackgroundColor: Color(0xFF1E1E2C),
-              defaultIconColor: Colors.tealAccent,
+              defaultIconBackgroundColor: theme.shareIconBackgroundColor,
+              defaultIconColor: theme.shareIconColor,
             ),
           ),
         ),
         profileCircleConfig: ProfileCircleConfiguration(
           profileImageUrl: typingUserIdProfilePic,
         ),
-        repliedMessageConfig: const RepliedMessageConfiguration(
-          backgroundColor: Color(0xFF1E1E2C),
-          verticalBarColor: Colors.tealAccent,
-          repliedMsgAutoScrollConfig: RepliedMsgAutoScrollConfig(),
+        repliedMessageConfig: RepliedMessageConfiguration(
+          backgroundColor: theme.repliedMessageColor,
+          verticalBarColor: theme.verticalBarColor,
+          repliedMsgAutoScrollConfig: const RepliedMsgAutoScrollConfig(
+            enableHighlightRepliedMsg: true,
+            highlightColor: Colors.pinkAccent,
+            highlightScale: 1.1,
+          ),
+          textStyle: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.25,
+          ),
+          replyTitleTextStyle: TextStyle(color: theme.repliedTitleTextColor),
         ),
-        swipeToReplyConfig: const SwipeToReplyConfiguration(
-          replyIconColor: Colors.tealAccent,
+        swipeToReplyConfig: SwipeToReplyConfiguration(
+          replyIconColor: theme.swipeToReplyIconColor,
         ),
-        replyPopupConfig: ReplyPopupConfiguration(
-          backgroundColor: const Color(0xFF1E1E2C),
-          buttonTextStyle: const TextStyle(color: Colors.white),
-          onUnsendTap: unsendMessage,
-          onMoreTap: (message, sentByCurrentUser) {
-            _openMore(message, sentByCurrentUser);
-          },
+        scrollToBottomButtonConfig: ScrollToBottomButtonConfig(
+          backgroundColor: theme.textFieldBackgroundColor,
+          border: Border.all(
+            color: isDarkTheme ? Colors.transparent : Colors.grey,
+          ),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: theme.themeIconColor,
+            weight: 10,
+            size: 30,
+          ),
+        ),
+        typeIndicatorConfig: TypeIndicatorConfiguration(
+          flashingCircleBrightColor: theme.flashingCircleBrightColor,
+          flashingCircleDarkColor: theme.flashingCircleDarkColor,
         ),
       ),
     );
