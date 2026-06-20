@@ -80,8 +80,7 @@ class _RecomandedgroupsState extends State<Recomandedgroups>
       isLoading = true;
     });
     try {
-      PaginatedGroupResult result =
-          await GroupsService.getRecommendedGroups();
+      PaginatedGroupResult result = await GroupsService.getRecommendedGroups();
       groups = result.groups;
       print(groups);
     } catch (error) {

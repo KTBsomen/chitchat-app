@@ -12,7 +12,7 @@ import 'package:chitchat/screens/story.dart';
 import 'package:chitchat/screens/watchlist.dart';
 import 'package:chitchat/services/chats.dart';
 import 'package:chitchat/services/story.dart';
-import 'package:deep_link_router/deep_link_router.dart';
+import 'package:chitchat/services/deferred_link_service.dart';
 import 'package:event_handeler/event_handeler.dart';
 import 'package:shimmer/shimmer.dart';
 import "package:story_view/story_view.dart";
@@ -60,13 +60,6 @@ class _HomePageState extends State<HomePage> {
   bool _isRefreshing = false;
   List<dynamic> _feedItems = [];
   StreamSubscription? _subscription;
-  Future<void> _handelDeepLinks() async {
-    Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
-    print("Pending Link on homepage: $pendingLink");
-    if (pendingLink != null) {
-      await DeepLinkRouter.completePendingNavigation(context);
-    }
-  }
 
   @override
   void initState() {
@@ -74,7 +67,14 @@ class _HomePageState extends State<HomePage> {
     _scrollController.addListener(_onScroll);
     AppVariables.registerState(this);
     AppVariables.set("selectedTabIndex", 0);
-    _handelDeepLinks();
+    // Try once after the first frame in case the screen that pushed us here
+    // did not already dispatch (e.g. legacy code paths). dispatchPendingDeepLink
+    // is idempotent — if there is no pending URI it returns false silently,
+    // and if there is one it pushes the target on top of HomePage via
+    // navigatorKey.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DeferredLinkService.dispatchPendingDeepLink();
+    });
     _loadMoreItems(invalidate: "true");
     _getMyStories();
     _getStories();

@@ -18,7 +18,7 @@ packages:
     source: hosted
     version: "5.0.1"
   android_play_install_referrer:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: android_play_install_referrer
       sha256: cba8387c1aaa35d2441159beebe5e9160901c44632d02d0579c6875756ecb798
@@ -34,7 +34,7 @@ packages:
     source: hosted
     version: "3.0.3"
   app_links:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: app_links
       sha256: "5f88447519add627fe1cbcab4fd1da3d4fed15b9baf29f28b22535c95ecee3e8"
@@ -286,12 +286,10 @@ packages:
   deep_link_router:
     dependency: "direct main"
     description:
-      path: "."
-      ref: HEAD
-      resolved-ref: d7b23717c6041978ad26fbcb925b9693a4a21eb4
-      url: "https://github.com/KTBsomen/deep_link_router.git"
-    source: git
-    version: "0.0.3"
+      path: "packages/deep_link_router"
+      relative: true
+    source: path
+    version: "0.1.0"
   dio:
     dependency: "direct main"
     description:

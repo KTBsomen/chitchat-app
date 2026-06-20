@@ -1,7 +1,7 @@
 name: chitchat
 description: "Social media for Gen Z"
-publish_to: 'none'
-version: 2.0.0+2
+publish_to: "none"
+version: 2.0.0+7
 
 environment:
   sdk: ^3.5.4
@@ -23,13 +23,14 @@ dependencies:
   youtube_player_flutter: ^9.1.1
   shimmer: ^3.0.0
   just_audio: ^0.10.5
-  video_player: 
+  video_player:
   flutter_expandable_fab: ^2.3.0
   event_handeler: ^0.0.2
   file_picker: ^10.3.3
   vs_story_designer: ^2.2.0
   share_plus: ^12.0.0
   oktoast: ^3.4.0
+  app_links: ^6.4.1
   camerawesome: ^2.5.0
   permission_handler: ^11.4.0
   better_open_file:
@@ -44,9 +45,7 @@ dependencies:
       url: https://github.com/KTBsomen/chatview.git
     # path: ../../../chatview
   deep_link_router:
-    git:
-      url: https://github.com/KTBsomen/deep_link_router.git
-    # path: ../../../deep_link_router
+    path: packages/deep_link_router
   mqtt_client: ^10.5.1
   flutterdb: ^0.0.4
   jitsi_meet_flutter_sdk: ^10.0.0
@@ -56,6 +55,7 @@ dependencies:
   flutter_local_notifications: ^19.2.1
   easy_video_editor: ^0.1.2
   connectivity_plus: ^7.0.0
+  android_play_install_referrer: ^0.4.0
   geolocator: ^14.0.2
   visibility_detector: ^0.4.0+2
   flutter_map: ^8.2.2
@@ -75,7 +75,6 @@ flutter:
     - assets/images/
     - assets/emojies/
     - lib/constants/india-states-districts-latest.json
-  
 
   fonts:
     - family: PassionOne
@@ -91,14 +90,6 @@ flutter:
           weight: 700
         - asset: assets/fonts/Poppins/Poppins-Italic.ttf
           style: italic
-
-
-
-
-
-
-
-
 # name: chitchat
 # description: "A new Flutter project."
 # publish_to: 'none'
@@ -164,7 +155,6 @@ flutter:
 #     - assets/fonts/
 #     - assets/images/
 #     - assets/emojies/
-  
 
 #   fonts:
 #     - family: PassionOne

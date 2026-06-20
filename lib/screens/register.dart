@@ -14,7 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:page_transition/page_transition.dart';
-import 'package:deep_link_router/deep_link_router.dart';
+import 'package:chitchat/services/deferred_link_service.dart';
 
 import '../components/AdvancedTextFormField.dart';
 import '../components/SelectionBottomSheet.dart';
@@ -243,10 +243,39 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       print("User: $user");
       await UserService.setAccessToken(data['token']);
       await UserService.setUserId(user['_id']);
+      // Mark the user as logged in so the next cold start follows the
+      // logged-in branch in main.dart instead of dropping back to onboarding.
+      await UserService.setLoggedIn(true);
       AppVariables.update("serverProfile", user);
-      await DeepLinkRouter.completePendingNavigation(context);
 
-      // Registration successful
+      if (!mounted) return;
+
+      // Explicitly dismiss the "Registering..." dialog before navigating so
+      // pushReplacement targets RegistrationScreen (not the dialog) and the
+      // navigator stack stays clean.
+      Navigator.of(context, rootNavigator: true).pop();
+
+      final pendingLink =
+          await DeferredLinkService.preparePendingDeepLinkForRouter();
+      if (!mounted) return;
+
+      if (pendingLink != null) {
+        Navigator.pushReplacement(
+          context,
+          PageTransition(
+              isIos: true,
+              child: HomePage(),
+              type: PageTransitionType.leftToRight),
+        );
+        // Dispatch the deep link AFTER the HomePage transition settles. The
+        // helper schedules itself on a post-frame callback and dispatches
+        // through navigatorKey, so it does not depend on this State's
+        // BuildContext remaining mounted.
+        await DeferredLinkService.dispatchPendingDeepLink();
+        return;
+      }
+
+      // Registration successful, no pending deep link.
       Navigator.pushReplacement(
         context,
         PageTransition(
@@ -923,7 +952,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 "School",
                                 "College",
                                 "University",
-                                "Passout"
                               ]
                                   .map((e) => DropdownMenuItem(
                                       value: e, child: Text(e)))
@@ -1006,10 +1034,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                             ],
 
                             // Passout fields - only state and district
-                            if (_educationalBackground == "Passout") ...[
-                              const SizedBox(height: 16),
-                              _buildStateDistrictSelectors(),
-                            ],
+                            // if (_educationalBackground == "Passout") ...[
+                            //   const SizedBox(height: 16),
+                            //   _buildStateDistrictSelectors(),
+                            // ],
                           ],
                         ),
                       ),

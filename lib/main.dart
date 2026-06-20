@@ -19,11 +19,12 @@ import 'firebase_options.dart';
 import 'screens/groupPublic.dart';
 import 'screens/home.dart';
 import 'screens/register.dart';
+import 'screens/profilePublic.dart';
+import 'screens/post_detail.dart';
 import 'package:oktoast/oktoast.dart';
 import 'package:deep_link_router/deep_link_router.dart';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'services/deferred_link_service.dart';
 import 'screens/chat.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -46,6 +47,8 @@ void main() async {
 }
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -64,7 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    DeepLinkRouter.instance.configure(routes: [
+    DeepLinkRouter.instance.configure(navigatorKey: navigatorKey, routes: [
+      // ── Group Join ──
       DeepLinkRoute(
         matcher: (uri) =>
             uri.path == '/join' && uri.queryParameters.containsKey('group'),
@@ -80,17 +84,67 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         },
       ),
+      // ── User Profile ──
+      DeepLinkRoute(
+        matcher: (uri) {
+          final segments = uri.pathSegments;
+          return segments.length == 3 && segments[0] == 'user';
+        },
+        handler: (context, uri) async {
+          try {
+            final dbIndex = uri.pathSegments[1];
+            final uid = uri.pathSegments[2];
+            navigatorKey.currentState?.push(MaterialPageRoute(
+              builder: (_) => PublicProfilePage(dbIndex: dbIndex, uid: uid),
+            ));
+            return true;
+          } catch (e) {
+            return false;
+          }
+        },
+      ),
+      // ── Post Detail ──
+      DeepLinkRoute(
+        matcher: (uri) {
+          final segments = uri.pathSegments;
+          return segments.length == 2 && segments[0] == 'post';
+        },
+        handler: (context, uri) async {
+          try {
+            final postId = uri.pathSegments[1];
+            navigatorKey.currentState?.push(MaterialPageRoute(
+              builder: (_) => PostDetailScreen(postId: postId),
+            ));
+            return true;
+          } catch (e) {
+            return false;
+          }
+        },
+      ),
+      // ── General Invite (opens home, referral tracked server-side) ──
+      DeepLinkRoute(
+        matcher: (uri) => uri.path == '/invite',
+        handler: (context, uri) async {
+          navigatorKey.currentState?.pushReplacement(MaterialPageRoute(
+            builder: (_) => HomePage(),
+          ));
+          return true;
+        },
+      ),
     ]);
-    try {
-      DeepLinkRouter.instance.initialize(context);
-    } catch (e) {
-      print("DeepLinkRouter initialization error: $e");
-    }
+    // Warm-link listener only. Cold-start capture lives in
+    // DeferredLinkService so the two paths do not race over getInitialLink().
+    DeepLinkRouter.instance.initialize().catchError((e) {
+      debugPrint('DeepLinkRouter initialization error: $e');
+    });
 
     // AppVariables.update('baseurl', 'https://jdhd235g-3000.asse.devtunnels.ms');
     AppVariables.update('baseurl', 'https://chitzchat.com/api/v1');
 
+    final startupLinksReady = DeferredLinkService.checkAndStoreStartupLinks();
+
     UserService.isLoggedIn().then((value) async {
+      await startupLinksReady;
       if (value) {
         await UserService.refreshFCMToken();
         Map<String, dynamic> result = await UserService.fetchMyProfile();
@@ -115,18 +169,22 @@ class _LoginScreenState extends State<LoginScreen> {
           }
           return;
         }
-        Uri? pendingLink = await DeepLinkRouter.getPendingDeepLink();
-        if (pendingLink != null) {
-          await DeepLinkRouter.completePendingNavigation(context);
-        } else {
-          Navigator.pushReplacement(
-              context,
-              PageTransition(
-                  isIos: true,
-                  type: PageTransitionType.leftToRight,
-                  child: HomePage()));
+        if (!mounted) return;
+        Navigator.pushReplacement(
+            context,
+            PageTransition(
+                isIos: true,
+                type: PageTransitionType.leftToRight,
+                child: HomePage()));
+        // Dispatch any pending deep link AFTER the new route is in the
+        // stack. dispatchPendingDeepLink schedules itself on a post-frame
+        // callback and uses navigatorKey, so it does not depend on the
+        // (now-unmounted) LoginScreen context.
+        final dispatched = await DeferredLinkService.dispatchPendingDeepLink();
+        if (!dispatched) {
           // App is fully initialized — consume any pending FCM notification
-          // (e.g. user tapped a notification that launched the app from killed state)
+          // (e.g. user tapped a notification that launched the app from
+          // killed state).
           WidgetsBinding.instance.addPostFrameCallback((_) {
             FCMHandler.consumePendingNotification();
           });
@@ -174,7 +232,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     showSplashScreen = true;
                                     isAccountPendingDeletion = false;
                                   });
-                                  Future.delayed(Duration(seconds: 1), () {
+                                  Future.delayed(Duration(seconds: 1),
+                                      () async {
+                                    if (!mounted) return;
                                     Navigator.pushReplacement(
                                         context,
                                         PageTransition(
@@ -182,6 +242,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                             type:
                                                 PageTransitionType.leftToRight,
                                             child: HomePage()));
+                                    // Existing user → consume any pending
+                                    // (cold-start or deferred) deep link
+                                    // after the HomePage transition settles.
+                                    await DeferredLinkService
+                                        .dispatchPendingDeepLink();
                                   });
                                 } else {
                                   setState(() {
@@ -319,8 +384,7 @@ class OnboardingScreen extends StatefulWidget {
   final VoidCallback onAdminLogin;
 
   const OnboardingScreen(
-      {Key? key, required this.onGoogleLogin, required this.onAdminLogin})
-      : super(key: key);
+      {super.key, required this.onGoogleLogin, required this.onAdminLogin});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
