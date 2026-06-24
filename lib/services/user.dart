@@ -8,6 +8,7 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/services/fcm.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class UserService {
   static const String _keyIsLoggedIn = 'isLoggedIn';
@@ -116,7 +117,13 @@ class UserService {
         await setUserId(user['_id']);
         print('Signedin: ${googleUser.displayName}');
         print('FCM Token: $token');
-        AppVariables.update("userProfile", googleUser);
+        final profile = AuthProfile(
+          email: googleUser.email,
+          name: googleUser.displayName,
+          photoUrl: googleUser.photoUrl,
+          provider: 'google',
+        );
+        AppVariables.update("userProfile", profile);
         AppVariables.update("serverProfile", user);
         AppVariables.update("fcmToken", token);
         await FCMService.uploadFcmToken(token!);
@@ -134,7 +141,13 @@ class UserService {
         throw Exception('Invalid Token try to login again');
       } else if (response.statusCode == 404) {
         //user not found so needs to registerd.
-        AppVariables.update("userProfile", googleUser);
+        final profile = AuthProfile(
+          email: googleUser.email,
+          name: googleUser.displayName,
+          photoUrl: googleUser.photoUrl,
+          provider: 'google',
+        );
+        AppVariables.update("userProfile", profile);
       } else {
         throw Exception('Failed to authenticate with server');
       }
@@ -153,6 +166,106 @@ class UserService {
     } catch (e) {
       print('Error signing in with Google: $e');
       rethrow; // Re-throw to handle in UI
+    } finally {
+      onLoading(false);
+    }
+  }
+
+  /// Signs in the user using Apple authentication.
+  static Future<void> signInWithApple(Function(bool) onLoading) async {
+    onLoading(true);
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final String? identityToken = credential.identityToken;
+      if (identityToken == null) {
+        throw Exception('Apple Sign-In failed: No identity token returned');
+      }
+
+      // Reconstruct user's name if provided by Apple (only first time)
+      String? name;
+      if (credential.givenName != null || credential.familyName != null) {
+        name = '${credential.givenName ?? ''} ${credential.familyName ?? ''}'.trim();
+      }
+
+      String? token = await FCMService.getFcmToken();
+      if (token != null) {
+        AppVariables.update("fcmToken", token);
+        setFcmToken(token);
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppVariables.get("baseurl")}/apple/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': identityToken,
+          if (name != null && name.isNotEmpty) 'name': name,
+        }),
+      );
+
+      final authProfile = AuthProfile(
+        email: credential.email ?? '',
+        name: name,
+        photoUrl: null,
+        provider: 'apple',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print(data);
+        Map<String, dynamic> user = data['user'] as Map<String, dynamic>;
+        await setAccessToken(data['token']);
+        await setLoggedIn(true);
+        await setUserId(user['_id']);
+        print('Signed in with Apple: ${user['name']}');
+        print('FCM Token: $token');
+        
+        final finalProfile = AuthProfile(
+          email: user['email'] ?? authProfile.email,
+          name: user['name'] ?? authProfile.name,
+          photoUrl: user['profilePic'],
+          provider: 'apple',
+        );
+
+        AppVariables.update("userProfile", finalProfile);
+        AppVariables.update("serverProfile", user);
+        AppVariables.update("fcmToken", token);
+        await FCMService.uploadFcmToken(token!);
+        await fetchMyProfile();
+      } else if (response.statusCode == 403) {
+        final data = jsonDecode(response.body);
+        await UserService.signOut(onLoading);
+
+        if (data['code'] == 'account_pending_deletion') {
+          throw Exception('ACCOUNT_PENDING_DELETION');
+        }
+        throw Exception(data['message'] ?? 'Access denied');
+      } else if (response.statusCode == 401) {
+        await UserService.signOut(onLoading);
+        throw Exception('Invalid Token try to login again');
+      } else if (response.statusCode == 404) {
+        // User not found so needs to be registered.
+        final data = jsonDecode(response.body);
+        final details = data['detailsFromApple'] ?? {};
+        
+        final registrationProfile = AuthProfile(
+          email: details['email'] ?? authProfile.email,
+          name: details['name'] ?? authProfile.name,
+          photoUrl: null,
+          provider: 'apple',
+        );
+        AppVariables.update("userProfile", registrationProfile);
+      } else {
+        throw Exception('Failed to authenticate with server');
+      }
+    } catch (e) {
+      print('Error signing in with Apple: $e');
+      rethrow;
     } finally {
       onLoading(false);
     }
@@ -509,4 +622,18 @@ class UserService {
       return {"success": false, "error": e.toString()};
     }
   }
+}
+
+class AuthProfile {
+  final String email;
+  final String? name;
+  final String? photoUrl;
+  final String provider;
+
+  AuthProfile({
+    required this.email,
+    this.name,
+    this.photoUrl,
+    required this.provider,
+  });
 }

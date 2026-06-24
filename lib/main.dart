@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:chitchat/appstate/storyPrefs.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/comments.dart';
@@ -61,6 +63,59 @@ class _LoginScreenState extends State<LoginScreen> {
   void setLoading(bool loading) {
     setState(() {
       isLoading = loading;
+    });
+  }
+
+  void _handlePostSignIn(Future<void> signInFuture, String providerName) {
+    signInFuture.then((_) {
+      UserService.isLoggedIn().then((value) {
+        if (value) {
+          setState(() {
+            showSplashScreen = true;
+            isAccountPendingDeletion = false;
+          });
+          Future.delayed(Duration(seconds: 1), () async {
+            if (!mounted) return;
+            Navigator.pushReplacement(
+                context,
+                PageTransition(
+                    isIos: true,
+                    type: PageTransitionType.leftToRight,
+                    child: HomePage()));
+            await DeferredLinkService.dispatchPendingDeepLink();
+          });
+        } else {
+          setState(() {
+            showSplashScreen = false;
+            isAccountPendingDeletion = false;
+          });
+          Navigator.pushReplacement(
+              context,
+              PageTransition(
+                  isIos: true,
+                  type: PageTransitionType.leftToRight,
+                  child: RegistrationScreen()));
+        }
+      });
+    }).catchError((error) {
+      if (error.toString().contains('ACCOUNT_PENDING_DELETION')) {
+        setState(() {
+          isAccountPendingDeletion = true;
+        });
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Sign-In Error'),
+            content: Text('Failed to sign in with $providerName: $error'),
+            actions: [
+              TextButton(
+                  child: const Text('OK'),
+                  onPressed: () => Navigator.of(context).pop()),
+            ],
+          ),
+        );
+      }
     });
   }
 
@@ -224,68 +279,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   OnboardingScreen(
                     onGoogleLogin: isLoading
                         ? null
-                        : () {
-                            UserService.signInWithGoogle(setLoading).then((_) {
-                              UserService.isLoggedIn().then((value) {
-                                if (value) {
-                                  setState(() {
-                                    showSplashScreen = true;
-                                    isAccountPendingDeletion = false;
-                                  });
-                                  Future.delayed(Duration(seconds: 1),
-                                      () async {
-                                    if (!mounted) return;
-                                    Navigator.pushReplacement(
-                                        context,
-                                        PageTransition(
-                                            isIos: true,
-                                            type:
-                                                PageTransitionType.leftToRight,
-                                            child: HomePage()));
-                                    // Existing user → consume any pending
-                                    // (cold-start or deferred) deep link
-                                    // after the HomePage transition settles.
-                                    await DeferredLinkService
-                                        .dispatchPendingDeepLink();
-                                  });
-                                } else {
-                                  setState(() {
-                                    showSplashScreen = false;
-                                    isAccountPendingDeletion = false;
-                                  });
-                                  Navigator.pushReplacement(
-                                      context,
-                                      PageTransition(
-                                          isIos: true,
-                                          type: PageTransitionType.leftToRight,
-                                          child: RegistrationScreen()));
-                                }
-                              });
-                            }).catchError((error) {
-                              if (error
-                                  .toString()
-                                  .contains('ACCOUNT_PENDING_DELETION')) {
-                                setState(() {
-                                  isAccountPendingDeletion = true;
-                                });
-                              } else {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: Text('Sign-In Error'),
-                                    content: Text(
-                                        'Failed to sign in with Google: $error'),
-                                    actions: [
-                                      TextButton(
-                                          child: Text('OK'),
-                                          onPressed: () =>
-                                              Navigator.of(context).pop()),
-                                    ],
-                                  ),
-                                );
-                              }
-                            });
-                          },
+                        : () => _handlePostSignIn(
+                              UserService.signInWithGoogle(setLoading),
+                              'Google',
+                            ),
+                    onAppleLogin: isLoading
+                        ? null
+                        : () => _handlePostSignIn(
+                              UserService.signInWithApple(setLoading),
+                              'Apple',
+                            ),
                     onAdminLogin: () {
                       Navigator.push(
                           context,
@@ -381,10 +384,15 @@ class _LoginScreenState extends State<LoginScreen> {
 // ─────────────────────────────────────────────
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback? onGoogleLogin;
+  final VoidCallback? onAppleLogin;
   final VoidCallback onAdminLogin;
 
-  const OnboardingScreen(
-      {super.key, required this.onGoogleLogin, required this.onAdminLogin});
+  const OnboardingScreen({
+    super.key,
+    required this.onGoogleLogin,
+    required this.onAppleLogin,
+    required this.onAdminLogin,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -466,6 +474,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     letterSpacing: 0.5)),
           ),
         ),
+        if (Platform.isIOS) ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 50.0),
+            child: SignInWithAppleButton(
+              onPressed: widget.onAppleLogin ?? () {},
+              height: 54,
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+        ],
         TextButton(
           onPressed: widget.onAdminLogin,
           child: const Text('Admin Login',

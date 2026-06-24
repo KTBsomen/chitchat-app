@@ -127,6 +127,12 @@ class _SelectionBottomSheetState<T> extends State<SelectionBottomSheet<T>> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _searchController,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
               decoration: InputDecoration(
                 hintText: 'Search...',
                 hintStyle: TextStyle(color: Colors.grey[400]),

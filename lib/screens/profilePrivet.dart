@@ -660,7 +660,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                     "https://chitzchat.com/#contact"));
               }
               if (value == 'privacy') {
-                launchUrl(Uri.parse("https://chitzchat.com/privacy"));
+                launchUrl(
+                    Uri.parse("https://chitzchat.com/privacy-policy.html"));
               }
               if (value == 'delete_account') {
                 _showDeleteAccountConfirmation(context);

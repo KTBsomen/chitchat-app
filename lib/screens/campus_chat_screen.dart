@@ -505,7 +505,8 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
 
   void _handleMessage(String message, {String? topic}) {
     if (topic != null && !topic.startsWith(_campusTopic)) {
-      print("Ignoring personal/other group message from topic: $topic (current campus topic: $_campusTopic)");
+      print(
+          "Ignoring personal/other group message from topic: $topic (current campus topic: $_campusTopic)");
       return;
     }
     try {
@@ -673,28 +674,6 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
             message.setStatus = MessageStatus.undelivered;
             messageQueue.add(message);
           }
-
-          // Auto-add media to memories (fire-and-forget, skip duplicates)
-          final url = uploadResponse.publicUrl;
-          final myGroupId = AppVariables.get<String>('myGroupId');
-          if ((messageType == MessageType.image ||
-                  messageType == MessageType.video) &&
-              myGroupId != null &&
-              !_memorySentUrls.contains(url) &&
-              !isOneTime) {
-            _memorySentUrls.add(url);
-            PostService.createMemories(
-              files: [url],
-              myGroupId: myGroupId,
-            ).then((result) {
-              if (result['success']) {
-                print('[MEMORY] Auto-saved chat media as memory');
-              } else {
-                print('[MEMORY] Failed: ${result['error']}');
-                _memorySentUrls.remove(url); // allow retry
-              }
-            });
-          }
         }).catchError((error) {
           print('Upload failed: $error');
           message.setStatus = MessageStatus.error;
@@ -757,7 +736,8 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
         backgroundColor: theme.appBarColor,
         elevation: theme.elevation ?? 1,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: theme.backArrowColor, size: 20),
+          icon:
+              Icon(Icons.arrow_back_ios, color: theme.backArrowColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: GestureDetector(
@@ -900,11 +880,13 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
               bodyStyle: theme.incomingChatLinkBodyStyle,
               titleStyle: theme.incomingChatLinkTitleStyle,
             ),
-            textStyle: TextStyle(color: theme.inComingChatBubbleTextColor, fontSize: 16),
+            textStyle: TextStyle(
+                color: theme.inComingChatBubbleTextColor, fontSize: 16),
             onMessageRead: (message) {
               _markAsRead(message);
             },
-            senderNameTextStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
+            senderNameTextStyle:
+                TextStyle(color: theme.inComingChatBubbleTextColor),
             color: theme.inComingChatBubbleColor,
           ),
         ),
@@ -928,8 +910,10 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
           messageReactionConfig: MessageReactionConfiguration(
             backgroundColor: theme.messageReactionBackGroundColor,
             borderColor: theme.messageReactionBackGroundColor,
-            reactedUserCountTextStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
-            reactionCountTextStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
+            reactedUserCountTextStyle:
+                TextStyle(color: theme.inComingChatBubbleTextColor),
+            reactionCountTextStyle:
+                TextStyle(color: theme.inComingChatBubbleTextColor),
             reactionsBottomSheetConfig: ReactionsBottomSheetConfiguration(
               backgroundColor: theme.backgroundColor,
               reactedUserTextStyle: TextStyle(
@@ -939,9 +923,7 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
                 color: theme.inComingChatBubbleColor,
                 boxShadow: [
                   BoxShadow(
-                    color: isDarkTheme
-                        ? Colors.black12
-                        : Colors.grey.shade200,
+                    color: isDarkTheme ? Colors.black12 : Colors.grey.shade200,
                     offset: const Offset(0, 20),
                     blurRadius: 40,
                   )

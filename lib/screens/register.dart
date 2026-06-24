@@ -141,8 +141,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      GoogleSignInAccount? googleUser =
-          AppVariables.get<GoogleSignInAccount>('userProfile');
+      AuthProfile? googleUser = AppVariables.get<AuthProfile>('userProfile');
       if (googleUser == null) {
         // Handle the case where the user is not signed in
         showDialog(
@@ -189,8 +188,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         );
       },
     );
-    GoogleSignInAccount? googleUser =
-        AppVariables.get<GoogleSignInAccount>('userProfile');
+    AuthProfile? googleUser = AppVariables.get<AuthProfile>('userProfile');
     List<String?> value = [googleUser?.photoUrl];
     if (_profilePicPath != null) {
       // Upload image to S3
@@ -807,11 +805,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         child: Column(
                           children: [
                             TextFormField(
+                              maxLength: 30,
                               decoration:
                                   const InputDecoration(labelText: "Name"),
                               validator: (value) => value!.isEmpty ||
                                       value.length < 3
-                                  ? "Name is required and must be 3 characters long "
+                                  ? "Name is required and must be minimum 3 or maximum 30 characters long "
                                   : null,
                               onChanged: (value) => _name = value,
                               autofocus: true,
@@ -866,6 +865,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               },
                             ),
                             TextFormField(
+                              maxLength: 15,
                               controller: _usernameController,
                               validator: (value) {
                                 if (_isCheckingUsername) {
