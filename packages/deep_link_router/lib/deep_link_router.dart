@@ -47,6 +47,11 @@ class DeepLinkRouter {
   AppLinks? _appLinks;
   StreamSubscription<Uri>? _uriSub;
 
+  /// When `false`, the warm-link stream listener is a no-op.  The host app
+  /// must call [markReadyForWarmLinks] once the initial navigation is
+  /// complete so that only genuine warm-start links are dispatched.
+  bool _readyForWarmLinks = false;
+
   /// Configures routes and an optional fallback handler.
   ///
   /// Pass a [navigatorKey] so the router can dispatch links without depending
@@ -87,7 +92,21 @@ class DeepLinkRouter {
     _uriSub = null;
   }
 
+  /// Signals that the app has finished its cold-start navigation and is ready
+  /// to accept warm-link dispatches.  Must be called exactly once after the
+  /// initial route (e.g. HomePage) is settled and any cold-start deep link has
+  /// been consumed.
+  void markReadyForWarmLinks() {
+    _readyForWarmLinks = true;
+  }
+
   void _onWarmLink(Uri uri) {
+    if (!_readyForWarmLinks) {
+      // Ignore links that arrive before the app is done with cold-start
+      // navigation — those are handled by DeferredLinkService.
+      debugPrint('[DeepLinkRouter] Ignoring warm-link during cold start: $uri');
+      return;
+    }
     // Defer to the next frame so the navigator is in a stable state.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _matchAndHandle(uri);

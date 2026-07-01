@@ -62,6 +62,7 @@ class FriendCircleLayout extends StatelessWidget {
       onMemberTap;
   final ScrollController? scrollController;
   final EdgeStyle defaultEdgeStyle;
+  final Widget? footerWidget;
 
   const FriendCircleLayout({
     Key? key,
@@ -72,17 +73,24 @@ class FriendCircleLayout extends StatelessWidget {
     this.onMemberTap,
     this.scrollController,
     this.defaultEdgeStyle = const EdgeStyle(),
+    this.footerWidget,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final hasFooter = footerWidget != null;
+    final itemCount = groups.length + (hasFooter ? 1 : 0);
+
     return MasonryGridView.count(
       controller: scrollController,
       crossAxisCount: crossAxisCount,
       mainAxisSpacing: spacing,
       crossAxisSpacing: spacing,
-      itemCount: groups.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        if (index >= groups.length) {
+          return footerWidget!;
+        }
         final group = groups[index];
         return _buildFriendCircleItem(context, group);
       },

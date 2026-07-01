@@ -83,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     type: PageTransitionType.leftToRight,
                     child: HomePage()));
             await DeferredLinkService.dispatchPendingDeepLink();
+            DeepLinkRouter.instance.markReadyForWarmLinks();
           });
         } else {
           setState(() {
@@ -236,6 +237,8 @@ class _LoginScreenState extends State<LoginScreen> {
         // callback and uses navigatorKey, so it does not depend on the
         // (now-unmounted) LoginScreen context.
         final dispatched = await DeferredLinkService.dispatchPendingDeepLink();
+        // Cold-start navigation is settled — open the warm-link gate.
+        DeepLinkRouter.instance.markReadyForWarmLinks();
         if (!dispatched) {
           // App is fully initialized — consume any pending FCM notification
           // (e.g. user tapped a notification that launched the app from
@@ -245,6 +248,8 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         }
       } else {
+        // Not logged in — cold-start phase is still over, open the gate.
+        DeepLinkRouter.instance.markReadyForWarmLinks();
         setState(() {
           showSplashScreen = false;
         });

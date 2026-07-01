@@ -38,7 +38,14 @@ class _SearchPageState extends State<SearchPage> {
   double scale = 0.0;
   bool isLoading = true;
   bool isLoadingError = false;
+  bool isLoadingMoreGroups = false;
   Map<String, dynamic> myUniversity = {};
+
+  // Cursor-based pagination state for recommended groups
+  String? _groupCursor;
+  bool _groupHasMore = true;
+  final ScrollController _groupScrollController = ScrollController();
+
   String get _educationLevel {
     return AppVariables.get<Map<String, dynamic>>(
             "profile")?["educationLevel"] ??
@@ -142,16 +149,36 @@ class _SearchPageState extends State<SearchPage> {
     _fetchRecommendedInstitutions();
     _getGroups();
     selectedType = _educationLevel;
+    _groupScrollController.addListener(_onGroupScroll);
     setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _groupScrollController.dispose();
+    super.dispose();
+  }
+
+  void _onGroupScroll() {
+    if (_groupScrollController.position.pixels >=
+            _groupScrollController.position.maxScrollExtent - 300 &&
+        !isLoadingMoreGroups &&
+        _groupHasMore) {
+      _loadMoreGroups();
+    }
   }
 
   _getGroups() async {
     setState(() {
       isLoading = true;
+      _groupCursor = null;
+      _groupHasMore = true;
     });
     try {
       final result = await GroupsService.getRecommendedGroups();
       groups = result.groups;
+      _groupCursor = result.nextCursor;
+      _groupHasMore = result.hasMore;
       print(groups);
     } catch (error) {
       print(error);
@@ -165,6 +192,33 @@ class _SearchPageState extends State<SearchPage> {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMoreGroups() async {
+    if (isLoadingMoreGroups || !_groupHasMore) return;
+
+    setState(() {
+      isLoadingMoreGroups = true;
+    });
+
+    try {
+      final result = await GroupsService.getRecommendedGroups(
+        cursor: _groupCursor,
+      );
+      setState(() {
+        groups.addAll(result.groups);
+        _groupCursor = result.nextCursor;
+        _groupHasMore = result.hasMore;
+      });
+    } catch (error) {
+      print('Error loading more groups: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingMoreGroups = false;
+        });
+      }
     }
   }
 
@@ -652,57 +706,71 @@ class _SearchPageState extends State<SearchPage> {
         ],
       ),
       Expanded(
-        child: InteractiveViewer(
-          onInteractionUpdate: (details) {
-            setState(() {
-              scale = details.scale;
-            });
-            print(details.scale);
-          },
-          maxScale: 10.0,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: FriendCircleLayout(
-              groups: groups,
-              spacing: 10 * scale,
-              crossAxisCount: 2,
-              defaultEdgeStyle: EdgeStyle(
-                  color: const Color.fromARGB(255, 189, 190, 190),
-                  width: 6,
-                  outerGlow: 3.0,
-                  outerGlowColor: Colors.blue.withOpacity(0.3),
-                  cornerRadius: 100.0,
-                  gradientColors: [
-                    Colors.blue,
-                    Colors.pink,
-                    Colors.orange,
-                  ]),
-              onGroupTap: (groupId, groupData) {
-                print('Group $groupId tapped with data: $groupData');
-                Navigator.push(
-                  context,
-                  PageTransition(
-                    type: PageTransitionType.rightToLeft,
-                    child: GroupPublicViewScreen(
-                      groupId: groupId,
-                    ),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: FriendCircleLayout(
+            scrollController: _groupScrollController,
+            groups: groups,
+            spacing: 10,
+            crossAxisCount: 2,
+            defaultEdgeStyle: EdgeStyle(
+                color: const Color.fromARGB(255, 189, 190, 190),
+                width: 6,
+                outerGlow: 3.0,
+                outerGlowColor: Colors.blue.withOpacity(0.3),
+                cornerRadius: 100.0,
+                gradientColors: [
+                  Colors.blue,
+                  Colors.pink,
+                  Colors.orange,
+                ]),
+            onGroupTap: (groupId, groupData) {
+              print('Group $groupId tapped with data: $groupData');
+              Navigator.push(
+                context,
+                PageTransition(
+                  type: PageTransitionType.rightToLeft,
+                  child: GroupPublicViewScreen(
+                    groupId: groupId,
                   ),
-                );
-              },
-              onMemberTap: (groupId, memberId, memberData) {
-                print(
-                    'Member $memberId in group $groupId tapped with data: $memberData');
-                Navigator.push(
-                  context,
-                  PageTransition(
-                    type: PageTransitionType.rightToLeft,
-                    child: GroupPublicViewScreen(
-                      groupId: groupId,
-                    ),
+                ),
+              );
+            },
+            onMemberTap: (groupId, memberId, memberData) {
+              print(
+                  'Member $memberId in group $groupId tapped with data: $memberData');
+              Navigator.push(
+                context,
+                PageTransition(
+                  type: PageTransitionType.rightToLeft,
+                  child: GroupPublicViewScreen(
+                    groupId: groupId,
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
+            footerWidget: isLoadingMoreGroups
+                ? Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white54,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  )
+                : (!_groupHasMore && groups.isNotEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Center(
+                          child: Text(
+                            'No more groups',
+                            style: TextStyle(
+                                color: Colors.white38, fontFamily: 'Poppins'),
+                          ),
+                        ),
+                      )
+                    : null),
           ),
         ),
       ),
