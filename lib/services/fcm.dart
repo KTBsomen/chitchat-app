@@ -261,7 +261,11 @@ class FCMHandler {
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+    const initSettings = InitializationSettings(android: androidSettings,iOS:  DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    ));
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse:

@@ -1,7 +1,7 @@
 name: chitchat
 description: "Social media for Gen Z"
 publish_to: "none"
-version: 2.0.0+9
+version: 2.0.0+11
 
 environment:
   sdk: ^3.5.4
@@ -20,7 +20,7 @@ dependencies:
   google_mlkit_face_detection: ^0.13.1
   image: ^4.3.0
   dio: ^5.7.0
-  page_transition: ^2.1.0
+  page_transition: ^2.2.2
   youtube_player_flutter: ^9.1.1
   shimmer: ^3.0.0
   just_audio: ^0.10.5

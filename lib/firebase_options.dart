@@ -68,7 +68,7 @@ class DefaultFirebaseOptions {
         '1075161631917-tbkvuvue4hlimsb0h65mkh9khfqsnjvq.apps.googleusercontent.com',
     iosClientId:
         '1075161631917-d5npdk2m3mu2klt1pb4vflsue4hnagu5.apps.googleusercontent.com',
-    iosBundleId: 'com.devansh.chit',
+    iosBundleId: 'com.devansh.chitchat',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
