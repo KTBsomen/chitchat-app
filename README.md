@@ -13,3 +13,4 @@ SO when i need to share my code i will share this modified library packges also 
 in chat 
 ## flutterdb packege in findBypage add 
 `   orderBy: 'created_at desc',`
+# chitchat-ios
