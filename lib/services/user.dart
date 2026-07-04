@@ -190,7 +190,8 @@ class UserService {
       // Reconstruct user's name if provided by Apple (only first time)
       String? name;
       if (credential.givenName != null || credential.familyName != null) {
-        name = '${credential.givenName ?? ''} ${credential.familyName ?? ''}'.trim();
+        name = '${credential.givenName ?? ''} ${credential.familyName ?? ''}'
+            .trim();
       }
 
       String? token = await FCMService.getFcmToken();
@@ -212,6 +213,7 @@ class UserService {
         email: credential.email ?? '',
         name: name,
         photoUrl: null,
+        appleId: credential.userIdentifier,
         provider: 'apple',
       );
 
@@ -224,11 +226,12 @@ class UserService {
         await setUserId(user['_id']);
         print('Signed in with Apple: ${user['name']}');
         print('FCM Token: $token');
-        
+
         final finalProfile = AuthProfile(
           email: user['email'] ?? authProfile.email,
           name: user['name'] ?? authProfile.name,
           photoUrl: user['profilePic'],
+          appleId: user['appleId'] ?? authProfile.appleId,
           provider: 'apple',
         );
 
@@ -252,11 +255,12 @@ class UserService {
         // User not found so needs to be registered.
         final data = jsonDecode(response.body);
         final details = data['detailsFromApple'] ?? {};
-        
+
         final registrationProfile = AuthProfile(
           email: details['email'] ?? authProfile.email,
           name: details['name'] ?? authProfile.name,
           photoUrl: null,
+          appleId: authProfile.appleId,
           provider: 'apple',
         );
         AppVariables.update("userProfile", registrationProfile);
@@ -629,11 +633,13 @@ class AuthProfile {
   final String? name;
   final String? photoUrl;
   final String provider;
+  final String? appleId;
 
   AuthProfile({
     required this.email,
     this.name,
     this.photoUrl,
     required this.provider,
+    this.appleId,
   });
 }

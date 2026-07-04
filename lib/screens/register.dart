@@ -202,6 +202,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final formData = {
       "name": _name,
       "email": googleUser?.email,
+      "appleId": googleUser?.appleId,
       "birthday": _birthday,
       "username": _username,
       "educationLevel": _educationalBackground,
