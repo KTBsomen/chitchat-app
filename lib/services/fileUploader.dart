@@ -86,8 +86,9 @@ class S3Uploader {
     bool showPresignedUrlProgress = false,
     CancelToken? cancelToken,
   }) async {
-    // Create progress tracker
-    progressNotifier.value = progressNotifier.value.copyWith(
+    // Create progress tracker and clear any caller-set customStageText
+    progressNotifier.value = FileUploadProgress(
+      fileName: progressNotifier.value.fileName,
       stage: UploadStage.preparing,
       totalFiles: files.length,
       currentFileIndex: 0,

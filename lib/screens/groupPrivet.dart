@@ -20,6 +20,7 @@ import 'package:chitchat/screens/profilePrivet.dart';
 import 'package:chitchat/screens/profilePublic.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
+import 'package:chitchat/services/media_normalizer.dart';
 import 'package:chitchat/services/posts.dart';
 import 'package:chitchat/services/user.dart';
 import 'package:chitchat/services/userOnline.dart';
@@ -709,15 +710,15 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
             children: [
               ListTile(
                 leading: const Icon(Icons.image, color: Colors.white),
-                title: const Text('Pick Image',
+                title: const Text('Pick Images',
                     style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
                   final ImagePicker _picker = ImagePicker();
-                  final XFile? image =
-                      await _picker.pickImage(source: ImageSource.gallery);
-                  if (image != null) {
-                    _handleDirectUpload(File(image.path));
+                  final List<XFile> images = await _picker.pickMultiImage();
+                  if (images.isNotEmpty) {
+                    _handleDirectUpload(
+                        images.map((x) => File(x.path)).toList());
                   }
                 },
               ),
@@ -729,10 +730,10 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
                 onTap: () async {
                   Navigator.pop(context);
                   final ImagePicker _picker = ImagePicker();
-                  final XFile? video =
-                      await _picker.pickVideo(source: ImageSource.gallery);
-                  if (video != null) {
-                    _handleDirectUpload(File(video.path));
+                  final List<XFile> videos = await _picker.pickMultiVideo();
+                  if (videos.isNotEmpty) {
+                    _handleDirectUpload(
+                        videos.map((x) => File(x.path)).toList());
                   }
                 },
               ),
@@ -744,16 +745,16 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
     );
   }
 
-  Future<void> _handleDirectUpload(File file) async {
+  Future<void> _handleDirectUpload(List<File> files) async {
     final baseurl =
         AppVariables.get<String>('baseurl')?.trim() ?? 'http://localhost:3000';
     final _progressNotifier = ValueNotifier<FileUploadProgress>(
-      FileUploadProgress(fileName: 'Uploading memory...'),
-    );
-
-    final uploader = S3Uploader(
-      presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
-      progressNotifier: _progressNotifier,
+      FileUploadProgress(
+        fileName: 'Preparing memories...',
+        stage: UploadStage.preparing,
+        totalFiles: files.length,
+        currentFileIndex: 0,
+      ),
     );
 
     showDialog(
@@ -761,64 +762,91 @@ class _GroupPrivateViewScreenState extends State<GroupPrivateViewScreen>
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.bottomSheetBackground,
-        title: const Text('Uploading Memory',
+        title: const Text('Uploading Memories',
             style: TextStyle(color: Colors.white)),
         content: UploadProgressWidget(
           progressNotifier: _progressNotifier,
           stageTextStyle:
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          progressTextStyle: TextStyle(color: Colors.white),
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          progressTextStyle: const TextStyle(color: Colors.white),
         ),
       ),
     );
 
     try {
+      // 1. Normalize media formats (HEIC -> PNG, MOV -> MP4)
+      _progressNotifier.value = _progressNotifier.value.copyWith(
+        stage: UploadStage.preparing,
+        customStageText: "Optimizing Media",
+        customStageTextDetail: "Converting formats...",
+      );
+
+      final List<File> normalizedFiles =
+          await MediaNormalizer.normalizeFiles(files);
+
+      // 2. Upload using S3Uploader in parallel batch
+      final uploader = S3Uploader(
+        presignedUrlEndpoint: "$baseurl/api/get-batch-upload-urls",
+        progressNotifier: _progressNotifier,
+      );
+
       final List<String> urls = await uploader.uploadFiles(
-        files: [file],
-        compressionParams: file.path.endsWith('.mp4') ||
-                file.path.endsWith('.mov') ||
-                file.path.endsWith('.avi')
-            ? null // No compression for video through this helper yet
-            : {"width": 1080, "quality": 85},
+        files: normalizedFiles,
+        compressionParams: {"width": 1080, "quality": 85},
       );
 
       if (urls.isNotEmpty) {
-        final result = await PostService.createMemories(
-          myGroupId: groupDetails!.groupId,
-          files: urls,
+        _progressNotifier.value = _progressNotifier.value.copyWith(
+          stage: UploadStage.custom,
+          customStageText: "Saving Memories",
+          customStageTextDetail: "Saving memories to server...",
         );
+
+        // 3. Call PostService.createMemories for each URL to create individual memory items
+        final results =
+            await Future.wait(urls.map((url) => PostService.createMemories(
+                  myGroupId: groupDetails!.groupId,
+                  files: [url],
+                )));
 
         if (mounted) Navigator.pop(context); // Close progress dialog
 
-        if (result['success']) {
-          // Trigger the listener for immediate update
-          if (result['data'] is List) {
-            for (var m in result['data']) {
-              AppVariables.update("memories", m);
+        bool anySuccess = false;
+        String? lastError;
+
+        for (var result in results) {
+          if (result['success']) {
+            anySuccess = true;
+            if (result['data'] is List) {
+              for (var m in result['data']) {
+                AppVariables.update("memories", m);
+              }
+            } else {
+              AppVariables.update("memories", result['data']);
             }
           } else {
-            AppVariables.update("memories", result['data']);
+            lastError = result['error'];
           }
-          // Also fetch to ensure everything is synced (cursor, etc.)
-          // _fetchMemories(refresh: true);
+        }
+
+        if (anySuccess) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Memory uploaded successfully!')),
+              const SnackBar(content: Text('Memories uploaded successfully!')),
             );
           }
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text('Failed to save memory: ${result['error']}')),
+              SnackBar(content: Text('Failed to save memories: $lastError')),
             );
           }
         }
       } else {
-        if (mounted) Navigator.pop(context);
+        if (mounted) Navigator.pop(context); // Close progress dialog
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context); // Close progress dialog
       print("Upload error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

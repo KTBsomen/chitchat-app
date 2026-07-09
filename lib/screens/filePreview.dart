@@ -10,6 +10,7 @@ import 'package:chitchat/screens/createStory.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/upload_chit_service.dart';
 import 'package:chitchat/services/user.dart';
+import 'package:chitchat/services/media_normalizer.dart';
 import 'package:flutter/material.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:vs_media_picker/vs_media_picker.dart';
@@ -124,6 +125,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
   int _currentIndex = 0;
   late List<File> editedFiles;
   late List<PickedAssetModel> _files;
+  bool _isNormalizing = false;
 
   static String baseUrl =
       AppVariables.get<String>('baseurl')!.trim() ?? 'http://localhost:3000';
@@ -155,6 +157,50 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
     }
   }
 
+  Future<void> _normalizePickedFiles(List<PickedAssetModel> files) async {
+    setState(() {
+      _isNormalizing = true;
+    });
+
+    try {
+      final List<File> originalFiles =
+          files.map((file) => File(file.path!)).toList();
+      final List<File> normalizedFiles =
+          await MediaNormalizer.normalizeFiles(originalFiles);
+
+      setState(() {
+        editedFiles = normalizedFiles;
+        for (int i = 0; i < normalizedFiles.length; i++) {
+          _files[i] = PickedAssetModel(
+            id: normalizedFiles[i].path,
+            path: normalizedFiles[i].path,
+            type: _files[i].type,
+            thumbnail: _files[i].thumbnail,
+          );
+        }
+        _isNormalizing = false;
+      });
+
+      if (editedFiles.length == 1 && !widget.isPost! && !widget.isGroupPost!) {
+        _editFile(editedFiles[0], 0);
+      }
+    } catch (e) {
+      print("[FilePreviewPage] Error in normalization: $e");
+      setState(() {
+        _isNormalizing = false;
+      });
+    }
+  }
+
+  bool _needsNormalization(List<PickedAssetModel> files) {
+    return files.any((file) {
+      final path = file.path?.toLowerCase() ?? '';
+      return path.endsWith('.heic') ||
+          path.endsWith('.heif') ||
+          path.endsWith('.mov');
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -162,11 +208,24 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
     editedFiles = List.from(widget.files.map((file) => File(file.path!)));
     _files = List.from(widget.files);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (editedFiles.length == 1 && !widget.isPost! && !widget.isGroupPost!) {
-        _editFile(editedFiles[0], 0);
-      }
-    });
+    if (_needsNormalization(widget.files)) {
+      _isNormalizing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 350), () {
+          if (mounted) {
+            _normalizePickedFiles(_files);
+          }
+        });
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (editedFiles.length == 1 &&
+            !widget.isPost! &&
+            !widget.isGroupPost!) {
+          _editFile(editedFiles[0], 0);
+        }
+      });
+    }
   }
 
 //ImageEditor(image: file.readAsBytesSync())
@@ -248,7 +307,7 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
   }
 
   bool _isImage(File file) {
-    return [".jpg", ".jpeg", ".png", ".gif", ".bmp", '.webp']
+    return [".jpg", ".jpeg", ".png", ".gif", ".bmp", '.webp', '.heic', '.heif']
         .any((ext) => file.path.toLowerCase().endsWith(ext));
   }
 
@@ -292,158 +351,176 @@ class _FilePreviewPageState extends State<FilePreviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text(
-          "Preview & Edit",
-          style: TextStyle(fontSize: 15, fontFamily: 'Poppins'),
-        ),
-        backgroundColor: AppColors.background,
-        foregroundColor: Colors.white,
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              foregroundColor: Colors.white,
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            centerTitle: true,
+            title: const Text(
+              "Preview & Edit",
+              style: TextStyle(fontSize: 15, fontFamily: 'Poppins'),
             ),
-            onPressed: () async {
-              // Upload editedFiles list using centralized UploadChitService
-              if (widget.isMemory == true) {
-                UploadChitService.upload(
-                  context: context,
-                  filePaths: editedFiles.map((f) => f.path).toList(),
-                  type: ChitType.memory,
-                  groupId: (widget.myGroupId != null &&
-                          widget.myGroupId!.isNotEmpty)
-                      ? widget.myGroupId
-                      : myGroupId,
-                );
-              } else if (widget.isPost != null && widget.isPost != true) {
-                print(
-                    "Files to upload: ${editedFiles.map((f) => f.path).toList()}");
-                await showModalBottomSheet(
-                    context: context,
-                    backgroundColor: Colors.black.withValues(alpha: 0.3),
-                    barrierColor: Colors.black.withValues(alpha: 0.6),
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    builder: (_) => _OptionSelector(
-                        uri: editedFiles.map((f) => f.path).toList()));
-              } else {
-                UploadChitService.upload(
-                  context: context,
-                  filePaths: editedFiles.map((f) => f.path).toList(),
-                  type: widget.isGroupPost == true
-                      ? ChitType.groupPost
-                      : ChitType.post,
-                  groupId: (widget.myGroupId != null &&
-                          widget.myGroupId!.isNotEmpty)
-                      ? widget.myGroupId
-                      : myGroupId,
-                );
-              }
-            },
-            child: const Text("Next"),
+            backgroundColor: AppColors.background,
+            foregroundColor: Colors.white,
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  // Upload editedFiles list using centralized UploadChitService
+                  if (widget.isMemory == true) {
+                    UploadChitService.upload(
+                      context: context,
+                      filePaths: editedFiles.map((f) => f.path).toList(),
+                      type: ChitType.memory,
+                      groupId: (widget.myGroupId != null &&
+                              widget.myGroupId!.isNotEmpty)
+                          ? widget.myGroupId
+                          : myGroupId,
+                    );
+                  } else if (widget.isPost != null && widget.isPost != true) {
+                    print(
+                        "Files to upload: ${editedFiles.map((f) => f.path).toList()}");
+                    await showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.black.withValues(alpha: 0.3),
+                        barrierColor: Colors.black.withValues(alpha: 0.6),
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        builder: (_) => _OptionSelector(
+                            uri: editedFiles.map((f) => f.path).toList()));
+                  } else {
+                    UploadChitService.upload(
+                      context: context,
+                      filePaths: editedFiles.map((f) => f.path).toList(),
+                      type: widget.isGroupPost == true
+                          ? ChitType.groupPost
+                          : ChitType.post,
+                      groupId: (widget.myGroupId != null &&
+                              widget.myGroupId!.isNotEmpty)
+                          ? widget.myGroupId
+                          : myGroupId,
+                    );
+                  }
+                },
+                child: const Text("Next"),
+              ),
+              const SizedBox(
+                width: 10,
+              ),
+            ],
           ),
-          const SizedBox(
-            width: 10,
-          ),
-        ],
-      ),
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: editedFiles.length,
-              onPageChanged: (index) => setState(() => _currentIndex = index),
-              itemBuilder: (context, index) {
-                final file = editedFiles[index];
-                return Stack(
-                  alignment: Alignment.bottomCenter,
+          backgroundColor: AppColors.background,
+          body: _isNormalizing
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 10),
+                      Text("Normalizing Files...",
+                          style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                )
+              : Column(
                   children: [
-                    Center(
-                      child: _isImage(file)
-                          ? Image.file(file, fit: BoxFit.contain)
-                          : VideoPlayerWidget(videoFile: file),
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _pageController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: editedFiles.length,
+                        onPageChanged: (index) =>
+                            setState(() => _currentIndex = index),
+                        itemBuilder: (context, index) {
+                          final file = editedFiles[index];
+                          return Stack(
+                            alignment: Alignment.bottomCenter,
+                            children: [
+                              Center(
+                                child: _isImage(file)
+                                    ? Image.file(file, fit: BoxFit.contain)
+                                    : VideoPlayerWidget(videoFile: file),
+                              ),
+                              Positioned(
+                                bottom: 20,
+                                right: 20,
+                                child: FloatingActionButton(
+                                  onPressed: () => _editFile(file, index),
+                                  child: const Icon(Icons.edit),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
-                    Positioned(
-                      bottom: 20,
-                      right: 20,
-                      child: FloatingActionButton(
-                        onPressed: () => _editFile(file, index),
-                        child: const Icon(Icons.edit),
+                    SizedBox(
+                      height: 80,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: editedFiles.length,
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () => setState(() {
+                              _currentIndex = index;
+                              _pageController.jumpToPage(index);
+                            }),
+                            child: GestureDetector(
+                              onLongPress: () {
+                                _showDeleteConfirmationDialog(index);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(5.0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _currentIndex == index
+                                          ? Colors.blue
+                                          : Colors.grey,
+                                      width: 3,
+                                    ),
+                                  ),
+                                  child: _isImage(editedFiles[index])
+                                      ? Image.file(editedFiles[index],
+                                          width: 60, height: 60)
+                                      : _files.length >= index &&
+                                              _files[index].thumbnail != null
+                                          ? Stack(
+                                              children: [
+                                                Image.memory(
+                                                  _files[index].thumbnail!,
+                                                  width: 60,
+                                                  height: 60,
+                                                ),
+                                                const Icon(
+                                                  Icons.play_arrow,
+                                                  size: 60,
+                                                  color: Colors.blue,
+                                                ),
+                                              ],
+                                            )
+                                          : const Icon(
+                                              Icons.video_file,
+                                              size: 60,
+                                              color: Colors.white,
+                                            ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
-                );
-              },
-            ),
-          ),
-          SizedBox(
-            height: 80,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: editedFiles.length,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () => setState(() {
-                    _currentIndex = index;
-                    _pageController.jumpToPage(index);
-                  }),
-                  child: GestureDetector(
-                    onLongPress: () {
-                      _showDeleteConfirmationDialog(index);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(5.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _currentIndex == index
-                                ? Colors.blue
-                                : Colors.grey,
-                            width: 3,
-                          ),
-                        ),
-                        child: _isImage(editedFiles[index])
-                            ? Image.file(editedFiles[index],
-                                width: 60, height: 60)
-                            : _files.length >= index &&
-                                    _files[index].thumbnail != null
-                                ? Stack(
-                                    children: [
-                                      Image.memory(
-                                        _files[index].thumbnail!,
-                                        width: 60,
-                                        height: 60,
-                                      ),
-                                      const Icon(
-                                        Icons.play_arrow,
-                                        size: 60,
-                                        color: Colors.blue,
-                                      ),
-                                    ],
-                                  )
-                                : const Icon(
-                                    Icons.video_file,
-                                    size: 60,
-                                    color: Colors.white,
-                                  ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                ),
+        ),
+      ],
     );
   }
 }
@@ -628,8 +705,6 @@ class _VideoEditorState extends State<VideoEditor> {
     super.dispose();
   }
 
-
-
   Future<void> trimVideo({
     required String inputPath,
     required String outputPath,
@@ -696,8 +771,6 @@ class _VideoEditorState extends State<VideoEditor> {
       );
     });
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -983,8 +1056,6 @@ class _VideoEditorState extends State<VideoEditor> {
       )
     ];
   }
-
-
 }
 
 class _OptionSelector extends StatefulWidget {
@@ -1075,8 +1146,8 @@ class _OptionSelectorState extends State<_OptionSelector> {
                   Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => MemberSelectionPage(
-                            files: widget.uri),
+                        builder: (context) =>
+                            MemberSelectionPage(files: widget.uri),
                       ));
                 },
               ),

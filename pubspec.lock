@@ -511,6 +511,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  flutter_exif_rotation:
+    dependency: "direct main"
+    description:
+      name: flutter_exif_rotation
+      sha256: f581601523bbb7fbec3a0498fe930bf6c48f627d4548d859b2772230edfbe658
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.2"
   flutter_expandable_fab:
     dependency: "direct main"
     description:
@@ -865,6 +873,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.0+2"
+  heic_to_png_jpg:
+    dependency: "direct main"
+    description:
+      name: heic_to_png_jpg
+      sha256: "01f1dc02be760d313cc10b74679a34a83fd8736bafe664ffcf8b977fae2a0cd9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.2"
+  heif_converter:
+    dependency: "direct main"
+    description:
+      name: heif_converter
+      sha256: b1711482dc4f08c05ba86e251d6331a3b7a6fd01a7514f0491dd0b10fe1712a3
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.6"
   html:
     dependency: transitive
     description:

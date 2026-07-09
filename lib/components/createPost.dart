@@ -20,7 +20,7 @@ class CreatePost {
 
   static ScrollController _scrollController2 = ScrollController();
 
-  static dynamic show(BuildContext context,
+  static dynamic show(BuildContext parentContext,
       {bool isGroupPost = false,
       bool isPost = true,
       bool isMemory = false,
@@ -30,9 +30,9 @@ class CreatePost {
     List<PickedAssetModel> selectedFiles = <PickedAssetModel>[];
     if (isMemory) {
       ImagePicker picker = ImagePicker();
-      BuildContext rootcontext = context;
+      BuildContext rootcontext = parentContext;
       showModalBottomSheet(
-        context: context,
+        context: parentContext,
         backgroundColor: Colors.transparent,
         isScrollControlled: false,
         builder: (context) {
@@ -137,7 +137,7 @@ class CreatePost {
     }
 
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       isScrollControlled: true,
       backgroundColor: const Color.fromRGBO(0, 0, 0, 1),
       builder: (context) => Stack(
@@ -200,8 +200,9 @@ class CreatePost {
                           return isVisible
                               ? InkWell(
                                   onTap: () async {
-                                    await Navigator.pushReplacement(
-                                      context,
+                                    Navigator.pop(context); // Close bottom sheet cleanly
+                                    Navigator.push(
+                                      parentContext,
                                       MaterialPageRoute(
                                           builder: (context) => FilePreviewPage(
                                                 files: selectedFiles,
@@ -211,33 +212,6 @@ class CreatePost {
                                                 myGroupId: myGroupId,
                                               )),
                                     );
-                                    // Navigator.pop(context);
-                                    // showModalBottomSheet(
-                                    //   context: context,
-                                    //   isScrollControlled: true,
-                                    //   isDismissible: false,
-                                    //   enableDrag: false,
-                                    //   backgroundColor: Colors.black,
-                                    //   builder: (context) =>
-                                    //       FlutterStoryEditor(
-                                    //     controller: controller,
-                                    //     captionController:
-                                    //         _captionController,
-                                    //     selectedFiles: selectedFiles
-                                    //         .map(
-                                    //           (e) =>
-                                    //               e.file ??
-                                    //               File(e.path ?? ""),
-                                    //         )
-                                    //         .toList(),
-                                    //     onSaveClickListener: (files) {
-                                    //       // Handle save click logic here
-                                    //       print(
-                                    //         "Selected files: ${files.map((e) => e.path).toList()}",
-                                    //       );
-                                    //     },
-                                    //   ),
-                                    // );
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
