@@ -1,3 +1,42 @@
+// allprojects {
+//     repositories {
+//         google()
+//         mavenCentral()
+//     }
+// }
+
+// rootProject.buildDir = "../build"
+// subprojects {
+//     project.buildDir = "${rootProject.buildDir}/${project.name}"
+// }
+// subprojects {
+//     afterEvaluate { project ->
+//         if (project.plugins.hasPlugin("com.android.application") ||
+//                 project.plugins.hasPlugin("com.android.library")) {
+//             project.android {
+//                 compileSdkVersion 36
+//                 defaultConfig {
+//                     ndk {
+//                         abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+//                         ldLibs "log"
+//                     }
+//                     externalNativeBuild {
+//                         cmake {
+//                             arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+// subprojects {
+//     project.evaluationDependsOn(":app")
+// }
+
+// tasks.register("clean", Delete) {
+//     delete rootProject.buildDir
+// }
 allprojects {
     repositories {
         google()
@@ -9,16 +48,50 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
 subprojects {
     afterEvaluate { project ->
         if (project.plugins.hasPlugin("com.android.application") ||
                 project.plugins.hasPlugin("com.android.library")) {
             project.android {
                 compileSdkVersion 36
+                defaultConfig {
+                    ndk {
+                        abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+                        ldLibs "log"
+                    }
+                    externalNativeBuild {
+                        cmake {
+                            arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+// --- FIX ADDED HERE ---
+subprojects {
+    project.configurations.all { configuration ->
+        // Force a uniform version for any standalone media3 dependencies
+        resolutionStrategy {
+            eachDependency { DependencyResolveDetails details ->
+                if (details.requested.group == 'androidx.media3') {
+                    details.useVersion '1.8.0'
+                }
+            }
+             // Route the duplicate Jitsi modules directly to the official Android artifacts
+             // Strip the duplicate RTSP layout from Jitsi packages globally
+        // BUT allow video_player_android to retain its vital native components
+        if (project.name != 'video_player_android') {
+            configuration.exclude group: 'androidx.media3', module: 'media3-exoplayer-rtsp'
+        }
+        }
+
+ }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }

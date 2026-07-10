@@ -1,7 +1,7 @@
 name: chitchat
 description: "Social media for Gen Z"
 publish_to: "none"
-version: 2.0.0+11
+version: 2.0.0+12
 
 environment:
   sdk: ^3.5.4
@@ -49,7 +49,7 @@ dependencies:
     path: packages/deep_link_router
   mqtt_client: ^10.5.1
   flutterdb: ^0.0.4
-  jitsi_meet_flutter_sdk: ^10.0.0
+  jitsi_meet_flutter_sdk: ^13.0.0
   # flutter_ringtone_player: ^4.0.0+4
   video_thumbnail: ^0.5.6
   flutter_callkit_incoming: ^3.0.0

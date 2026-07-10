@@ -39,6 +39,17 @@ android {
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
+    }
+    packagingOptions {
+        jniLibs {
+            // CRITICAL: Keeps native libs uncompressed inside the bundle for 16KB compatibility
+            useLegacyPackaging = false
+        }
     }
 
     signingConfigs {
