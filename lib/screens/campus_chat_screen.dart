@@ -232,7 +232,7 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
     final userId = await UserService.getUserId();
 
     mqtt = MQTTService(
-      broker: '13.204.86.50',
+      broker: '13.204.75.73',
       clientId:
           (userId.toString().substring(0, min(20, userId.toString().length))),
       onConnected: _onConnected,

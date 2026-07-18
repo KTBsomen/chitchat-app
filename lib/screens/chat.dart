@@ -87,7 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _mqttInitialized = true;
 
     mqtt = MQTTService(
-      broker: '13.204.86.50',
+      broker: '13.204.75.73',
       // broker: '192.168.0.114',
       clientId: ((await UserService.getUserId()).toString().substring(0, 20)),
       onConnected: _onConnected,
@@ -174,8 +174,11 @@ class _ChatScreenState extends State<ChatScreen> {
   String _typingUserIdProfilePic = '';
   ValueNotifier<String> typingUserIdProfilePic = ValueNotifier('');
   void _handleMessage(String message, {String? topic}) {
-    if (topic != null && groupDetails?.groupId != null && !topic.startsWith(groupDetails!.groupId!)) {
-      print("Ignoring campus/other group message from topic: $topic (current group: ${groupDetails?.groupId})");
+    if (topic != null &&
+        groupDetails?.groupId != null &&
+        !topic.startsWith(groupDetails!.groupId!)) {
+      print(
+          "Ignoring campus/other group message from topic: $topic (current group: ${groupDetails?.groupId})");
       return;
     }
     // Deduplicate and store locally
