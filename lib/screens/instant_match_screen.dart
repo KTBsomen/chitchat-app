@@ -1,9 +1,14 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/services/instant_match_service.dart';
+import 'package:chitchat/services/posts.dart';
+import 'package:chitchat/services/user.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class InstantMatchScreen extends StatefulWidget {
   const InstantMatchScreen({Key? key}) : super(key: key);
@@ -17,7 +22,7 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
-  
+
   StreamSubscription? _stateSubscription;
   StreamSubscription? _messageSubscription;
   StreamSubscription? _typingSubscription;
@@ -31,7 +36,7 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
   void initState() {
     super.initState();
     _service.init();
-    
+
     _stateSubscription = _service.stateStream.listen((state) {
       if (mounted) setState(() {});
       if (state == MatchState.chatting) {
@@ -81,11 +86,13 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
           SnackBar(
             content: Text(
               errMsg,
-              style: const TextStyle(fontFamily: 'Poppins', color: Colors.white),
+              style:
+                  const TextStyle(fontFamily: 'Poppins', color: Colors.white),
             ),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
         Navigator.pop(context);
@@ -114,9 +121,9 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
 
   void _onTypingChanged(String value) {
     if (_typingTimer?.isActive ?? false) _typingTimer!.cancel();
-    
+
     _service.sendTyping(true);
-    
+
     _typingTimer = Timer(const Duration(seconds: 2), () {
       _service.sendTyping(false);
     });
@@ -136,7 +143,39 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
 
   String? _lastPreference;
 
-  void _showGenderSelection() {
+  void _showGenderSelection() async {
+    bool? termsok = (await AppVariables.getPersistent<bool>("termsOK"));
+    if (termsok != true) {
+      final profile = AppVariables.get<Map<String, dynamic>>("profile") ??
+          AppVariables.get<Map<String, dynamic>>("serverProfile");
+      if (profile != null && profile['tncAccepted'] == true) {
+        termsok = true;
+        AppVariables.setPersistent<bool>("termsOK", true);
+      } else {
+        final consentResult = await UserService.fetchConsentLogs();
+        if (consentResult['success'] == true &&
+            consentResult['data'] is List &&
+            (consentResult['data'] as List).isNotEmpty) {
+          termsok = true;
+          AppVariables.setPersistent<bool>("termsOK", true);
+        }
+      }
+    }
+
+    if (termsok != true) {
+      final accepted = await showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => const TermsAndConditionsSheet(),
+      );
+      if (accepted == true && mounted) {
+        _showGenderSelection();
+      } else if (mounted && _service.state == MatchState.idle) {
+        Navigator.pop(context);
+      }
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -184,17 +223,18 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
               ),
             ),
           ),
-          
+
           SafeArea(
             child: _buildBody(),
           ),
-          
+
           // Back Button
           Positioned(
             top: 50,
             left: 20,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+              icon: const Icon(Icons.arrow_back_ios,
+                  color: Colors.white, size: 20),
               onPressed: () {
                 _service.leaveMatch();
                 Navigator.pop(context);
@@ -266,6 +306,151 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
     );
   }
 
+  void _showReportDialog(BuildContext context, String type) {
+    final List<String> reasons = [
+      "Spam",
+      "Inappropriate Content",
+      "Harassment",
+      "False Information",
+      "Other"
+    ];
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Report $type"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: reasons.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(reasons[index]),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _submitReport(context, reasons[index]);
+                  },
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _submitReport(BuildContext context, String reason) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          const Center(child: CircularProgressIndicator()),
+    );
+
+    final navigator = Navigator.of(context);
+    PostService.reportUser(userId: _service.partnerId!, reason: reason)
+        .then((result) {
+      _findNextMatch();
+      if (!mounted) return;
+      navigator.pop(); // Close loader using captured navigator
+      if (result['success']) {
+        _showStatusDialog(navigator.context, 'Report Result',
+            'Report submitted. Thank you for your feedback.',
+            isError: false);
+      } else {
+        _showStatusDialog(navigator.context, 'Report failed',
+            'Failed to submit report. Please try again.',
+            isError: true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        navigator.pop();
+        _showStatusDialog(navigator.context, 'Error',
+            'An error occurred while submitting report.',
+            isError: true);
+      }
+    });
+  }
+
+  void _showStatusDialog(BuildContext context, String title, String message,
+      {required bool isError}) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title,
+              style: TextStyle(color: isError ? Colors.red : Colors.green)),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBlockConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Block User"),
+          content: const Text(
+              "Are you sure you want to block this user? You will no longer see their posts or messages."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _blockUser(context);
+              },
+              child: const Text("Block", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _blockUser(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          const Center(child: CircularProgressIndicator()),
+    );
+
+    final navigator = Navigator.of(context);
+    UserService.blockUser(userId: _service.partnerId!).then((result) {
+      print(result);
+      _findNextMatch();
+      if (!mounted) return;
+      navigator.pop(); // Close loader using captured navigator
+      if (result['success']) {
+        _showStatusDialog(navigator.context, 'Success', 'User blocked.',
+            isError: false);
+      } else {
+        _showStatusDialog(navigator.context, 'Error', 'Failed to block user.',
+            isError: true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        navigator.pop();
+        _showStatusDialog(navigator.context, 'Error',
+            'An error occurred while blocking user.',
+            isError: true);
+      }
+    });
+  }
+
   Widget _buildChatView() {
     return Column(
       children: [
@@ -304,12 +489,35 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
                   _findNextMatch,
                   compact: true,
                 ),
+              PopupMenuButton(
+                icon: const Icon(
+                  Icons.more_vert,
+                  color: Colors.white,
+                ),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'block',
+                    child: const Text('Block'),
+                  ),
+                  PopupMenuItem(
+                    value: 'report',
+                    child: const Text('Report'),
+                  ),
+                ],
+                onSelected: (value) {
+                  if (value == 'block') {
+                    _showBlockConfirmation(context);
+                  } else if (value == 'report') {
+                    _showReportDialog(context, "User");
+                  }
+                },
+              ),
             ],
           ),
         ),
-        
+
         const Divider(color: Colors.white10),
-        
+
         // Messages
         Expanded(
           child: ListView.builder(
@@ -323,32 +531,33 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
             },
           ),
         ),
-        
+
         // Input or Ended View
-        _service.state == MatchState.ended 
-          ? _buildMatchEndedOverlay()
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_partnerIsTyping)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "${_service.partnerAlias ?? 'Partner'} is typing...",
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 12,
-                          fontFamily: 'Poppins',
-                          fontStyle: FontStyle.italic,
+        _service.state == MatchState.ended
+            ? _buildMatchEndedOverlay()
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_partnerIsTyping)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "${_service.partnerAlias ?? 'Partner'} is typing...",
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 12,
+                            fontFamily: 'Poppins',
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                _buildMessageInput(),
-              ],
-            ),
+                  _buildMessageInput(),
+                ],
+              ),
       ],
     );
   }
@@ -398,17 +607,18 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
     );
   }
 
-
   Widget _buildMessageBubble(Map<String, dynamic> msg, bool isMe) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Container(
             margin: const EdgeInsets.only(bottom: 4),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.75),
             decoration: BoxDecoration(
               color: isMe ? AppColors.primary : Colors.white.withOpacity(0.1),
               borderRadius: BorderRadius.only(
@@ -433,7 +643,9 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
               child: Icon(
                 Icons.done_all,
                 size: 14,
-                color: (msg['isRead'] ?? false) ? Colors.blueAccent : Colors.white38,
+                color: (msg['isRead'] ?? false)
+                    ? Colors.blueAccent
+                    : Colors.white38,
               ),
             ),
         ],
@@ -509,7 +721,8 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
     _service.sendTyping(false);
   }
 
-  Widget _buildActionButton(String label, Color color, VoidCallback onTap, {bool compact = false}) {
+  Widget _buildActionButton(String label, Color color, VoidCallback onTap,
+      {bool compact = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -536,6 +749,158 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
             fontWeight: FontWeight.bold,
             fontFamily: 'Poppins',
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class TermsAndConditionsSheet extends StatefulWidget {
+  final String termsUrl;
+
+  const TermsAndConditionsSheet({
+    super.key,
+    this.termsUrl = 'https://chitzchat.com/terms.html',
+  });
+
+  @override
+  State<TermsAndConditionsSheet> createState() =>
+      _TermsAndConditionsSheetState();
+}
+
+class _TermsAndConditionsSheetState extends State<TermsAndConditionsSheet> {
+  late TapGestureRecognizer _termsTapRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsTapRecognizer = TapGestureRecognizer()..onTap = _openTermsUrl;
+  }
+
+  @override
+  void dispose() {
+    _termsTapRecognizer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openTermsUrl() async {
+    final Uri url = Uri.parse(widget.termsUrl);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Could not open Terms of Service link"),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        decoration: BoxDecoration(
+          color: const Color(0xFF16163F).withOpacity(0.8),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(40),
+            topRight: Radius.circular(40),
+          ),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 50,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Before you start",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                fontFamily: 'PassionOne',
+              ),
+            ),
+            const SizedBox(height: 20),
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                text: "By using Anonymous Chat, you agree to our ",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 14,
+                  fontFamily: 'Poppins',
+                  height: 1.5,
+                ),
+                children: [
+                  TextSpan(
+                    text: "Terms of Service",
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: _termsTapRecognizer,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Harassment, abuse, hate speech, threats, sexual exploitation, and other objectionable behavior are not allowed.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 13,
+                fontFamily: 'Poppins',
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () async {
+                AppVariables.setPersistent<bool>("termsOK", true);
+                UserService.logConsent(
+                  documentType: "TNC_EULA",
+                  version: "1.0",
+                );
+                if (context.mounted) {
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text(
+                "Accept & Continue",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -590,11 +955,14 @@ class GenderSelectionSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
-            _buildOption(context, "Connect with Boys", "Male", Icons.male, Colors.blueAccent),
+            _buildOption(context, "Connect with Boys", "Male", Icons.male,
+                Colors.blueAccent),
             const SizedBox(height: 15),
-            _buildOption(context, "Connect with Girls", "Female", Icons.female, Colors.pinkAccent),
+            _buildOption(context, "Connect with Girls", "Female", Icons.female,
+                Colors.pinkAccent),
             const SizedBox(height: 15),
-            _buildOption(context, "Anyone is Cool!", "Any", Icons.all_inclusive, Colors.purpleAccent),
+            _buildOption(context, "Anyone is Cool!", "Any", Icons.all_inclusive,
+                Colors.purpleAccent),
             const SizedBox(height: 20),
           ],
         ),
@@ -602,7 +970,8 @@ class GenderSelectionSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildOption(BuildContext context, String title, String value, IconData icon, Color color) {
+  Widget _buildOption(BuildContext context, String title, String value,
+      IconData icon, Color color) {
     return GestureDetector(
       onTap: () => Navigator.pop(context, value),
       child: Container(
@@ -633,7 +1002,8 @@ class GenderSelectionSheet extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+            const Icon(Icons.arrow_forward_ios,
+                color: Colors.white24, size: 16),
           ],
         ),
       ),
@@ -648,7 +1018,8 @@ class RadarAnimation extends StatefulWidget {
   _RadarAnimationState createState() => _RadarAnimationState();
 }
 
-class _RadarAnimationState extends State<RadarAnimation> with SingleTickerProviderStateMixin {
+class _RadarAnimationState extends State<RadarAnimation>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -681,7 +1052,7 @@ class _RadarAnimationState extends State<RadarAnimation> with SingleTickerProvid
             );
           },
         ),
-        
+
         // Central Logo/Avatar
         Container(
           width: 80,
@@ -730,11 +1101,11 @@ class RadarPainter extends CustomPainter {
         ..strokeWidth = 2;
 
       canvas.drawCircle(center, radius, paint);
-      
+
       final fillPaint = Paint()
         ..color = AppColors.primary.withOpacity(opacity * 0.1)
         ..style = PaintingStyle.fill;
-        
+
       canvas.drawCircle(center, radius, fillPaint);
     }
   }

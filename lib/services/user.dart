@@ -626,6 +626,62 @@ class UserService {
       return {"success": false, "error": e.toString()};
     }
   }
+
+  static Future<Map<String, dynamic>> logConsent({
+    String documentType = "TNC_EULA",
+    String version = "1.0",
+  }) async {
+    try {
+      String? token = await UserService.getAccessToken();
+      if (token == null) {
+        return {"success": false, "error": "No access token"};
+      }
+      final response = await http.post(
+        Uri.parse('$baseurl/user/consent'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "documentType": documentType,
+          "version": version,
+        }),
+      );
+      return {
+        "success": response.statusCode == 200 || response.statusCode == 201,
+        "data": response.statusCode == 200 || response.statusCode == 201
+            ? jsonDecode(response.body)
+            : null,
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchConsentLogs() async {
+    try {
+      String? token = await UserService.getAccessToken();
+      if (token == null) {
+        return {"success": false, "error": "No access token"};
+      }
+      final response = await http.get(
+        Uri.parse('$baseurl/user/consent'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+      if (response.statusCode == 200) {
+        return {
+          "success": true,
+          "data": jsonDecode(response.body),
+        };
+      }
+      return {"success": false, "error": "Failed to fetch consent logs"};
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
 }
 
 class AuthProfile {
