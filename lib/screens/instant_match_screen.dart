@@ -459,29 +459,34 @@ class _InstantMatchScreenState extends State<InstantMatchScreen> {
           padding: const EdgeInsets.fromLTRB(60, 20, 20, 10),
           child: Row(
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _service.partnerAlias ?? "Anonymous",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontFamily: 'PassionOne',
-                      letterSpacing: 1,
-                    ),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _service.partnerAlias ?? "Anonymous",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontFamily: 'PassionOne',
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      Text(
+                        "${_service.partnerProfile?['institute'] ?? 'Student'} • ${_service.partnerProfile?['gender'] ?? 'Unknown'}",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 12,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    "${_service.partnerProfile?['institute'] ?? 'Student'} • ${_service.partnerProfile?['gender'] ?? 'Unknown'}",
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 12,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 10),
               if (_service.state == MatchState.chatting)
                 _buildActionButton(
                   "Skip",
