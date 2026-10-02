@@ -32,6 +32,9 @@ class _WatchlistPageState extends State<WatchlistPage> {
   // Cursor-based pagination state for campus lounge
   String? _campusLoungeCursor;
   bool _campusLoungeHasMore = true;
+  List<dynamic> usersWithNoGroups = [];
+  bool hasMoreNonGroupUsers = true;
+  String? nextCursor2;
   // Cursor-based pagination state for recommended groups (For You tab)
   String? _recommendedCursor;
   bool _recommendedHasMore = true;
@@ -81,6 +84,8 @@ class _WatchlistPageState extends State<WatchlistPage> {
       isLoadingCampusLounge = true;
       _campusLoungeCursor = null;
       _campusLoungeHasMore = true;
+      hasMoreNonGroupUsers = true;
+      nextCursor2 = null;
     });
 
     try {
@@ -89,6 +94,13 @@ class _WatchlistPageState extends State<WatchlistPage> {
         campusLoungeGroups = result.groups;
         _campusLoungeCursor = result.nextCursor;
         _campusLoungeHasMore = result.hasMore;
+
+        usersWithNoGroups = result.usersWithNoGroups;
+        campusLoungeGroups
+            .addAll(result.usersWithNoGroups); //fake groups build at runtime.
+        campusLoungeGroups.shuffle();
+        hasMoreNonGroupUsers = result.hasMoreNonGroupUsers;
+        nextCursor2 = result.nextCursor2;
       });
     } catch (e) {
       print('Error loading campus lounge data: $e');
@@ -162,7 +174,8 @@ class _WatchlistPageState extends State<WatchlistPage> {
   }
 
   Future<void> _loadMoreCampusLoungeData() async {
-    if (isLoadingMore || !_campusLoungeHasMore) return;
+    if (isLoadingMore || (!_campusLoungeHasMore && !hasMoreNonGroupUsers))
+      return;
 
     setState(() {
       isLoadingMore = true;
@@ -170,12 +183,15 @@ class _WatchlistPageState extends State<WatchlistPage> {
 
     try {
       PaginatedGroupResult result = await GroupsService.getCampusLoungeGroups(
-        cursor: _campusLoungeCursor,
-      );
+          cursor: _campusLoungeCursor, userCursor: nextCursor2);
       setState(() {
         campusLoungeGroups.addAll(result.groups);
+        campusLoungeGroups.addAll(result.usersWithNoGroups);
+        campusLoungeGroups.shuffle();
         _campusLoungeCursor = result.nextCursor;
         _campusLoungeHasMore = result.hasMore;
+        nextCursor2 = result.nextCursor2;
+        hasMoreNonGroupUsers = result.hasMoreNonGroupUsers;
       });
     } catch (e) {
       print('Error loading more campus lounge data: $e');
@@ -392,28 +408,66 @@ class _WatchlistPageState extends State<WatchlistPage> {
                       size: FIXED_CIRCLE_SIZE,
                       nodeSize: FIXED_NODE_SIZE,
                       onGroupTap: () {
-                        Navigator.push(
-                          context,
-                          PageTransition(
-                            type: PageTransitionType.rightToLeft,
-                            child: GroupPublicViewScreen(
-                              groupId: group.groupId,
+                        if (group.groupData["name"] == 'Fake Group') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'No groups found showing personal profile.')),
+                          );
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: PublicProfilePage(
+                                uid: group.groupId,
+                                dbIndex: group.groupData["dbIndex"].toString(),
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                          return;
+                        } else {
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: GroupPublicViewScreen(
+                                groupId: group.groupId,
+                              ),
+                            ),
+                          );
+                        }
                       },
                       onMemberTap: (memberIndex) {
                         print(
                             'Member ${group.members[memberIndex].id} in group ${group.groupId} tapped');
-                        Navigator.push(
-                          context,
-                          PageTransition(
-                            type: PageTransitionType.rightToLeft,
-                            child: GroupPublicViewScreen(
-                              groupId: group.groupId,
+                        if (group.groupData["name"] == 'Fake Group') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'No groups found showing personal profile.')),
+                          );
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: PublicProfilePage(
+                                uid: group.groupId,
+                                dbIndex: group.groupData["dbIndex"].toString(),
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                          return;
+                        } else {
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: GroupPublicViewScreen(
+                                groupId: group.groupId,
+                              ),
+                            ),
+                          );
+                        }
                       },
                       edgeStyle: EdgeStyle(
                         width: 3,
@@ -576,28 +630,66 @@ class _WatchlistPageState extends State<WatchlistPage> {
                       size: FIXED_CIRCLE_SIZE,
                       nodeSize: FIXED_NODE_SIZE,
                       onGroupTap: () {
-                        Navigator.push(
-                          context,
-                          PageTransition(
-                            type: PageTransitionType.rightToLeft,
-                            child: GroupPublicViewScreen(
-                              groupId: group.groupId,
+                        if (group.groupData["name"] == 'Fake Group') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'No groups found showing personal profile.')),
+                          );
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: PublicProfilePage(
+                                uid: group.groupId,
+                                dbIndex: group.groupData["dbIndex"].toString(),
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                          return;
+                        } else {
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: GroupPublicViewScreen(
+                                groupId: group.groupId,
+                              ),
+                            ),
+                          );
+                        }
                       },
                       onMemberTap: (index) {
                         print(
                             'Member ${group.members[index].id} in group ${group.groupId} tapped');
-                        Navigator.push(
-                          context,
-                          PageTransition(
-                            type: PageTransitionType.rightToLeft,
-                            child: GroupPublicViewScreen(
-                              groupId: group.groupId,
+                        if (group.groupData["name"] == 'Fake Group') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'No groups found showing personal profile.')),
+                          );
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: PublicProfilePage(
+                                uid: group.groupId,
+                                dbIndex: group.groupData["dbIndex"].toString(),
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                          return;
+                        } else {
+                          Navigator.push(
+                            context,
+                            PageTransition(
+                              type: PageTransitionType.rightToLeft,
+                              child: GroupPublicViewScreen(
+                                groupId: group.groupId,
+                              ),
+                            ),
+                          );
+                        }
                       },
                       edgeStyle: EdgeStyle(
                         width: 3,

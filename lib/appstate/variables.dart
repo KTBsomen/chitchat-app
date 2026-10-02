@@ -43,6 +43,14 @@ class AppVariables {
     _notifyUIUpdateCallbacks();
   }
 
+  static void setIfNotExist<T>(String key, T value) {
+    if (_variables[key] == null) {
+      _variables[key] = value;
+      _notifyListeners(key, value);
+      _notifyUIUpdateCallbacks();
+    }
+  }
+
   static T? get<T>(String key) {
     final value = _variables[key];
     return value is T ? value : null;

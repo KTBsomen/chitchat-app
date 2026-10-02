@@ -67,6 +67,7 @@ class _HomePageState extends State<HomePage> {
     _scrollController.addListener(_onScroll);
     AppVariables.registerState(this);
     AppVariables.set("selectedTabIndex", 0);
+    AppVariables.setIfNotExist<bool>("show_watch_notificatio", true);
     // Try once after the first frame in case the screen that pushed us here
     // did not already dispatch (e.g. legacy code paths). dispatchPendingDeepLink
     // is idempotent — if there is no pending URI it returns false silently,
@@ -116,6 +117,7 @@ class _HomePageState extends State<HomePage> {
       }
     });
   }
+
   void show(BuildContext parentContext) {
     ValueNotifier<bool> isNextButtonVisible = ValueNotifier(false);
     List<PickedAssetModel> selectedFiles = <PickedAssetModel>[];
@@ -184,7 +186,8 @@ class _HomePageState extends State<HomePage> {
                           return isVisible
                               ? InkWell(
                                   onTap: () async {
-                                    Navigator.pop(context); // Close bottom sheet cleanly
+                                    Navigator.pop(
+                                        context); // Close bottom sheet cleanly
                                     Navigator.push(
                                       parentContext,
                                       MaterialPageRoute(
@@ -567,7 +570,11 @@ class _HomePageState extends State<HomePage> {
               ),
               NavMenuItem(
                 icon: Icons.favorite_rounded,
+                badge: AppVariables.get<bool>("show_watch_notificatio")!
+                    ? "."
+                    : null,
                 onTap: () {
+                  AppVariables.set<bool>("show_watch_notificatio", false);
                   Navigator.push(
                     context,
                     PageTransition(

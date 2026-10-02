@@ -49,6 +49,40 @@ class GroupsService {
     );
   }
 
+  static FriendCircleGroup fake_buildFriendCircleGroup(
+      Map<String, dynamic> groupData) {
+    return FriendCircleGroup(
+      groupId: groupData["_id"],
+      groupData: {
+        'name': "Fake Group",
+        'description':
+            "we create a group whne the user dont have a group so just a demo to look nice.",
+        'GroupProfilePic': groupData["profilePic"],
+        'createdBy': "",
+        'createdAt': "",
+        "dbIndex": groupData["dbIndex"] ?? 0,
+      },
+      members: [
+        FriendCircleMember(
+          id: groupData["_id"],
+          avatarUrl: groupData["profilePic"] ?? '',
+          additionalData: {
+            'memberName': groupData["name"],
+            'memberBio': groupData["bio"].toString(),
+            'educationLevel': groupData["educationLevel"],
+            'school': groupData["school"],
+            'college': groupData["college"],
+            'university': groupData["university"],
+            'semester': groupData["semester"],
+            'year': groupData["year"],
+            'userClass': groupData["userClass"],
+            'dbIndex': groupData["dbIndex"] ?? 0,
+          },
+        )
+      ],
+    );
+  }
+
   static Future<PaginatedGroupResult> getRecommendedGroups({
     String? cursor,
     int limit = 20,
@@ -93,6 +127,7 @@ class GroupsService {
 
   static Future<PaginatedGroupResult> getCampusLoungeGroups({
     String? cursor,
+    String? userCursor,
     int limit = 20,
   }) async {
     String? token = await UserService.getAccessToken();
@@ -102,6 +137,9 @@ class GroupsService {
     };
     if (cursor != null && cursor.isNotEmpty) {
       queryParams['cursor'] = cursor;
+    }
+    if (userCursor != null && userCursor.isNotEmpty) {
+      queryParams['userCursor'] = userCursor;
     }
 
     final uri = Uri.parse('$baseurl/recommend/campus-lounge')
@@ -120,20 +158,28 @@ class GroupsService {
       final List<dynamic> data = body['groups'] ?? [];
       final String? nextCursor = body['nextCursor'];
       final bool hasMore = body['hasMore'] ?? false;
+      final List<dynamic> usersWithNoGroups = body['usersWithNoGroups'] ?? [];
+      final bool hasMoreNonGroupUsers = body['hasMoreNonGroupUsers'] ?? false;
+      final String? nextCursor2 = body['nextCursor2'];
 
       final groups = data.map((item) => buildFriendCircleGroup(item)).toList();
+      final fakeGroups = usersWithNoGroups
+          .map((item) => fake_buildFriendCircleGroup(item))
+          .toList();
 
       return PaginatedGroupResult(
         groups: groups,
         nextCursor: nextCursor,
         hasMore: hasMore,
+        usersWithNoGroups: fakeGroups,
+        hasMoreNonGroupUsers: hasMoreNonGroupUsers,
+        nextCursor2: nextCursor2,
       );
     } else {
       throw Exception(
           'Failed to load campus lounge groups: ${response.statusCode}');
     }
   }
-
 
   static Future<List<FriendCircleGroup>> getGroupDetails(
       {required String gid}) async {
@@ -490,10 +536,16 @@ class PaginatedGroupResult {
   final List<FriendCircleGroup> groups;
   final String? nextCursor;
   final bool hasMore;
+  final List<FriendCircleGroup> usersWithNoGroups;
+  final bool hasMoreNonGroupUsers;
+  final String? nextCursor2;
 
   PaginatedGroupResult({
     required this.groups,
     this.nextCursor,
     this.hasMore = false,
+    this.usersWithNoGroups = const [],
+    this.hasMoreNonGroupUsers = false,
+    this.nextCursor2,
   });
 }

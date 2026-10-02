@@ -14,6 +14,7 @@ import 'package:page_transition/page_transition.dart';
 class NavMenuItem {
   final IconData icon;
   final String? label;
+  final String? badge;
 
   /// Custom handler called when this item is tapped.
   final VoidCallback? onTap;
@@ -22,6 +23,7 @@ class NavMenuItem {
     required this.icon,
     this.label,
     this.onTap,
+    this.badge,
   });
 }
 
@@ -214,21 +216,49 @@ class AppBottomNav extends StatelessWidget {
           _defaultNavigate(context, index);
         }
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.warning.withOpacity(0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Icon(
-          item.icon,
-          size: 24,
-          color: isSelected ? AppColors.warning : Colors.white.withOpacity(0.5),
-        ),
+      child: Stack(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppColors.warning.withOpacity(0.15)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Icon(
+              item.icon,
+              size: 24,
+              color: isSelected
+                  ? AppColors.warning
+                  : Colors.white.withOpacity(0.5),
+            ),
+          ),
+          if (item.badge != null &&
+              item.badge.toString().isNotEmpty &&
+              !isSelected)
+            Positioned(
+              right: 8,
+              top: -2,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  item.badge ?? "",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            )
+        ],
       ),
     );
   }
