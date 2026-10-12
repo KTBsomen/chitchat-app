@@ -66,6 +66,10 @@ dependencies:
   socket_io_client: ^3.1.4
   flutter_exif_rotation: ^0.5.2
   heic_to_png_jpg: ^0.1.2
+  beacon_broadcaster: 0.2.4
+  flutter_blue_plus: 2.3.12
+  flutter_foreground_task: 11.0.1
+  convert: 3.1.2
 
 dev_dependencies:
   flutter_test:

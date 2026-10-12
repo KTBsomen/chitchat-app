@@ -62,6 +62,10 @@
 	<string>Chitchat needs permission to save photos and videos to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Chitchat needs access to your photo library to select photos and videos for posts, stories, and messages.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Chitchat needs Bluetooth to discover nearby users and broadcast your presence.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Chitchat needs Bluetooth to broadcast beacon signals for nearby discovery.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -70,6 +74,8 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 		<string>voip</string>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

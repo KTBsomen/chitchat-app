@@ -14,6 +14,7 @@ import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 import 'package:chitchat/screens/instant_match_screen.dart';
 import 'package:chitchat/screens/campus_chat_screen.dart';
+import 'package:chitchat/screens/nearby_radar.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:page_transition/page_transition.dart';
 
@@ -292,7 +293,7 @@ class _WatchlistPageState extends State<WatchlistPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildTabHeader(1, 'Watchlist'),
+                  _buildTabHeader(1, 'Nearby'),
                   _buildTabHeader(0, 'Campus'),
                   _buildTabHeader(2, 'For you'),
                 ],
@@ -304,12 +305,86 @@ class _WatchlistPageState extends State<WatchlistPage> {
               child: selectedTab == 0
                   ? _buildCampusLoungeTab()
                   : selectedTab == 1
-                      ? _buildWatchlistTab()
+                      ? NearbyRadarView(
+                          onOpenWatchlist: _openWatchlistBottomSheet,
+                        )
                       : _buildForYouTab(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  void _openWatchlistBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Container(
+          height: MediaQuery.of(bottomSheetContext).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Color(0xFF0A0A1F),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 20,
+                offset: Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.favorite_rounded,
+                            color: Colors.orange, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'Watchlist',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          color: Colors.white70),
+                      onPressed: () => Navigator.pop(bottomSheetContext),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 1),
+              Expanded(
+                child: _buildWatchlistTab(),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

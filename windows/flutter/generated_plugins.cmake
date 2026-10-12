@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   emoji_picker_flutter
   file_selector_windows
   firebase_core
+  flutter_blue_plus_winrt
   flutter_inappwebview_windows
   geolocator_windows
   permission_handler_windows
