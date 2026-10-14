@@ -579,9 +579,7 @@ class NearbyService {
 
       final uid = (actualUser['_id'] ?? actualUser['id'] ?? userMap['_id'] ?? userMap['id'])?.toString();
       if (uid != null && currentMap.containsKey(uid)) {
-        if (userMap.containsKey('activeTag') && userMap['activeTag'] != null) {
-          actualUser['activeTag'] = userMap['activeTag'];
-        }
+        actualUser['activeTag'] = userMap['activeTag'];
         currentMap[uid]!.details = actualUser;
         currentMap[uid]!.isLoading = false;
         returnedIds.add(uid);
@@ -713,6 +711,27 @@ class NearbyService {
     } catch (e) {
       debugPrint("NearbyService.deleteMyActiveTag error: $e");
       return false;
+    }
+  }
+
+  /// Public method to refresh radar details and active tags for all discovered users and current user
+  Future<void> refreshRadarDetails() async {
+    try {
+      debugPrint("NearbyService: Pull-to-refresh triggered");
+      // 1. Fetch current user active tag
+      await fetchMyActiveTag();
+
+      // 2. Trigger Redis Geo / backend nearby users update
+      await triggerLocationSearch();
+
+      // 3. Batch refetch all current users' profiles and active tags
+      final currentMap = usersFoundNotifier.value;
+      final allIds = currentMap.keys.toList();
+      if (allIds.isNotEmpty) {
+        await _fetchUserDetailsBatch(allIds);
+      }
+    } catch (e) {
+      debugPrint("NearbyService.refreshRadarDetails error: $e");
     }
   }
 

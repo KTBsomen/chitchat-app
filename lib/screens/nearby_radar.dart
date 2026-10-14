@@ -1323,23 +1323,36 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
     final myProfile = AppVariables.get<Map<String, dynamic>>('profile');
     final myProfilePic = myProfile?['profilePic'];
 
-    return Stack(
-      children: [
-        // Solar System Orbit Canvas & Planet Nodes (rendered first)
-        Positioned.fill(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final center = Offset(
-                constraints.maxWidth / 2,
-                constraints.maxHeight / 2,
-              );
-              // Radius definitions for 4 concentric oval rings (horizontal & vertical radii)
-              final baseRadiusX = constraints.maxWidth * 0.44;
-              final baseRadiusY = constraints.maxHeight * 0.38;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final center = Offset(
+          constraints.maxWidth / 2,
+          constraints.maxHeight / 2,
+        );
+        // Radius definitions for 4 concentric oval rings (horizontal & vertical radii)
+        final baseRadiusX = constraints.maxWidth * 0.44;
+        final baseRadiusY = constraints.maxHeight * 0.38;
 
-              final orbitRatios = [0.42, 0.62, 0.80, 0.98];
+        final orbitRatios = [0.42, 0.62, 0.80, 0.98];
 
-              return ValueListenableBuilder<Map<String, NearbyUserFound>>(
+        return RefreshIndicator(
+          color: const Color(0xFF00FF9D),
+          backgroundColor: const Color(0xFF141728),
+          strokeWidth: 2.5,
+          edgeOffset: 70.0,
+          onRefresh: () async {
+            await _nearbyService.refreshRadarDetails();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: SizedBox(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+              child: Stack(
+                children: [
+                  // Solar System Orbit Canvas & Planet Nodes (rendered first)
+                  Positioned.fill(
+                    child: ValueListenableBuilder<Map<String, NearbyUserFound>>(
                 valueListenable: _nearbyService.usersFoundNotifier,
                 builder: (context, usersMap, _) {
                   final usersList = usersMap.values.toList();
@@ -1525,10 +1538,8 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                     ],
                   );
                 },
-              );
-            },
-          ),
-        ),
+              ),
+            ),
 
         // Top Toolbar: Status & Watchlist Heart Icon Button (rendered on top so taps always work)
         Positioned(
@@ -1638,7 +1649,12 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
             ],
           ),
         ),
-      ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2319,7 +2335,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                           ),
                       ],
 
-                      // Active broadcast tag banner if active
+                      // Active broadcast tag banner & reply field (ONLY shown if user has an active tag)
                       if (activeTagMsg != null && activeTagMsg.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Container(
@@ -2363,141 +2379,139 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                             ],
                           ),
                         ),
-                      ],
-
-                      // Reply / Chat input field (always available on node tap)
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: replyController,
-                              scrollPadding: const EdgeInsets.only(bottom: 120),
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 13),
-                              decoration: InputDecoration(
-                                hintText: (activeTagMsg != null &&
-                                        activeTagMsg.isNotEmpty)
-                                    ? "Reply to $name's tag..."
-                                    : "Send a message to $name...",
-                                hintStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.4),
-                                  fontSize: 13,
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFF1E1E38),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 10),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide.none,
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: replyController,
+                                scrollPadding:
+                                    const EdgeInsets.only(bottom: 120),
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: "Reply to $name's tag...",
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withOpacity(0.4),
+                                    fontSize: 13,
+                                  ),
+                                  filled: true,
+                                  fillColor: const Color(0xFF1E1E38),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 10),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: BorderSide.none,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: activeColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: isSending
-                                ? const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.black,
+                            const SizedBox(width: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: activeColor,
+                                shape: BoxShape.circle,
+                              ),
+                              child: isSending
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.black,
+                                        ),
                                       ),
-                                    ),
-                                  )
-                                : IconButton(
-                                    icon: const Icon(Icons.send_rounded,
-                                        color: Colors.black, size: 18),
-                                    onPressed: () async {
-                                      final replyText =
-                                          replyController.text.trim();
-                                      if (replyText.isEmpty) return;
+                                    )
+                                  : IconButton(
+                                      icon: const Icon(Icons.send_rounded,
+                                          color: Colors.black, size: 18),
+                                      onPressed: () async {
+                                        final replyText =
+                                            replyController.text.trim();
+                                        if (replyText.isEmpty) return;
 
-                                      final myId = (AppVariables.get<
-                                                      Map<String, dynamic>>(
-                                                  'profile')?['_id'] ??
-                                              '')
-                                          .toString();
-                                      if (myId.isNotEmpty && myId == user.id) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                "Cannot reply to your own node"),
-                                            backgroundColor: Colors.orange,
-                                          ),
-                                        );
-                                        return;
-                                      }
-
-                                      setModalState(() {
-                                        isSending = true;
-                                      });
-
-                                      final modalNav =
-                                          Navigator.of(modalContext);
-                                      final messenger =
-                                          ScaffoldMessenger.of(context);
-
-                                      final res =
-                                          await PersonalChatService.replyToTag(
-                                        targetUserId: user.id,
-                                        replyText: replyText,
-                                        broadcastTagText: activeTagMsg ??
-                                            "Nearby Beacon Wave",
-                                      );
-
-                                      if (!mounted) return;
-
-                                      if (res['success'] == true) {
-                                        modalNav.pop();
-
-                                        final pairList = [myId, user.id]
-                                          ..sort();
-                                        final pairKey = (res['data'] is Map &&
-                                                res['data']['pairKey'] != null)
-                                            ? res['data']['pairKey'].toString()
-                                            : pairList.join('_');
-
-                                        Navigator.push(
-                                          context,
-                                          PageTransition(
-                                            isIos: true,
-                                            type:
-                                                PageTransitionType.rightToLeft,
-                                            child: PersonalChatScreen(
-                                              pairKey: pairKey,
-                                              otherUserId: user.id,
-                                              otherUserName: name,
-                                              otherUserPic: profilePic,
+                                        final myId = (AppVariables.get<
+                                                        Map<String, dynamic>>(
+                                                    'profile')?['_id'] ??
+                                                '')
+                                            .toString();
+                                        if (myId.isNotEmpty &&
+                                            myId == user.id) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  "Cannot reply to your own node"),
+                                              backgroundColor: Colors.orange,
                                             ),
-                                          ),
-                                        );
-                                      } else {
+                                          );
+                                          return;
+                                        }
+
                                         setModalState(() {
-                                          isSending = false;
+                                          isSending = true;
                                         });
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(res['error'] ??
-                                                'Failed to send message'),
-                                            backgroundColor: Colors.redAccent,
-                                          ),
+
+                                        final modalNav =
+                                            Navigator.of(modalContext);
+                                        final messenger =
+                                            ScaffoldMessenger.of(context);
+
+                                        final res =
+                                            await PersonalChatService.replyToTag(
+                                          targetUserId: user.id,
+                                          replyText: replyText,
+                                          broadcastTagText: activeTagMsg,
                                         );
-                                      }
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
+
+                                        if (!mounted) return;
+
+                                        if (res['success'] == true) {
+                                          modalNav.pop();
+
+                                          final pairList = [myId, user.id]
+                                            ..sort();
+                                          final pairKey = (res['data'] is Map &&
+                                                  res['data']['pairKey'] !=
+                                                      null)
+                                              ? res['data']['pairKey']
+                                                  .toString()
+                                              : pairList.join('_');
+
+                                          Navigator.push(
+                                            context,
+                                            PageTransition(
+                                              isIos: true,
+                                              type: PageTransitionType
+                                                  .rightToLeft,
+                                              child: PersonalChatScreen(
+                                                pairKey: pairKey,
+                                                otherUserId: user.id,
+                                                otherUserName: name,
+                                                otherUserPic: profilePic,
+                                              ),
+                                            ),
+                                          );
+                                        } else {
+                                          setModalState(() {
+                                            isSending = false;
+                                          });
+                                          messenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(res['error'] ??
+                                                  'Failed to send message'),
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                            ),
+                          ],
+                        ),
+                      ],
 
                       const SizedBox(height: 20),
 
