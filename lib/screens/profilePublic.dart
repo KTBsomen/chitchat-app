@@ -13,6 +13,8 @@ import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/screens/groupPrivet.dart';
 import 'package:chitchat/screens/groupPublic.dart';
 import 'package:chitchat/screens/recomandedgroups.dart';
+import 'package:chitchat/screens/personal_chat_screen.dart';
+import 'package:chitchat/services/personal_chat_service.dart';
 import 'package:chitchat/services/fileUploader.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/services/user.dart';
@@ -37,6 +39,97 @@ class PublicProfilePage extends StatefulWidget {
 
 class _PublicProfilePageState extends State<PublicProfilePage>
     with TickerProviderStateMixin {
+
+  void _openChatRequestDialog() {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2230),
+        title: Text(
+          'Message ' + (userProfile?['name'] ?? 'User'),
+          style: const TextStyle(color: Colors.white, fontFamily: 'Poppins'),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Send a message request to start chatting.',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: textController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Type your message...',
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.tealAccent,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () async {
+              final msg = textController.text.trim();
+              if (msg.isEmpty) return;
+              Navigator.pop(ctx);
+
+              final res = await PersonalChatService.sendChatRequest(
+                targetUserId: widget.uid,
+                initialMessage: msg,
+              );
+
+              if (!mounted) return;
+
+              if (res['success'] == true) {
+                final myId = myProfile?['_id'] ?? (await UserService.getUserId()) ?? '';
+                final pairList = [myId.toString(), widget.uid]..sort();
+                final pairKey = res['data']?['pairKey'] ?? pairList.join('_');
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PersonalChatScreen(
+                      pairKey: pairKey,
+                      otherUserId: widget.uid,
+                      otherUserName: userProfile?['name'] ?? 'User',
+                      otherUserPic: userProfile?['profilePic'],
+                    ),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(res['error'] ?? 'Failed to send chat request'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
   FriendCircleGroup? userGroup;
   Map<String, dynamic>? userProfile;
   Map<String, dynamic>? myProfile;
@@ -857,6 +950,34 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                 textAlign: TextAlign.left,
                               ),
                             ),
+
+                            if (myProfile?['_id'] != widget.uid)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                    label: const Text(
+                                      'Message',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.tealAccent,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    onPressed: _openChatRequestDialog,
+                                  ),
+                                ),
+                              ),
 
                             Divider(
                               color: const Color.fromARGB(95, 158, 158, 158),

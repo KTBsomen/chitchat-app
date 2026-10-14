@@ -240,8 +240,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                       PageTransition(
                         type: PageTransitionType.rightToLeft,
                         child: PublicProfilePage(
-                            dbIndex:
-                                group.members[index].additionalData['dbIndex'],
+                            dbIndex: group
+                                .members[index].additionalData['dbIndex']
+                                .toString(),
                             uid: group.members[index].id),
                       ),
                     );

@@ -32,6 +32,36 @@ class NearbyUserFound {
     lastSeen = DateTime.now();
   }
 
+  bool get isRecentlyActive {
+    return DateTime.now().difference(lastSeen).inMinutes < 5;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'distanceMeters': distanceMeters,
+        'distanceFormatted': distanceFormatted,
+        'rssi': rssi,
+        'details': details,
+        'isLoading': isLoading,
+        'lastSeen': lastSeen.toIso8601String(),
+        'discoverySource': discoverySource,
+      };
+
+  factory NearbyUserFound.fromJson(Map<String, dynamic> json) => NearbyUserFound(
+        id: json['id']?.toString() ?? '',
+        distanceMeters: (json['distanceMeters'] as num?)?.toDouble() ?? 50.0,
+        distanceFormatted: json['distanceFormatted']?.toString() ?? 'Nearby',
+        rssi: (json['rssi'] as num?)?.toInt() ?? -70,
+        details: json['details'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(json['details'])
+            : (json['details'] is Map ? Map<String, dynamic>.from(json['details']) : null),
+        isLoading: json['isLoading'] ?? false,
+        lastSeen: json['lastSeen'] != null
+            ? DateTime.tryParse(json['lastSeen'].toString()) ?? DateTime.now()
+            : DateTime.now(),
+        discoverySource: json['discoverySource']?.toString() ?? 'bluetooth',
+      );
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

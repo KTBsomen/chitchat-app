@@ -194,6 +194,16 @@ class UserService {
             .trim();
       }
 
+      final prefs = await SharedPreferences.getInstance();
+      if (name != null && name.isNotEmpty) {
+        await prefs.setString('apple_user_name', name);
+      } else {
+        final cached = prefs.getString('apple_user_name');
+        if (cached != null && cached.isNotEmpty) {
+          name = cached;
+        }
+      }
+
       String? token = await FCMService.getFcmToken();
       if (token != null) {
         AppVariables.update("fcmToken", token);

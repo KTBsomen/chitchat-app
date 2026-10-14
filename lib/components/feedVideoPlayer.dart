@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -29,6 +30,8 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
   bool _disposed = false;
   bool _isInitializing = false;
 
+  Timer? _initDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +50,7 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
   @override
   void didPushNext() {
     _isRouteActive = false;
+    _initDebounce?.cancel();
     // Fully dispose the controller to release the native hardware decoder
     _releaseController();
   }
@@ -56,16 +60,29 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
     _isRouteActive = true;
     // Lazy re-init will pick it up if visible via _onVisibilityChanged
     if (_isVisible && !_initialized && !_isInitializing) {
-      _initController();
+      _scheduleInit();
     }
   }
 
   void _releaseController() {
-    _controller?.dispose();
+    _initDebounce?.cancel();
+    try {
+      _controller?.pause();
+      _controller?.dispose();
+    } catch (_) {}
     _controller = null;
     _initialized = false;
     _isInitializing = false;
     if (mounted) setState(() {});
+  }
+
+  void _scheduleInit() {
+    if (_isInitializing || _disposed || _hasError) return;
+    _initDebounce?.cancel();
+    _initDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted || _disposed || !_isVisible || !_isRouteActive) return;
+      _initController();
+    });
   }
 
   Future<void> _initController() async {
@@ -75,14 +92,16 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
       final controller =
           VideoPlayerController.networkUrl(Uri.parse(widget.url));
       // Check disposed BEFORE the expensive network call
-      if (_disposed) {
+      if (_disposed || !_isVisible || !_isRouteActive) {
         controller.dispose();
+        _isInitializing = false;
         return;
       }
       await controller.initialize();
       // Check disposed AFTER the async gap
-      if (_disposed) {
+      if (_disposed || !_isVisible || !_isRouteActive) {
         controller.dispose();
+        _isInitializing = false;
         return;
       }
       _controller = controller;
@@ -112,21 +131,25 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
     final visible = info.visibleFraction >= 0.5;
     _isVisible = visible;
 
-    // Lazy init: only create the controller when scrolled into view
-    if (visible && !_initialized && !_isInitializing && !_hasError) {
-      _initController();
-      return;
-    }
-
-    if (!_initialized || _controller == null) return;
-
     if (visible && _isRouteActive) {
-      if (!_controller!.value.isPlaying) {
-        _controller!.play();
+      if (!_initialized && !_isInitializing && !_hasError) {
+        _scheduleInit();
+      } else if (_initialized && _controller != null) {
+        if (!_controller!.value.isPlaying) {
+          _controller!.play();
+        }
       }
     } else {
-      if (_controller!.value.isPlaying) {
-        _controller!.pause();
+      // Scrolled out of view: cancel debounce and release hardware decoder
+      _initDebounce?.cancel();
+      if (info.visibleFraction < 0.15) {
+        if (_controller != null) {
+          _releaseController();
+        }
+      } else if (_initialized && _controller != null) {
+        if (_controller!.value.isPlaying) {
+          _controller!.pause();
+        }
       }
     }
   }
@@ -142,15 +165,20 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
   @override
   void dispose() {
     _disposed = true;
+    _initDebounce?.cancel();
     routeObserver.unsubscribe(this);
-    _controller?.dispose();
+    try {
+      _controller?.pause();
+      _controller?.dispose();
+    } catch (_) {}
+    _controller = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return VisibilityDetector(
-      key: Key('feed-video-${widget.url}-${identityHashCode(this)}'),
+      key: Key('feed-video-${widget.url}'),
       onVisibilityChanged: _onVisibilityChanged,
       child: GestureDetector(
         onTap: widget.onTap,
@@ -168,7 +196,7 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
           height: 300,
           child: _hasError
               ? _buildErrorFallback()
-              : _initialized
+              : (_initialized && _controller != null && _controller!.value.isInitialized)
                   ? _buildPlayer()
                   : _buildLoading(),
         ),
@@ -177,6 +205,9 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> with RouteAware {
   }
 
   Widget _buildPlayer() {
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return _buildLoading();
+    }
     return Stack(
       fit: StackFit.expand,
       children: [

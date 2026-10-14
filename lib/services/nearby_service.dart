@@ -13,6 +13,8 @@ import 'package:http/http.dart' as http;
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/services/beacon_extractor.dart';
 import 'package:chitchat/services/user.dart';
+import 'package:chitchat/services/personal_chat_service.dart';
+import 'package:chitchat/services/location_service.dart';
 import 'package:chitchat/utils/object_id_converter.dart';
 
 /// Top-level callback required for FlutterForegroundTask
@@ -60,6 +62,7 @@ class NearbyService {
   NearbyService._internal();
 
   static const String _prefNearbyEnabled = 'nearby_beacon_enabled';
+  static const String _prefCachedUsers = 'cached_nearby_users_v1';
 
   final BeaconBroadcaster _broadcaster = BeaconBroadcaster();
   StreamSubscription<List<ScanResult>>? _scanSubscription;
@@ -69,11 +72,72 @@ class NearbyService {
   final ValueNotifier<bool> isScanningNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<Map<String, NearbyUserFound>> usersFoundNotifier =
       ValueNotifier<Map<String, NearbyUserFound>>({});
+  final ValueNotifier<Map<String, dynamic>?> myActiveTagNotifier =
+      ValueNotifier<Map<String, dynamic>?>(null);
 
   final Set<String> _pendingFetchIds = {};
   Timer? _fetchDebounceTimer;
 
   bool _isServiceInitialized = false;
+  bool _shouldScan = false;
+  bool _isStartingScan = false;
+  DateTime? _lastScanStartTime;
+  Timer? _scanWatchdogTimer;
+  Timer? _stalePruneTimer;
+  Timer? _locationScanTimer;
+  Timer? _cacheDebounceTimer;
+
+  /// Load cached users from SharedPreferences into usersFoundNotifier
+  /// and refetch their current profile details and tags from backend.
+  Future<void> loadCachedUsers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefCachedUsers);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          final currentMap =
+              Map<String, NearbyUserFound>.from(usersFoundNotifier.value);
+          final List<String> idsToRefetch = [];
+          for (final item in decoded) {
+            if (item is Map<String, dynamic>) {
+              final user = NearbyUserFound.fromJson(item);
+              if (user.id.isNotEmpty && !currentMap.containsKey(user.id)) {
+                currentMap[user.id] = user;
+                idsToRefetch.add(user.id);
+              }
+            }
+          }
+          usersFoundNotifier.value = currentMap;
+          if (idsToRefetch.isNotEmpty) {
+            _fetchUserDetailsBatch(idsToRefetch);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("NearbyService.loadCachedUsers error: $e");
+    }
+  }
+
+  /// Debounced save of current users to SharedPreferences
+  void saveCachedUsersDebounced() {
+    _cacheDebounceTimer?.cancel();
+    _cacheDebounceTimer = Timer(const Duration(milliseconds: 600), () {
+      saveCachedUsers();
+    });
+  }
+
+  /// Save current users to SharedPreferences
+  Future<void> saveCachedUsers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final usersList =
+          usersFoundNotifier.value.values.map((u) => u.toJson()).toList();
+      await prefs.setString(_prefCachedUsers, jsonEncode(usersList));
+    } catch (e) {
+      debugPrint("NearbyService.saveCachedUsers error: $e");
+    }
+  }
 
   /// Check if user has explicitly enabled nearby beacon discovery and permissions are granted
   Future<bool> hasUserEnabledNearby() async {
@@ -151,9 +215,11 @@ class NearbyService {
     }
   }
 
-  /// Called at app launch to resume foreground service and broadcasting if enabled
+  /// Called at app launch to resume foreground service, load cached profiles, and broadcasting if enabled
   static Future<void> initOnAppLaunch() async {
     final service = NearbyService.instance;
+    await service.loadCachedUsers();
+
     final enabled = await service.hasUserEnabledNearby();
     if (!enabled) return;
 
@@ -184,10 +250,10 @@ class NearbyService {
             playSound: false,
           ),
           foregroundTaskOptions: ForegroundTaskOptions(
-            eventAction: ForegroundTaskEventAction.repeat(15000),
-            autoRunOnBoot: true,
-            autoRunOnMyPackageReplaced: true,
-            allowWakeLock: true,
+            eventAction: ForegroundTaskEventAction.repeat(30000),
+            autoRunOnBoot: false,
+            autoRunOnMyPackageReplaced: false,
+            allowWakeLock: false,
             allowWifiLock: false,
           ),
         );
@@ -267,11 +333,15 @@ class NearbyService {
     }
   }
 
-  /// Start scanning for nearby beacons
+  /// Start scanning for nearby beacons continuously
   Future<void> startScanning() async {
-    if (isScanningNotifier.value) return;
+    _shouldScan = true;
+    isScanningNotifier.value = true;
 
     try {
+      // 0. Ensure cached users are loaded from local storage
+      await loadCachedUsers();
+
       // Ensure Bluetooth is on
       if (Platform.isAndroid) {
         try {
@@ -279,58 +349,127 @@ class NearbyService {
         } catch (_) {}
       }
 
-      await _scanSubscription?.cancel();
-      isScanningNotifier.value = true;
+      // 1. Setup scan results listener BEFORE starting the scan
+      if (_scanSubscription == null) {
+        final myUserId = await UserService.getUserId();
 
-      // Start BLE scan with continuous updates for dynamic distance estimation
-      await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 45),
-        continuousUpdates: true,
-      );
-
-      final myUserId = await UserService.getUserId();
-
-      _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-        for (final r in results) {
-          // Look for iBeacon manufacturer data
-          final beaconData = BeaconExtractor.extractIBeacon(
-            r.advertisementData.manufacturerData,
-            r.rssi,
-          ) ?? BeaconExtractor.extractAltBeacon(
-            r.advertisementData.manufacturerData,
-            r.rssi,
-          );
-
-          if (beaconData != null) {
-            final String targetUserId = beaconData['objectId'];
-            final double distanceMeters = beaconData['distanceMeters'];
-            final String distanceFormatted = beaconData['distanceFormatted'];
-            final int rssi = beaconData['rssi'];
-
-            // Skip discovering oneself
-            if (myUserId != null && targetUserId == myUserId) {
-              continue;
-            }
-
-            _onBeaconDiscovered(
-              targetUserId,
-              distanceMeters,
-              distanceFormatted,
-              rssi,
+        _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+          for (final r in results) {
+            final beaconData = BeaconExtractor.extractIBeacon(
+              r.advertisementData.manufacturerData,
+              r.rssi,
+            ) ?? BeaconExtractor.extractAltBeacon(
+              r.advertisementData.manufacturerData,
+              r.rssi,
             );
+
+            if (beaconData != null) {
+              final String targetUserId = beaconData['objectId'];
+              final double distanceMeters = beaconData['distanceMeters'];
+              final String distanceFormatted = beaconData['distanceFormatted'];
+              final int rssi = beaconData['rssi'];
+
+              if (myUserId != null && targetUserId == myUserId) {
+                continue;
+              }
+
+              _onBeaconDiscovered(
+                targetUserId,
+                distanceMeters,
+                distanceFormatted,
+                rssi,
+              );
+            }
           }
+        });
+      }
+
+      // 2. Safely trigger scan without recursive listeners
+      await _triggerScan();
+
+      // 3. Heartbeat watchdog timer every 25s to keep scan continuously active
+      _scanWatchdogTimer?.cancel();
+      _scanWatchdogTimer = Timer.periodic(const Duration(seconds: 25), (t) {
+        if (!_shouldScan) {
+          t.cancel();
+          return;
+        }
+        if (!FlutterBluePlus.isScanningNow) {
+          debugPrint("NearbyService watchdog: scanner inactive. Triggering scan...");
+          _triggerScan();
         }
       });
+
+      // 4. Periodic UI tick: preserves cached users and triggers UI refresh for active (green) vs inactive (gray) borders
+      _stalePruneTimer?.cancel();
+      _stalePruneTimer = Timer.periodic(const Duration(seconds: 25), (t) {
+        if (!_shouldScan) {
+          t.cancel();
+          return;
+        }
+        usersFoundNotifier.value =
+            Map<String, NearbyUserFound>.from(usersFoundNotifier.value);
+      });
+
+      // 5. Periodic Location Search: search backend with GPS coordinates
+      _locationScanTimer?.cancel();
+      _locationScanTimer =
+          Timer.periodic(const Duration(seconds: 20), (t) {
+        if (!_shouldScan) {
+          t.cancel();
+          return;
+        }
+        triggerLocationSearch();
+      });
+      triggerLocationSearch();
     } catch (e) {
       debugPrint("NearbyService.startScanning error: $e");
-      isScanningNotifier.value = false;
+    }
+  }
+
+  Future<void> _triggerScan() async {
+    if (!_shouldScan) return;
+    if (_isStartingScan) return;
+    if (FlutterBluePlus.isScanningNow) return;
+
+    // Cooldown check: Android enforces maximum 5 scan starts per 30 seconds (status 6 SCAN_FAILED_SCANNING_TOO_FREQUENTLY)
+    final now = DateTime.now();
+    if (_lastScanStartTime != null &&
+        now.difference(_lastScanStartTime!).inSeconds < 8) {
+      debugPrint("NearbyService: scan trigger throttled by cooldown");
+      return;
+    }
+
+    _isStartingScan = true;
+    _lastScanStartTime = now;
+
+    try {
+      debugPrint("NearbyService: starting BLE scan...");
+      await FlutterBluePlus.startScan(
+        continuousUpdates: true,
+        androidScanMode: AndroidScanMode.balanced,
+      );
+      debugPrint("NearbyService: BLE scan started successfully");
+    } catch (e) {
+      debugPrint("NearbyService._triggerScan error: $e");
+    } finally {
+      _isStartingScan = false;
     }
   }
 
   /// Stop scanning
   Future<void> stopScanning() async {
+    _shouldScan = false;
+    _scanWatchdogTimer?.cancel();
+    _scanWatchdogTimer = null;
+    _stalePruneTimer?.cancel();
+    _stalePruneTimer = null;
+    _locationScanTimer?.cancel();
+    _locationScanTimer = null;
     try {
-      await FlutterBluePlus.stopScan();
+      if (FlutterBluePlus.isScanningNow) {
+        await FlutterBluePlus.stopScan();
+      }
       await _scanSubscription?.cancel();
       _scanSubscription = null;
       isScanningNotifier.value = false;
@@ -346,11 +485,16 @@ class NearbyService {
     String distanceFormatted,
     int rssi,
   ) {
-    final currentMap = Map<String, NearbyUserFound>.from(usersFoundNotifier.value);
+    final currentMap =
+        Map<String, NearbyUserFound>.from(usersFoundNotifier.value);
 
     if (currentMap.containsKey(userId)) {
       currentMap[userId]!.updateDistance(distanceMeters, rssi);
+      currentMap[userId]!.lastSeen = DateTime.now();
       usersFoundNotifier.value = currentMap;
+      if (currentMap[userId]!.details == null) {
+        _queueFetchUserDetails(userId);
+      }
     } else {
       currentMap[userId] = NearbyUserFound(
         id: userId,
@@ -358,10 +502,13 @@ class NearbyService {
         distanceFormatted: distanceFormatted,
         rssi: rssi,
         isLoading: true,
+        lastSeen: DateTime.now(),
+        discoverySource: 'bluetooth',
       );
       usersFoundNotifier.value = currentMap;
       _queueFetchUserDetails(userId);
     }
+    saveCachedUsersDebounced();
   }
 
   /// Queue a user ID to fetch details from backend
@@ -426,11 +573,19 @@ class NearbyService {
     final returnedIds = <String>{};
 
     for (final userMap in results) {
-      final uid = (userMap['_id'] ?? userMap['id'])?.toString();
+      final actualUser = userMap.containsKey('_doc') && userMap['_doc'] is Map
+          ? Map<String, dynamic>.from(userMap['_doc'] as Map)
+          : Map<String, dynamic>.from(userMap);
+
+      final uid = (actualUser['_id'] ?? actualUser['id'] ?? userMap['_id'] ?? userMap['id'])?.toString();
       if (uid != null && currentMap.containsKey(uid)) {
-        currentMap[uid]!.details = userMap;
+        if (userMap.containsKey('activeTag') && userMap['activeTag'] != null) {
+          actualUser['activeTag'] = userMap['activeTag'];
+        }
+        currentMap[uid]!.details = actualUser;
         currentMap[uid]!.isLoading = false;
         returnedIds.add(uid);
+        debugPrint("NearbyService: User $uid activeTag -> ${actualUser['activeTag']}");
       }
     }
 
@@ -441,10 +596,11 @@ class NearbyService {
           final profileRes =
               await UserService.fetchUserPublicProfile(dbIndex: '0', uid: id);
           if (profileRes['success'] == true && profileRes['data'] != null) {
-            currentMap[id]!.details = profileRes['data'] as Map<String, dynamic>;
+            final profileData = Map<String, dynamic>.from(profileRes['data'] as Map);
+            currentMap[id]!.details = profileData;
             currentMap[id]!.isLoading = false;
+            debugPrint("NearbyService: Fallback fetched profile for $id, activeTag -> ${profileData['activeTag']}");
           } else {
-            // Keep with basic placeholder if not found
             currentMap[id]!.isLoading = false;
           }
         } catch (_) {
@@ -454,6 +610,110 @@ class NearbyService {
     }
 
     usersFoundNotifier.value = currentMap;
+    saveCachedUsersDebounced();
+  }
+
+  /// Trigger a location-based nearby query from backend
+  Future<void> triggerLocationSearch() async {
+    try {
+      final results =
+          await LocationTrackingService.instance.fetchNearbyUsers();
+      if (results.isNotEmpty) {
+        addLocationDiscoveredUsers(results);
+      }
+    } catch (e) {
+      debugPrint("NearbyService.triggerLocationSearch error: $e");
+    }
+  }
+
+  /// Process users discovered via server location search
+  void addLocationDiscoveredUsers(
+      List<Map<String, dynamic>> locationUsers) async {
+    final myUserId = await UserService.getUserId();
+    final currentMap =
+        Map<String, NearbyUserFound>.from(usersFoundNotifier.value);
+    bool changed = false;
+
+    for (final userMap in locationUsers) {
+      final actualUser = userMap.containsKey('_doc') && userMap['_doc'] is Map
+          ? Map<String, dynamic>.from(userMap['_doc'] as Map)
+          : Map<String, dynamic>.from(userMap);
+
+      final uid = (actualUser['_id'] ??
+              actualUser['id'] ??
+              userMap['_id'] ??
+              userMap['id'])
+          ?.toString();
+      if (uid == null || uid.isEmpty || uid == myUserId) continue;
+
+      final distMeters =
+          (userMap['distanceMeters'] as num?)?.toDouble() ?? 50.0;
+      final distFormatted = userMap['distanceFormatted']?.toString() ??
+          (distMeters < 1000
+              ? "${distMeters.toStringAsFixed(0)}m"
+              : "${(distMeters / 1000).toStringAsFixed(1)}km");
+
+      if (currentMap.containsKey(uid)) {
+        final existing = currentMap[uid]!;
+        existing.details = actualUser;
+        existing.isLoading = false;
+        existing.lastSeen = DateTime.now();
+        if (existing.discoverySource == 'location') {
+          existing.distanceMeters = distMeters;
+          existing.distanceFormatted = distFormatted;
+        }
+        changed = true;
+      } else {
+        currentMap[uid] = NearbyUserFound(
+          id: uid,
+          distanceMeters: distMeters,
+          distanceFormatted: distFormatted,
+          rssi: -60,
+          details: actualUser,
+          isLoading: false,
+          lastSeen: DateTime.now(),
+          discoverySource: 'location',
+        );
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      usersFoundNotifier.value = currentMap;
+      saveCachedUsersDebounced();
+    }
+  }
+
+  /// Fetch the current user's active nearby tag from server
+  Future<void> fetchMyActiveTag() async {
+    try {
+      final res = await PersonalChatService.getMyNearbyTag();
+      if (res['success'] == true) {
+        final tag = res['tag'];
+        if (tag is Map) {
+          myActiveTagNotifier.value = Map<String, dynamic>.from(tag);
+        } else {
+          myActiveTagNotifier.value = null;
+        }
+      }
+    } catch (e) {
+      debugPrint("NearbyService.fetchMyActiveTag error: $e");
+    }
+  }
+
+  /// Delete / Clear the current user's active nearby tag from server
+  Future<bool> deleteMyActiveTag() async {
+    try {
+      final res = await PersonalChatService.deleteNearbyTag();
+      if (res['success'] == true) {
+        myActiveTagNotifier.value = null;
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint("NearbyService.deleteMyActiveTag error: $e");
+      return false;
+    }
   }
 
   /// Stop all nearby services (scan, broadcast, foreground service)

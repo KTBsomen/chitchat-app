@@ -28,6 +28,7 @@ import 'package:deep_link_router/deep_link_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/deferred_link_service.dart';
 import 'services/nearby_service.dart';
+import 'services/location_service.dart';
 import 'screens/chat.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -78,6 +79,8 @@ class _LoginScreenState extends State<LoginScreen> {
           Future.delayed(Duration(seconds: 1), () async {
             if (!mounted) return;
             NearbyService.initOnAppLaunch();
+            Future.microtask(() =>
+                LocationTrackingService.instance.startLocationTracking());
             Navigator.pushReplacement(
                 context,
                 PageTransition(
@@ -229,6 +232,8 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         if (!mounted) return;
         NearbyService.initOnAppLaunch();
+        Future.microtask(() =>
+            LocationTrackingService.instance.startLocationTracking());
         Navigator.pushReplacement(
             context,
             PageTransition(

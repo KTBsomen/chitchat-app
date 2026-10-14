@@ -664,7 +664,9 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                     Uri.parse("https://chitzchat.com/privacy-policy.html"));
               }
               if (value == 'delete_account') {
-                _showDeleteAccountConfirmation(context);
+                // _showDeleteAccountConfirmation(context);
+                launchUrl(Uri.parse("https://chitzchat.com/#contact"),
+                    mode: LaunchMode.externalApplication);
               }
               if (value == 'blocked_users') {
                 _showBlockedUsersList(context);

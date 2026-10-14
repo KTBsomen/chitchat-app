@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/main.dart';
@@ -38,6 +39,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   int _stepIndex = 0;
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
   String? _name,
       _gender,
       _birthday,
@@ -140,6 +142,23 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       progressNotifier: _progressNotifier,
     );
 
+    final userProfile = AppVariables.get<AuthProfile>('userProfile');
+    final initialName = userProfile?.name;
+    if (initialName != null && initialName.isNotEmpty) {
+      _nameController.text = initialName;
+      _name = initialName;
+    } else {
+      SharedPreferences.getInstance().then((prefs) {
+        final cached = prefs.getString('apple_user_name');
+        if (cached != null && cached.isNotEmpty && mounted) {
+          setState(() {
+            _nameController.text = cached;
+            _name = cached;
+          });
+        }
+      });
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AuthProfile? googleUser = AppVariables.get<AuthProfile>('userProfile');
       if (googleUser == null) {
@@ -200,7 +219,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
     print("googleUser: ${googleUser?.email}");
     final formData = {
-      "name": _name,
+      "name": _name ?? _nameController.text.trim(),
       "email": googleUser?.email,
       "appleId": googleUser?.appleId,
       "birthday": _birthday,
@@ -806,14 +825,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         child: Column(
                           children: [
                             TextFormField(
+                              controller: _nameController,
                               maxLength: 30,
                               decoration:
                                   const InputDecoration(labelText: "Name"),
-                              validator: (value) => value!.isEmpty ||
-                                      value.length < 3
+                              validator: (value) => value == null ||
+                                      value.trim().isEmpty ||
+                                      value.trim().length < 3
                                   ? "Name is required and must be minimum 3 or maximum 30 characters long "
                                   : null,
                               onChanged: (value) => _name = value,
+                              onSaved: (value) => _name = value,
                               autofocus: true,
                             ),
                             TextFormField(
@@ -1221,5 +1243,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _usernameController.dispose();
+    _birthdayController.dispose();
+    _faceDetector.close();
+    _debounce?.cancel();
+    super.dispose();
   }
 }

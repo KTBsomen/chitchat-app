@@ -20,6 +20,7 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/appstate/storyPrefs.dart';
 
 import 'package:chitchat/components/appbar.dart';
+import 'package:chitchat/components/personal_chat_button.dart';
 import 'package:chitchat/components/bottomnav.dart';
 import 'package:chitchat/components/renderpost.dart';
 import 'package:chitchat/constants/colors.dart';
@@ -366,7 +367,7 @@ class _HomePageState extends State<HomePage> {
                   content:
                       Text("Your session has expired. Please login again."),
                   actions: [
-                    TextButton(
+                            TextButton(
                       onPressed: () async {
                         await UserService.signOut((b) {});
 
@@ -633,6 +634,7 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       actions: [
+        const PersonalChatButton(),
         const NotificationIcon(
           icon: Icons.notifications_none_rounded,
           type: NotificationIconType.Notification,

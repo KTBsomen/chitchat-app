@@ -87,7 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _mqttInitialized = true;
 
     mqtt = MQTTService(
-      broker: '13.204.75.73',
+      broker: 'chitzchat.com',
       // broker: '192.168.0.114',
       clientId: ((await UserService.getUserId()).toString().substring(0, 20)),
       onConnected: _onConnected,

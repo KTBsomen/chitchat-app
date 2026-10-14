@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -40,6 +41,8 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
   bool _disposed = false;
   bool _isInitializing = false;
 
+  Timer? _initDebounce;
+
   String get videoUrl => widget.url;
 
   @override
@@ -61,6 +64,7 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
   @override
   void didPushNext() {
     _isRouteActive = false;
+    _initDebounce?.cancel();
     // Fully dispose the controller to release the native hardware decoder
     _releaseController();
   }
@@ -70,16 +74,29 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
     _isRouteActive = true;
     // Lazy re-init will pick it up if visible via _onVisibilityChanged
     if (_isVisible && !_isInitialized && !_isInitializing) {
-      _initController();
+      _scheduleInit();
     }
   }
 
   void _releaseController() {
-    _controller?.dispose();
+    _initDebounce?.cancel();
+    try {
+      _controller?.pause();
+      _controller?.dispose();
+    } catch (_) {}
     _controller = null;
     _isInitialized = false;
     _isInitializing = false;
     if (mounted) setState(() {});
+  }
+
+  void _scheduleInit() {
+    if (_isInitializing || _disposed) return;
+    _initDebounce?.cancel();
+    _initDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted || _disposed || !_isVisible || !_isRouteActive) return;
+      _initController();
+    });
   }
 
   Future<void> _initController() async {
@@ -88,14 +105,16 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
     try {
       final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
       // Check disposed BEFORE the expensive network call
-      if (_disposed) {
+      if (_disposed || !_isVisible || !_isRouteActive) {
         controller.dispose();
+        _isInitializing = false;
         return;
       }
       await controller.initialize();
       // Check disposed AFTER the async gap
-      if (_disposed) {
+      if (_disposed || !_isVisible || !_isRouteActive) {
         controller.dispose();
+        _isInitializing = false;
         return;
       }
       _controller = controller;
@@ -138,21 +157,24 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
     final visible = info.visibleFraction >= 0.5;
     _isVisible = visible;
 
-    // Lazy init: only create the controller when scrolled into view
-    if (visible && !_isInitialized && !_isInitializing) {
-      _initController();
-      return;
-    }
-
-    if (!_isInitialized || _controller == null) return;
-
     if (visible && _isRouteActive) {
-      if (!_controller!.value.isPlaying) {
-        _controller!.play();
+      if (!_isInitialized && !_isInitializing) {
+        _scheduleInit();
+      } else if (_isInitialized && _controller != null) {
+        if (!_controller!.value.isPlaying) {
+          _controller!.play();
+        }
       }
     } else {
-      if (_controller!.value.isPlaying) {
-        _controller!.pause();
+      _initDebounce?.cancel();
+      if (info.visibleFraction < 0.15) {
+        if (_controller != null) {
+          _releaseController();
+        }
+      } else if (_isInitialized && _controller != null) {
+        if (_controller!.value.isPlaying) {
+          _controller!.pause();
+        }
       }
     }
   }
@@ -160,8 +182,13 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
   @override
   void dispose() {
     _disposed = true;
+    _initDebounce?.cancel();
     routeObserver.unsubscribe(this);
-    _controller?.dispose();
+    try {
+      _controller?.pause();
+      _controller?.dispose();
+    } catch (_) {}
+    _controller = null;
     super.dispose();
   }
 
@@ -176,7 +203,7 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
   @override
   Widget build(BuildContext context) {
     return VisibilityDetector(
-      key: Key('video-view-${widget.url}-${identityHashCode(this)}'),
+      key: Key('video-view-${widget.url}'),
       onVisibilityChanged: _onVisibilityChanged,
       child: SizedBox(
         width: double.infinity,
@@ -205,7 +232,7 @@ class _VideoMessageViewState extends State<VideoMessageView> with RouteAware {
                 }
               },
               child: SizedBox.expand(
-                child: _isInitialized
+                child: (_isInitialized && _controller != null && _controller!.value.isInitialized)
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: FittedBox(
