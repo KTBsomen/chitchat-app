@@ -367,7 +367,7 @@ class _HomePageState extends State<HomePage> {
                   content:
                       Text("Your session has expired. Please login again."),
                   actions: [
-                            TextButton(
+                    TextButton(
                       onPressed: () async {
                         await UserService.signOut((b) {});
 
@@ -640,7 +640,7 @@ class _HomePageState extends State<HomePage> {
           type: NotificationIconType.Notification,
         ),
         NotificationIcon(
-          icon: Icons.messenger_outline_rounded,
+          icon: Icons.forum_outlined,
           type: NotificationIconType.Message,
           onPressed: () {
             print("Messages clicked!");

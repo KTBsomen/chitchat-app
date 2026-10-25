@@ -157,16 +157,16 @@ class FriendCircle extends StatelessWidget {
 
     // Dynamic node size calculation
     double effectiveNodeSize = nodeSize ?? (size * 0.27);
-    if (buildCount > 0 && buildCount <= 1) {
+    if (buildCount > 0 && buildCount <= 2) {
       effectiveNodeSize = size * 0.40;
-    } else if (buildCount > 1 && buildCount <= 3) {
+    } else if (buildCount > 2 && buildCount <= 4) {
       effectiveNodeSize = size * 0.40;
-    } else if (buildCount > 3 && buildCount <= 5) {
+    } else if (buildCount > 4 && buildCount <= 6) {
       effectiveNodeSize = size * 0.32;
     }
 
     // painter should use a fixed integer for the ring smoothness
-    final painterCount = buildCount >= 1 ? 10 : 0;
+    final painterCount = buildCount >= 2 ? 10 : 0;
 
     // ✅ Create a single shuffled index list once
     final shuffledIndices = List.generate(buildCount, (idx) => idx)..shuffle();
@@ -351,7 +351,7 @@ class OuterEdgePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (memberCount < 1) return;
+    if (memberCount < 2) return;
 
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - 40) / 2;

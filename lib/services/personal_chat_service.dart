@@ -123,7 +123,7 @@ class PersonalChatService {
   static Future<Map<String, dynamic>> broadcastNearbyTag({
     required String message,
     String? tagType,
-    int ttlSeconds = 1800,
+    int ttlSeconds = 86400,
   }) async {
     try {
       final token = await UserService.getAccessToken();
@@ -148,7 +148,8 @@ class PersonalChatService {
       } else {
         return {
           'success': false,
-          'error': data['message'] ?? data['error'] ?? 'Failed to broadcast tag',
+          'error':
+              data['message'] ?? data['error'] ?? 'Failed to broadcast tag',
         };
       }
     } catch (e) {
@@ -273,7 +274,8 @@ class PersonalChatService {
   }
 
   /// Helper: Check if a chat has an unseen message locally
-  static Future<bool> isChatUnseen(String pairKey, String? latestMessageId) async {
+  static Future<bool> isChatUnseen(
+      String pairKey, String? latestMessageId) async {
     if (latestMessageId == null || latestMessageId.isEmpty) return false;
     final prefs = await SharedPreferences.getInstance();
     final lastSeenId = prefs.getString('last_seen_' + pairKey);
@@ -281,9 +283,180 @@ class PersonalChatService {
   }
 
   /// Helper: Mark a chat as seen up to messageId
-  static Future<void> markChatAsSeen(String pairKey, String? latestMessageId) async {
+  static Future<void> markChatAsSeen(
+      String pairKey, String? latestMessageId) async {
     if (latestMessageId == null || latestMessageId.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_seen_' + pairKey, latestMessageId);
+  }
+
+  /// Fetch predefined tag suggestions from backend (vibe and update status tags)
+  static Future<Map<String, List<String>>> getTagSuggestions(
+      {bool fresh = false}) async {
+    try {
+      final url =
+          Uri.parse('$baseUrl/tags/suggestions${fresh ? '?fresh=true' : ''}');
+      final response = await http.get(
+        url,
+        headers: {'Cache-Control': 'max-age=3600'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final vibeRaw = data['vibe'] as List? ?? [];
+        final updatesRaw = data['updates'] as List? ?? [];
+
+        final vibe = vibeRaw
+            .map((t) {
+              if (t is Map) return (t['label'] ?? '').toString();
+              return t.toString();
+            })
+            .where((s) => s.isNotEmpty)
+            .toList();
+
+        final updates = updatesRaw
+            .map((t) {
+              if (t is Map) return (t['label'] ?? '').toString();
+              return t.toString();
+            })
+            .where((s) => s.isNotEmpty)
+            .toList();
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_tag_vibe', jsonEncode(vibe));
+        await prefs.setString('cached_tag_updates', jsonEncode(updates));
+
+        return {'vibe': vibe, 'updates': updates};
+      }
+    } catch (_) {}
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cVibe = prefs.getString('cached_tag_vibe');
+      final cUpdates = prefs.getString('cached_tag_updates');
+      if (cVibe != null && cUpdates != null) {
+        return {
+          'vibe': List<String>.from(jsonDecode(cVibe)),
+          'updates': List<String>.from(jsonDecode(cUpdates)),
+        };
+      }
+    } catch (_) {}
+
+    return {
+      'vibe': [
+        '🗣️ Chatterbox',
+        '👂 Good Listener',
+        '😌 Chill Vibes',
+        '🤪 Goofy',
+        '🧠 Deep Thinker',
+        '🫂 Social Butterfly',
+        '🌙 Night Owl',
+        '🫣 Shy at First',
+        '😈 Mischief Maker',
+        '💬 Always Down to Talk',
+        '💃 Dance Addict',
+        '🎶 Music Person',
+        '🍻 Drinks & Vibes',
+        '🚬 Smoker',
+        '☕ Coffee & Conversations',
+        '🍜 Foodie',
+        '🏃 Always Outdoor',
+        '🎮 Game Nights',
+      ],
+      'updates': [
+        '☕ Coffee Break',
+        '📚 Library Study',
+        '💻 Coding Project',
+        '🍔 Grabbing Food',
+        '🏀 Playing Sports',
+        '💬 Open to Chat',
+      ],
+    };
+  }
+
+  /// Get current user's My Vibe list from backend
+  static Future<List<String>> getMyVibe() async {
+    try {
+      final token = await UserService.getAccessToken();
+      if (token == null) return [];
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/user/vibe'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['myVibe'] is List) {
+          return List<String>.from(data['myVibe']);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return [];
+  }
+
+  /// Update user's My Vibe in user profile model
+  static Future<Map<String, dynamic>> updateMyVibe(List<String> vibes) async {
+    try {
+      final token = await UserService.getAccessToken();
+      if (token == null) return {'success': false, 'error': 'Not logged in'};
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/user/vibe'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'vibes': vibes}),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'myVibe': List<String>.from(data['myVibe'] ?? [])
+        };
+      } else {
+        return {
+          'success': false,
+          'error': data['error'] ?? 'Failed to update vibes'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Clear user's My Vibe
+  static Future<Map<String, dynamic>> deleteMyVibe() async {
+    try {
+      final token = await UserService.getAccessToken();
+      if (token == null) return {'success': false, 'error': 'Not logged in'};
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/user/vibe'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'myVibe': []};
+      } else {
+        return {
+          'success': false,
+          'error': data['error'] ?? 'Failed to clear vibes'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
   }
 }

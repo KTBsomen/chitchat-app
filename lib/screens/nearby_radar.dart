@@ -28,13 +28,39 @@ class NearbyRadarView extends StatefulWidget {
 class _NearbyRadarViewState extends State<NearbyRadarView>
     with SingleTickerProviderStateMixin {
   void _showBroadcastTagDialog() {
-    final textController = TextEditingController();
-    String selectedTag = '';
+    final vibeTextController = TextEditingController();
+    final updateTextController = TextEditingController();
+
+    String activeInputSection = 'vibe'; // 'vibe' or 'update'
+    List<String> selectedVibes = [];
+    String selectedUpdateTag = '';
     int selectedTtlSeconds = 1800;
     bool isSubmitting = false;
     bool isDeleting = false;
+    bool hasLoadedInitial = false;
 
-    final predefinedTags = [
+    List<String> availableVibeTags = [
+      '🗣️ Chatterbox',
+      '👂 Good Listener',
+      '😌 Chill Vibes',
+      '🤪 Goofy',
+      '🧠 Deep Thinker',
+      '🫂 Social Butterfly',
+      '🌙 Night Owl',
+      '🫣 Shy at First',
+      '😈 Mischief Maker',
+      '💬 Always Down to Talk',
+      '💃 Dance Addict',
+      '🎶 Music Person',
+      '🍻 Drinks & Vibes',
+      '🚬 Smoker',
+      '☕ Coffee & Conversations',
+      '🍜 Foodie',
+      '🏃 Always Outdoor',
+      '🎮 Game Nights',
+    ];
+
+    List<String> availableUpdateTags = [
       '\u2615 Coffee Break',
       '\u{1F4DA} Library Study',
       '\u{1F4BB} Coding Project',
@@ -43,32 +69,28 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
       '\u{1F4AC} Open to Chat',
     ];
 
-    final ttlOptions = [
-      {'label': '5 mins', 'seconds': 300},
-      {'label': '30 mins', 'seconds': 1800},
-      {'label': '1 hr', 'seconds': 3600},
-      {'label': '4 hrs', 'seconds': 14400},
-      {'label': '12 hrs', 'seconds': 43200},
-      {'label': '24 hrs (1 Day)', 'seconds': 86400},
-    ];
-
     String formatRemaining(Map<String, dynamic>? tag) {
       if (tag == null) return '';
-      if (tag['expiresAt'] != null) {
-        final exp = (tag['expiresAt'] as num).toInt();
-        final diffMs = exp - DateTime.now().millisecondsSinceEpoch;
-        if (diffMs <= 0) return 'Expired';
-        final mins = (diffMs / 60000).ceil();
+      final exp = tag['expiresAt'];
+      if (exp is String) {
+        final expDate = DateTime.tryParse(exp);
+        if (expDate == null) return '';
+        final diff = expDate.difference(DateTime.now());
+        if (diff.isNegative) return 'Expired';
+        final mins = diff.inMinutes;
         if (mins < 60) return '${mins}m left';
-        final hours = mins ~/ 60;
+        final hours = diff.inHours;
         final remMins = mins % 60;
-        if (hours < 24)
+        if (hours < 24) {
           return remMins > 0 ? '${hours}h ${remMins}m left' : '${hours}h left';
+        }
         return '${hours ~/ 24}d left';
-      } else if (tag['remainingTtlSeconds'] != null) {
-        final secs = (tag['remainingTtlSeconds'] as num).toInt();
-        if (secs <= 0) return 'Expired';
-        if (secs < 3600) return '${(secs / 60).ceil()}m left';
+      }
+      final ttl = tag['ttlSeconds'];
+      if (ttl is num) {
+        final secs = ttl.toInt();
+        final mins = secs ~/ 60;
+        if (mins < 60) return '${mins}m left';
         final hours = secs ~/ 3600;
         final remMins = (secs % 3600) ~/ 60;
         if (hours < 24)
@@ -80,10 +102,21 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
 
     final initialActiveTag = _nearbyService.myActiveTagNotifier.value;
     if (initialActiveTag != null) {
-      textController.text = (initialActiveTag['message'] ?? '').toString();
-      if (initialActiveTag['ttlSeconds'] is num) {
-        selectedTtlSeconds = (initialActiveTag['ttlSeconds'] as num).toInt();
-      }
+      updateTextController.text = (initialActiveTag['message'] ?? '').toString();
+      selectedUpdateTag = updateTextController.text;
+    }
+
+    void syncVibesToText() {
+      vibeTextController.text = selectedVibes.join(', ');
+    }
+
+    void syncTextToVibes() {
+      final text = vibeTextController.text;
+      selectedVibes = text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
     }
 
     showModalBottomSheet(
@@ -93,6 +126,31 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
+            if (!hasLoadedInitial) {
+              hasLoadedInitial = true;
+              PersonalChatService.getTagSuggestions().then((res) {
+                if (res['vibe'] != null && res['vibe']!.isNotEmpty) {
+                  setModalState(() {
+                    availableVibeTags = res['vibe']!;
+                  });
+                }
+                if (res['updates'] != null && res['updates']!.isNotEmpty) {
+                  setModalState(() {
+                    availableUpdateTags = res['updates']!;
+                  });
+                }
+              });
+
+              PersonalChatService.getMyVibe().then((myVibes) {
+                if (myVibes.isNotEmpty) {
+                  setModalState(() {
+                    selectedVibes = List<String>.from(myVibes);
+                    syncVibesToText();
+                  });
+                }
+              });
+            }
+
             final activeTag = _nearbyService.myActiveTagNotifier.value;
             final hasActiveTag = activeTag != null &&
                 (activeTag['message']?.toString().isNotEmpty ?? false);
@@ -104,7 +162,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
               ),
               child: Container(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.94,
                 ),
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 decoration: const BoxDecoration(
@@ -139,11 +197,11 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                         children: [
                           Row(
                             children: const [
-                              Icon(Icons.local_offer_rounded,
-                                  color: Color(0xFF00FF9D), size: 22),
+                              Icon(Icons.auto_awesome,
+                                  color: Color(0xFFC084FC), size: 22),
                               SizedBox(width: 8),
                               Text(
-                                "Nearby Broadcast Tag",
+                                "My Vibe & Broadcast Tag",
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -164,7 +222,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        "Set an active status tag with a chosen duration visible to nearby students.",
+                        "Set your vibes for your profile and broadcast status tags to nearby peers.",
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.6),
                           fontSize: 12.5,
@@ -217,7 +275,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                                       ),
                                       const SizedBox(width: 6),
                                       const Text(
-                                        "Currently Active",
+                                        "Currently Active Broadcast",
                                         style: TextStyle(
                                           color: Color(0xFF00FF9D),
                                           fontSize: 12,
@@ -231,54 +289,46 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.08),
-                                        borderRadius: BorderRadius.circular(10),
+                                        color: const Color(0xFF00FF9D)
+                                            .withOpacity(0.15),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.timer_outlined,
-                                              size: 12, color: Colors.white70),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            remainingText,
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
+                                      child: Text(
+                                        remainingText,
+                                        style: const TextStyle(
+                                          color: Color(0xFF00FF9D),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                '"${activeTag['message']}"',
+                                (activeTag['message'] ?? '').toString(),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton.icon(
-                                  style: TextButton.styleFrom(
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFFFF5252),
-                                    backgroundColor: const Color(0xFFFF5252)
-                                        .withOpacity(0.12),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 8),
+                                    side: BorderSide(
+                                      color:
+                                          const Color(0xFFFF5252).withOpacity(0.5),
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
-                                      side: BorderSide(
-                                        color: const Color(0xFFFF5252)
-                                            .withOpacity(0.4),
-                                      ),
                                     ),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
                                   ),
                                   icon: isDeleting
                                       ? const SizedBox(
@@ -296,7 +346,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                                   label: Text(
                                     isDeleting
                                         ? "Deleting..."
-                                        : "Delete / Clear Tag",
+                                        : "Delete / Clear Active Tag",
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
@@ -311,8 +361,8 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                                               .deleteMyActiveTag();
                                           setModalState(() {
                                             isDeleting = false;
-                                            textController.clear();
-                                            selectedTag = '';
+                                            updateTextController.clear();
+                                            selectedUpdateTag = '';
                                           });
                                           if (mounted) {
                                             ScaffoldMessenger.of(context)
@@ -338,111 +388,375 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                         const SizedBox(height: 14),
                         const Divider(color: Colors.white12, height: 1),
                       ],
+
+                      // -------------------------------------------------------------
+                      // 1. MY VIBE SECTION
+                      // -------------------------------------------------------------
                       const SizedBox(height: 14),
                       Row(
                         children: const [
-                          Icon(Icons.hourglass_bottom_rounded,
-                              color: Color(0xFF00FF9D), size: 16),
+                          Icon(Icons.auto_awesome,
+                              color: Color(0xFFC084FC), size: 18),
                           SizedBox(width: 6),
                           Text(
-                            "Time To Live (Duration)",
+                            "My Vibe",
                             style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Tap vibe suggestions or edit in the comma-separated text box below:",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: availableVibeTags.map((tag) {
+                          final isSelected = selectedVibes.contains(tag);
+                          return GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                activeInputSection = 'vibe';
+                                if (isSelected) {
+                                  selectedVibes.remove(tag);
+                                } else {
+                                  selectedVibes.add(tag);
+                                }
+                                syncVibesToText();
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFFA855F7).withOpacity(0.28)
+                                    : const Color(0xFF1F2338),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFFA855F7)
+                                      : Colors.white.withOpacity(0.08),
+                                  width: isSelected ? 1.8 : 1.0,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(0xFFA855F7)
+                                              .withOpacity(0.35),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    tag,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.white70,
+                                      fontSize: 12.5,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  if (isSelected) ...[
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () {
+                                        setModalState(() {
+                                          selectedVibes.remove(tag);
+                                          syncVibesToText();
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFA855F7)
+                                              .withOpacity(0.5),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close_rounded,
+                                          size: 13,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+
+                      // -------------------------------------------------------------
+                      // 2. STATUS UPDATE TAGS SECTION
+                      // -------------------------------------------------------------
+                      const SizedBox(height: 18),
+                      Row(
+                        children: const [
+                          Icon(Icons.campaign_rounded,
+                              color: Color(0xFF00FF9D), size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            "Status Update Tags",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Broadcast what you're doing right now with nearby students:",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: availableUpdateTags.map((tag) {
+                          final isSelected = selectedUpdateTag == tag;
+                          return GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                activeInputSection = 'update';
+                                selectedUpdateTag = isSelected ? '' : tag;
+                                updateTextController.text = selectedUpdateTag;
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF00FF9D).withOpacity(0.2)
+                                    : const Color(0xFF1F2338),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF00FF9D)
+                                      : Colors.white.withOpacity(0.08),
+                                  width: isSelected ? 1.8 : 1.0,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(0xFF00FF9D)
+                                              .withOpacity(0.3),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Text(
+                                tag,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? const Color(0xFF00FF9D)
+                                      : Colors.white70,
+                                  fontSize: 12.5,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+
+                      // -------------------------------------------------------------
+                      // 3. SINGLE DYNAMIC INPUT BOX
+                      // -------------------------------------------------------------
+                      const SizedBox(height: 18),
+                      // Section Switcher Indicator
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              setModalState(() => activeInputSection = 'vibe');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: activeInputSection == 'vibe'
+                                    ? const Color(0xFFA855F7).withOpacity(0.25)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: activeInputSection == 'vibe'
+                                      ? const Color(0xFFA855F7)
+                                      : Colors.white12,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.auto_awesome,
+                                      size: 14,
+                                      color: activeInputSection == 'vibe'
+                                          ? const Color(0xFFC084FC)
+                                          : Colors.white54),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "Edit My Vibe (${selectedVibes.length})",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: activeInputSection == 'vibe'
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: activeInputSection == 'vibe'
+                                          ? Colors.white
+                                          : Colors.white54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              setModalState(() => activeInputSection = 'update');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: activeInputSection == 'update'
+                                    ? const Color(0xFF00FF9D).withOpacity(0.2)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: activeInputSection == 'update'
+                                      ? const Color(0xFF00FF9D)
+                                      : Colors.white12,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_note_rounded,
+                                      size: 16,
+                                      color: activeInputSection == 'update'
+                                          ? const Color(0xFF00FF9D)
+                                          : Colors.white54),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "Edit Update Tag",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: activeInputSection == 'update'
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: activeInputSection == 'update'
+                                          ? Colors.white
+                                          : Colors.white54,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: ttlOptions.map((opt) {
-                          final secs = opt['seconds'] as int;
-                          final label = opt['label'] as String;
-                          final isSelected = selectedTtlSeconds == secs;
-                          return ChoiceChip(
-                            label: Text(
-                              label,
-                              style: TextStyle(
-                                color: isSelected ? Colors.black : Colors.white,
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
+
+                      // Single Input Widget
+                      if (activeInputSection == 'vibe')
+                        TextField(
+                          key: const ValueKey('vibe_text_field'),
+                          controller: vibeTextController,
+                          onChanged: (val) {
+                            setModalState(() {
+                              syncTextToVibes();
+                            });
+                          },
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: "Add or edit vibes (comma separated)...",
+                            hintStyle: TextStyle(
+                                color: Colors.white.withOpacity(0.35)),
+                            prefixIcon: const Icon(Icons.auto_awesome,
+                                color: Color(0xFFC084FC), size: 18),
+                            filled: true,
+                            fillColor: const Color(0xFF1F2338),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFA855F7), width: 1.2),
                             ),
-                            selected: isSelected,
-                            selectedColor: const Color(0xFF00FF9D),
-                            backgroundColor: const Color(0xFF1F2338),
-                            onSelected: (selected) {
-                              if (selected) {
-                                setModalState(() => selectedTtlSeconds = secs);
-                              }
-                            },
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        "Quick Tags",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: predefinedTags.map((tag) {
-                          final isSelected = selectedTag == tag;
-                          return ChoiceChip(
-                            label: Text(
-                              tag,
-                              style: TextStyle(
-                                color: isSelected ? Colors.black : Colors.white,
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFA855F7), width: 1.5),
                             ),
-                            selected: isSelected,
-                            selectedColor: const Color(0xFF00FF9D),
-                            backgroundColor: const Color(0xFF1F2338),
-                            onSelected: (selected) {
-                              setModalState(() {
-                                selectedTag = selected ? tag : '';
-                                if (selected) {
-                                  textController.text = tag;
-                                }
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: textController,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: "Or type a custom status...",
-                          hintStyle:
-                              TextStyle(color: Colors.white.withOpacity(0.35)),
-                          filled: true,
-                          fillColor: const Color(0xFF1F2338),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                          ),
+                        )
+                      else
+                        TextField(
+                          key: const ValueKey('update_text_field'),
+                          controller: updateTextController,
+                          onChanged: (val) {
+                            setModalState(() {
+                              selectedUpdateTag = val;
+                            });
+                          },
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: "Or type a custom status update...",
+                            hintStyle: TextStyle(
+                                color: Colors.white.withOpacity(0.35)),
+                            prefixIcon: const Icon(Icons.campaign_rounded,
+                                color: Color(0xFF00FF9D), size: 18),
+                            filled: true,
+                            fillColor: const Color(0xFF1F2338),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF00FF9D), width: 1.2),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF00FF9D), width: 1.5),
+                            ),
                           ),
                         ),
-                      ),
+
                       const SizedBox(height: 18),
                       SizedBox(
                         width: double.infinity,
@@ -457,14 +771,12 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                                         Colors.black),
                                   ),
                                 )
-                              : const Icon(Icons.broadcast_on_personal,
+                              : const Icon(Icons.check_circle_outline_rounded,
                                   color: Colors.black, size: 18),
                           label: Text(
                             isSubmitting
-                                ? "Broadcasting..."
-                                : (hasActiveTag
-                                    ? "Update Broadcast Tag"
-                                    : "Broadcast Tag"),
+                                ? "Saving Changes..."
+                                : "Save My Vibe & Broadcast",
                             style: const TextStyle(
                               color: Colors.black,
                               fontSize: 14,
@@ -481,57 +793,48 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                           onPressed: isSubmitting
                               ? null
                               : () async {
-                                  final msg = textController.text.trim();
-                                  if (msg.isEmpty) return;
-
                                   setModalState(() => isSubmitting = true);
-                                  final res = await PersonalChatService
-                                      .broadcastNearbyTag(
-                                    message: msg,
-                                    tagType: selectedTag.isNotEmpty
-                                        ? 'preset'
-                                        : 'custom',
-                                    ttlSeconds: selectedTtlSeconds,
-                                  );
+                                  syncTextToVibes();
 
-                                  if (res['success'] == true &&
-                                      res['tag'] != null) {
-                                    _nearbyService.myActiveTagNotifier.value =
-                                        Map<String, dynamic>.from(res['tag']);
+                                  // 1. Save My Vibe to user profile model
+                                  await PersonalChatService.updateMyVibe(
+                                      selectedVibes);
+
+                                  // 2. Broadcast status tag if entered
+                                  final updateMsg =
+                                      updateTextController.text.trim();
+                                  if (updateMsg.isNotEmpty) {
+                                    final res = await PersonalChatService
+                                        .broadcastNearbyTag(
+                                      message: updateMsg,
+                                      tagType: selectedUpdateTag.isNotEmpty
+                                          ? 'preset'
+                                          : 'custom',
+                                      ttlSeconds: 1800,
+                                    );
+
+                                    if (res['success'] == true &&
+                                        res['tag'] != null) {
+                                      _nearbyService.myActiveTagNotifier.value =
+                                          Map<String, dynamic>.from(res['tag']);
+                                    }
                                   }
 
                                   Navigator.pop(ctx);
 
                                   if (mounted) {
-                                    if (res['success'] == true) {
-                                      final ttlItem = ttlOptions.firstWhere(
-                                        (o) =>
-                                            o['seconds'] == selectedTtlSeconds,
-                                        orElse: () => {
-                                          'label':
-                                              '${selectedTtlSeconds ~/ 60}m'
-                                        },
-                                      );
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            "Nearby tag active for ${ttlItem['label']}!",
-                                          ),
-                                          backgroundColor:
-                                              const Color(0xFF00FF9D),
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          updateMsg.isNotEmpty
+                                              ? "My Vibe & status tag updated successfully!"
+                                              : "My Vibe updated successfully!",
                                         ),
-                                      );
-                                    } else {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(res['error'] ??
-                                              "Failed to broadcast tag"),
-                                          backgroundColor: Colors.redAccent,
-                                        ),
-                                      );
-                                    }
+                                        backgroundColor:
+                                            const Color(0xFF00FF9D),
+                                      ),
+                                    );
                                   }
                                 },
                         ),
@@ -668,7 +971,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                   children: [
                     Row(
                       children: const [
-                        Icon(Icons.favorite_rounded,
+                        Icon(Icons.remove_red_eye_rounded,
                             color: Colors.orange, size: 22),
                         SizedBox(width: 8),
                         Text(
@@ -1222,7 +1525,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
           ),
         ),
 
-        // 2. Top Toolbar with Watchlist Heart Icon Button (rendered on top so taps are captured)
+        // 2. Top Toolbar with Tag Broadcast Heart Icon Button (rendered on top so taps are captured)
         Positioned(
           top: 8,
           right: 16,
@@ -1231,8 +1534,8 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
             shape: const CircleBorder(),
             child: InkWell(
               onTap: () {
-                debugPrint("Watchlist button tapped from permission view!");
-                _openWatchlistBottomSheet();
+                debugPrint("Tag dialog tapped from permission view!");
+                _showBroadcastTagDialog();
               },
               customBorder: const CircleBorder(),
               child: Container(
@@ -1609,14 +1912,14 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Heart Icon Button -> Opens Watchlist Bottomsheet
+                  // Heart Icon Button -> Opens Tag Input Bottomsheet
                   Material(
                     color: Colors.transparent,
                     shape: const CircleBorder(),
                     child: InkWell(
                       onTap: () {
-                        debugPrint("Watchlist button tapped from radar view!");
-                        _openWatchlistBottomSheet();
+                        debugPrint("Tag dialog tapped from radar view!");
+                        _showBroadcastTagDialog();
                       },
                       customBorder: const CircleBorder(),
                       child: Container(
@@ -2127,6 +2430,7 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
       activeTagMsg = activeTagRaw;
     }
     final replyController = TextEditingController();
+    bool isExpandedVibes = false;
 
     final bool isActive = user.isRecentlyActive;
     final Color activeColor =
@@ -2294,46 +2598,139 @@ class _NearbyRadarViewState extends State<NearbyRadarView>
                         ),
                       ),
 
-                      // Bio or Institution if present
-                      if (institution != null ||
-                          (bio != null && bio.isNotEmpty)) ...[
-                        const SizedBox(height: 14),
-                        if (institution != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.school_outlined,
-                                    color: Colors.white54, size: 16),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    institution.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                      // Institution if present
+                      if (institution != null) ...[
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.school_outlined,
+                                  color: Colors.white54, size: 16),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  institution.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        if (bio != null && bio.isNotEmpty)
-                          Text(
-                            bio,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.65),
-                              fontSize: 13,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
+                        ),
                       ],
+
+                      // My Vibe section (replaces bio)
+                      Builder(
+                        builder: (ctx) {
+                          List<String> userVibes = [];
+                          final rawVibes = details?['myVibe'] ?? details?['vibes'];
+                          if (rawVibes is List) {
+                            userVibes = rawVibes
+                                .map((v) => v.toString().trim())
+                                .where((s) => s.isNotEmpty)
+                                .toList();
+                          } else if (rawVibes is String && rawVibes.trim().isNotEmpty) {
+                            userVibes = rawVibes
+                                .split(',')
+                                .map((v) => v.trim())
+                                .where((s) => s.isNotEmpty)
+                                .toList();
+                          }
+
+                          if (userVibes.isEmpty) return const SizedBox.shrink();
+
+                          return StatefulBuilder(
+                            builder: (ctx, setVibeState) {
+                              const int maxFixed = 3;
+                              final hasMore = userVibes.length > maxFixed;
+                              final displayedVibes = isExpandedVibes || !hasMore
+                                  ? userVibes
+                                  : userVibes.take(maxFixed).toList();
+                              final remainingCount = userVibes.length - maxFixed;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      alignment: WrapAlignment.center,
+                                      children: [
+                                        ...displayedVibes.map((vibe) => Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10, vertical: 5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFA855F7)
+                                                    .withOpacity(0.18),
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: const Color(0xFFA855F7)
+                                                      .withOpacity(0.4),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                vibe,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w500,
+                                                  fontFamily: 'Poppins',
+                                                ),
+                                              ),
+                                            )),
+                                        if (hasMore)
+                                          GestureDetector(
+                                            onTap: () {
+                                              setVibeState(() {
+                                                isExpandedVibes = !isExpandedVibes;
+                                              });
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10, vertical: 5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF00FF9D)
+                                                    .withOpacity(0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: const Color(0xFF00FF9D)
+                                                      .withOpacity(0.5),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                isExpandedVibes
+                                                    ? "Show less"
+                                                    : "+$remainingCount more",
+                                                style: const TextStyle(
+                                                  color: Color(0xFF00FF9D),
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'Poppins',
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
 
                       // Active broadcast tag banner & reply field (ONLY shown if user has an active tag)
                       if (activeTagMsg != null && activeTagMsg.isNotEmpty) ...[

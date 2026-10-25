@@ -305,9 +305,7 @@ class _WatchlistPageState extends State<WatchlistPage> {
               child: selectedTab == 0
                   ? _buildCampusLoungeTab()
                   : selectedTab == 1
-                      ? NearbyRadarView(
-                          onOpenWatchlist: _openWatchlistBottomSheet,
-                        )
+                      ? const NearbyRadarView()
                       : _buildForYouTab(),
             ),
           ],
@@ -355,7 +353,7 @@ class _WatchlistPageState extends State<WatchlistPage> {
                   children: [
                     Row(
                       children: const [
-                        Icon(Icons.favorite_rounded,
+                        Icon(Icons.remove_red_eye_rounded,
                             color: Colors.orange, size: 22),
                         SizedBox(width: 8),
                         Text(
@@ -413,8 +411,9 @@ class _WatchlistPageState extends State<WatchlistPage> {
   }
 
   Widget _buildCampusLoungeTab() {
+    Widget content;
     if (isLoadingCampusLounge) {
-      return const Center(
+      content = const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -429,174 +428,216 @@ class _WatchlistPageState extends State<WatchlistPage> {
           ],
         ),
       );
-    }
-
-    if (campusLoungeGroups.isEmpty) {
-      return const Center(
+    } else if (campusLoungeGroups.isEmpty) {
+      content = const Center(
         child: Text(
           'No campus groups available',
           style: TextStyle(color: Colors.white54),
         ),
       );
-    }
+    } else {
+      // Calculate positions with fixed small size
+      List<Offset> positions =
+          _calculateCampusLoungePositions(campusLoungeGroups.length);
 
-    // Calculate positions with fixed small size
-    List<Offset> positions =
-        _calculateCampusLoungePositions(campusLoungeGroups.length);
+      // Get screen dimensions
+      final screenWidth = MediaQuery.of(context).size.width;
+      final screenHeight = MediaQuery.of(context).size.height;
 
-    // Get screen dimensions
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+      // Content dimensions expand with zoom
+      double contentWidth = screenWidth * max(1.0, currentScale * 1.5);
+      double contentHeight = max(
+        screenHeight - 100,
+        _calculateContentHeight(positions),
+      );
 
-    // Content dimensions expand with zoom
-    double contentWidth = screenWidth * max(1.0, currentScale * 1.5);
-    double contentHeight = max(
-      screenHeight - 100,
-      _calculateContentHeight(positions),
-    );
+      content = SingleChildScrollView(
+        controller: _scrollController,
+        child: SizedBox(
+          height: contentHeight,
+          child: InteractiveViewer(
+            transformationController: _transformationController,
+            boundaryMargin: EdgeInsets.all(currentScale > 1.5 ? 150 : 30),
+            minScale: 0.8,
+            maxScale: 4.0,
+            constrained: false,
+            child: Container(
+              width: contentWidth,
+              height: contentHeight,
+              child: Stack(
+                children: [
+                  ...campusLoungeGroups.asMap().entries.map((entry) {
+                    int index = entry.key;
+                    FriendCircleGroup group = entry.value;
+                    Offset position = positions[index];
 
-    return SingleChildScrollView(
-      controller: _scrollController,
-      child: SizedBox(
-        height: contentHeight,
-        child: InteractiveViewer(
-          transformationController: _transformationController,
-          boundaryMargin: EdgeInsets.all(currentScale > 1.5 ? 150 : 30),
-          minScale: 0.8,
-          maxScale: 4.0,
-          constrained: false,
-          child: Container(
-            width: contentWidth,
-            height: contentHeight,
-            child: Stack(
-              children: [
-                ...campusLoungeGroups.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  FriendCircleGroup group = entry.value;
-                  Offset position = positions[index];
-
-                  return Positioned(
-                    left: position.dx - FIXED_CIRCLE_SIZE / 2,
-                    top: position.dy - FIXED_CIRCLE_SIZE / 2,
-                    child: FriendCircle(
-                      group: group,
-                      size: FIXED_CIRCLE_SIZE,
-                      nodeSize: FIXED_NODE_SIZE,
-                      onGroupTap: () {
-                        if (group.groupData["name"] == 'Fake Group') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'No groups found showing personal profile.')),
-                          );
-                          Navigator.push(
-                            context,
-                            PageTransition(
-                              type: PageTransitionType.rightToLeft,
-                              child: PublicProfilePage(
-                                uid: group.groupId,
-                                dbIndex: group.groupData["dbIndex"].toString(),
+                    return Positioned(
+                      left: position.dx - FIXED_CIRCLE_SIZE / 2,
+                      top: position.dy - FIXED_CIRCLE_SIZE / 2,
+                      child: FriendCircle(
+                        group: group,
+                        size: FIXED_CIRCLE_SIZE,
+                        nodeSize: FIXED_NODE_SIZE,
+                        onGroupTap: () {
+                          if (group.groupData["name"] == 'Fake Group') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'No groups found showing personal profile.')),
+                            );
+                            Navigator.push(
+                              context,
+                              PageTransition(
+                                type: PageTransitionType.rightToLeft,
+                                child: PublicProfilePage(
+                                  uid: group.groupId,
+                                  dbIndex:
+                                      group.groupData["dbIndex"].toString(),
+                                ),
                               ),
-                            ),
-                          );
-                          return;
-                        } else {
-                          Navigator.push(
-                            context,
-                            PageTransition(
-                              type: PageTransitionType.rightToLeft,
-                              child: GroupPublicViewScreen(
-                                groupId: group.groupId,
+                            );
+                            return;
+                          } else {
+                            Navigator.push(
+                              context,
+                              PageTransition(
+                                type: PageTransitionType.rightToLeft,
+                                child: GroupPublicViewScreen(
+                                  groupId: group.groupId,
+                                ),
                               ),
-                            ),
-                          );
-                        }
-                      },
-                      onMemberTap: (memberIndex) {
-                        print(
-                            'Member ${group.members[memberIndex].id} in group ${group.groupId} tapped');
-                        if (group.groupData["name"] == 'Fake Group') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'No groups found showing personal profile.')),
-                          );
-                          Navigator.push(
-                            context,
-                            PageTransition(
-                              type: PageTransitionType.rightToLeft,
-                              child: PublicProfilePage(
-                                uid: group.groupId,
-                                dbIndex: group.groupData["dbIndex"].toString(),
+                            );
+                          }
+                        },
+                        onMemberTap: (memberIndex) {
+                          print(
+                              'Member ${group.members[memberIndex].id} in group ${group.groupId} tapped');
+                          if (group.groupData["name"] == 'Fake Group') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'No groups found showing personal profile.')),
+                            );
+                            Navigator.push(
+                              context,
+                              PageTransition(
+                                type: PageTransitionType.rightToLeft,
+                                child: PublicProfilePage(
+                                  uid: group.groupId,
+                                  dbIndex:
+                                      group.groupData["dbIndex"].toString(),
+                                ),
                               ),
-                            ),
-                          );
-                          return;
-                        } else {
-                          Navigator.push(
-                            context,
-                            PageTransition(
-                              type: PageTransitionType.rightToLeft,
-                              child: GroupPublicViewScreen(
-                                groupId: group.groupId,
+                            );
+                            return;
+                          } else {
+                            Navigator.push(
+                              context,
+                              PageTransition(
+                                type: PageTransitionType.rightToLeft,
+                                child: GroupPublicViewScreen(
+                                  groupId: group.groupId,
+                                ),
                               ),
-                            ),
-                          );
-                        }
-                      },
-                      edgeStyle: EdgeStyle(
-                        width: 3,
-                        outerGlow: 3,
-                        gradientColors: [
-                          Colors.blue,
-                          Colors.pink,
-                          Colors.orange
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-
-                // Loading indicator at bottom
-                if (isLoadingMore)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 20,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.black45,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF00FF9D)),
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Loading more...',
-                              style: TextStyle(color: Colors.white70),
-                            ),
+                            );
+                          }
+                        },
+                        edgeStyle: EdgeStyle(
+                          width: 3,
+                          outerGlow: 3,
+                          gradientColors: [
+                            Colors.blue,
+                            Colors.pink,
+                            Colors.orange
                           ],
                         ),
                       ),
+                    );
+                  }).toList(),
+
+                  // Loading indicator at bottom
+                  if (isLoadingMore)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 20,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black45,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF00FF9D)),
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Loading more...',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
+      );
+    }
+
+    return Stack(
+      children: [
+        content,
+        // Top Toolbar with Watchlist Eye Icon Button
+        Positioned(
+          top: 8,
+          right: 16,
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: _openWatchlistBottomSheet,
+              customBorder: const CircleBorder(),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A0A26).withOpacity(0.85),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.5),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.2),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.remove_red_eye_rounded,
+                  color: Colors.orange,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
