@@ -699,9 +699,10 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
               const PopupMenuItem<String>(
                 value: 'delete_account',
                 child: ListTile(
-                    leading: Icon(Icons.delete_forever, color: Colors.red),
-                    title: Text('Delete Account',
-                        style: TextStyle(color: Colors.red))),
+                    leading: Icon(Icons.delete_forever),
+                    title: Text(
+                      'Delete Account',
+                    )),
               ),
             ],
           ),
@@ -1036,13 +1037,15 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                             Builder(
                               builder: (context) {
                                 List<String> vibes = [];
-                                final rawVibes = myProfile?['myVibe'] ?? myProfile?['vibes'];
+                                final rawVibes =
+                                    myProfile?['myVibe'] ?? myProfile?['vibes'];
                                 if (rawVibes is List) {
                                   vibes = rawVibes
                                       .map((v) => v.toString().trim())
                                       .where((s) => s.isNotEmpty)
                                       .toList();
-                                } else if (rawVibes is String && rawVibes.trim().isNotEmpty) {
+                                } else if (rawVibes is String &&
+                                    rawVibes.trim().isNotEmpty) {
                                   vibes = rawVibes
                                       .split(',')
                                       .map((v) => v.trim())
@@ -1050,25 +1053,32 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                                       .toList();
                                 }
 
-                                if (vibes.isEmpty) return const SizedBox.shrink();
+                                if (vibes.isEmpty)
+                                  return const SizedBox.shrink();
 
                                 return StatefulBuilder(
                                   builder: (ctx, setVibeState) {
                                     const int maxFixed = 3;
                                     final hasMore = vibes.length > maxFixed;
-                                    final displayedVibes = _isExpandedVibes || !hasMore
-                                        ? vibes
-                                        : vibes.take(maxFixed).toList();
-                                    final remainingCount = vibes.length - maxFixed;
+                                    final displayedVibes =
+                                        _isExpandedVibes || !hasMore
+                                            ? vibes
+                                            : vibes.take(maxFixed).toList();
+                                    final remainingCount =
+                                        vibes.length - maxFixed;
 
                                     return Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8.0, vertical: 6.0),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
                                             children: const [
-                                              Icon(Icons.auto_awesome, color: Color(0xFFC084FC), size: 16),
+                                              Icon(Icons.auto_awesome,
+                                                  color: Color(0xFFC084FC),
+                                                  size: 16),
                                               SizedBox(width: 6),
                                               Text(
                                                 "My Vibe",
@@ -1088,12 +1098,21 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                                             children: [
                                               ...displayedVibes.map((vibe) {
                                                 return Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6),
                                                   decoration: BoxDecoration(
-                                                    color: const Color(0xFFA855F7).withOpacity(0.15),
-                                                    borderRadius: BorderRadius.circular(16),
+                                                    color:
+                                                        const Color(0xFFA855F7)
+                                                            .withOpacity(0.15),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            16),
                                                     border: Border.all(
-                                                      color: const Color(0xFFA855F7).withOpacity(0.4),
+                                                      color: const Color(
+                                                              0xFFA855F7)
+                                                          .withOpacity(0.4),
                                                       width: 1,
                                                     ),
                                                   ),
@@ -1102,7 +1121,8 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                                                     style: const TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 12,
-                                                      fontWeight: FontWeight.w500,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                       fontFamily: "Poppins",
                                                     ),
                                                   ),
@@ -1112,16 +1132,26 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                                                 GestureDetector(
                                                   onTap: () {
                                                     setVibeState(() {
-                                                      _isExpandedVibes = !_isExpandedVibes;
+                                                      _isExpandedVibes =
+                                                          !_isExpandedVibes;
                                                     });
                                                   },
                                                   child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6),
                                                     decoration: BoxDecoration(
-                                                      color: const Color(0xFF00FF9D).withOpacity(0.15),
-                                                      borderRadius: BorderRadius.circular(16),
+                                                      color: const Color(
+                                                              0xFF00FF9D)
+                                                          .withOpacity(0.15),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              16),
                                                       border: Border.all(
-                                                        color: const Color(0xFF00FF9D).withOpacity(0.5),
+                                                        color: const Color(
+                                                                0xFF00FF9D)
+                                                            .withOpacity(0.5),
                                                         width: 1,
                                                       ),
                                                     ),
@@ -1130,9 +1160,11 @@ class _PrivetProfilePageState extends State<PrivetProfilePage>
                                                           ? "Show less"
                                                           : "+$remainingCount more",
                                                       style: const TextStyle(
-                                                        color: Color(0xFF00FF9D),
+                                                        color:
+                                                            Color(0xFF00FF9D),
                                                         fontSize: 12,
-                                                        fontWeight: FontWeight.bold,
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                         fontFamily: 'Poppins',
                                                       ),
                                                     ),
