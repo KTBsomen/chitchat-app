@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:chitchat/components/friendcircle.dart';
 import 'package:chitchat/main.dart';
 import 'package:chitchat/screens/chat.dart';
+import 'package:chitchat/screens/personal_chat_screen.dart';
 import 'package:chitchat/services/chats.dart';
 import 'package:chitchat/services/groups.dart';
 import 'package:chitchat/appstate/notification_store.dart';
@@ -65,6 +66,36 @@ class FCMService {
     await prefs.remove(_keyIsLoggedIn);
     await prefs.remove(_keyUserId);
     await prefs.remove(_keyFcmToken);
+  }
+
+  /// Sanitizes topic string to conform to FCM topic regex: [a-zA-Z0-9-_.~%]+.
+  /// Converts slashes '/' and other disallowed characters to '_'.
+  static String sanitizeTopic(String topic) {
+    return topic
+        .replaceAll('/', '_')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9-_.~%]'), '_');
+  }
+
+  /// Subscribes to an FCM topic.
+  static Future<void> subscribeToTopic(String topic) async {
+    try {
+      final sanitized = sanitizeTopic(topic);
+      await messaging.subscribeToTopic(sanitized);
+      print('📌 Subscribed to FCM topic: $sanitized (original: $topic)');
+    } catch (e) {
+      print('❌ Error subscribing to FCM topic $topic: $e');
+    }
+  }
+
+  /// Unsubscribes from an FCM topic.
+  static Future<void> unsubscribeFromTopic(String topic) async {
+    try {
+      final sanitized = sanitizeTopic(topic);
+      await messaging.unsubscribeFromTopic(sanitized);
+      print('📌 Unsubscribed from FCM topic: $sanitized');
+    } catch (e) {
+      print('❌ Error unsubscribing from FCM topic $topic: $e');
+    }
   }
 }
 
@@ -205,6 +236,60 @@ class FCMHandler {
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
+  static const AndroidNotificationChannel _foregroundChannel =
+      AndroidNotificationChannel(
+    'chitchat_foreground_channel',
+    'ChitChat Notifications',
+    description: 'Notifications displayed when app is in foreground',
+    importance: Importance.high,
+    playSound: true,
+  );
+
+  /// Whitelist of notification titles allowed to display a local notification when in the foreground.
+  /// Currently includes "Reply to your tag". New titles can easily be added to this set or registered dynamically.
+  static final Set<String> allowedForegroundNotificationTitles = {
+    'Reply to your tag',
+    'New personal Message',
+    'New Personal Message',
+    'New Campus message'
+  };
+
+  /// Register an additional title to be shown in foreground local notifications.
+  static void registerForegroundNotificationTitle(String title) {
+    if (title.trim().isNotEmpty) {
+      allowedForegroundNotificationTitles.add(title.trim());
+    }
+  }
+
+  /// Remove a title from the allowed foreground local notifications.
+  static void unregisterForegroundNotificationTitle(String title) {
+    allowedForegroundNotificationTitles.removeWhere(
+      (t) => t.trim().toLowerCase() == title.trim().toLowerCase(),
+    );
+  }
+
+  /// Checks whether an incoming push notification should show a local notification in foreground.
+  static bool shouldShowForegroundNotification({
+    String? title,
+    RemoteMessage? message,
+    Map<String, dynamic>? data,
+  }) {
+    final effectiveTitle =
+        title ?? message?.notification?.title ?? data?['title']?.toString();
+
+    if (effectiveTitle == null || effectiveTitle.trim().isEmpty) {
+      return false;
+    }
+    if (message?.data["type"] == "campus_chat") {
+      return true;
+    }
+
+    final trimmedLower = effectiveTitle.trim().toLowerCase();
+    return allowedForegroundNotificationTitles.any(
+      (allowed) => allowed.trim().toLowerCase() == trimmedLower,
+    );
+  }
+
   /// Stores notification data when the app is opened from a terminated/background
   /// state so that navigation can happen after the app is fully initialized.
   static Map<String, dynamic>? _pendingNotificationData;
@@ -216,8 +301,21 @@ class FCMHandler {
       final data = _pendingNotificationData!;
       _pendingNotificationData = null;
       try {
-        navigatorKey.currentState?.push(
-            MaterialPageRoute(builder: (context) => ChatScreen(data: data)));
+        if (data['route'] == '/personal-chat' || data['pairKey'] != null) {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (context) => PersonalChatScreen(
+                pairKey: data['pairKey'] ?? '',
+                otherUserId: data['senderId'] ?? '',
+                otherUserName: data['senderName'] ?? data['title'] ?? 'User',
+                otherUserPic: data['senderPic'],
+              ),
+            ),
+          );
+        } else {
+          navigatorKey.currentState?.push(
+              MaterialPageRoute(builder: (context) => ChatScreen(data: data)));
+        }
       } catch (e) {
         print('Pending notification navigation failed: $e');
       }
@@ -246,10 +344,12 @@ class FCMHandler {
 
     // Try to request Android (Android 13+) notification permission if supported
     try {
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
+      final androidPlugin =
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.requestNotificationsPermission();
+      // Create high-importance foreground notification channel
+      await androidPlugin?.createNotificationChannel(_foregroundChannel);
     } catch (_) {
       // ignore if not supported by plugin/platform
     }
@@ -261,11 +361,13 @@ class FCMHandler {
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings,iOS:  DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    ));
+    const initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        ));
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse:
@@ -282,6 +384,22 @@ class FCMHandler {
               // will send it on init.
               navigatorKey.currentState?.push(MaterialPageRoute(
                   builder: (context) => ChatScreen(data: {'message': input})));
+              return;
+            }
+
+            // Route to PersonalChatScreen if it's a personal chat / tag reply
+            if (data['route'] == '/personal-chat' || data['pairKey'] != null) {
+              navigatorKey.currentState?.push(
+                MaterialPageRoute(
+                  builder: (context) => PersonalChatScreen(
+                    pairKey: data['pairKey'] ?? '',
+                    otherUserId: data['senderId'] ?? '',
+                    otherUserName:
+                        data['senderName'] ?? data['title'] ?? 'User',
+                    otherUserPic: data['senderPic'],
+                  ),
+                ),
+              );
               return;
             }
 
@@ -306,7 +424,19 @@ class FCMHandler {
           : (message.notification?.body != null
               ? _tryParseNotificationBody(message.notification!.body!)
               : <String, dynamic>{});
-      if (data['type'] == 'text') {
+      if (data['route'] == '/personal-chat' || data['pairKey'] != null) {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (context) => PersonalChatScreen(
+              pairKey: data['pairKey'] ?? '',
+              otherUserId: data['senderId'] ?? '',
+              otherUserName:
+                  data['senderName'] ?? message.notification?.title ?? 'User',
+              otherUserPic: data['senderPic'],
+            ),
+          ),
+        );
+      } else if (data['type'] == 'text') {
         _pendingNotificationData = data;
         consumePendingNotification();
       } else {
@@ -323,7 +453,19 @@ class FCMHandler {
             : (message.notification?.body != null
                 ? _tryParseNotificationBody(message.notification!.body!)
                 : <String, dynamic>{});
-        if (data['type'] == 'text') {
+        if (data['route'] == '/personal-chat' || data['pairKey'] != null) {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (context) => PersonalChatScreen(
+                pairKey: data['pairKey'] ?? '',
+                otherUserId: data['senderId'] ?? '',
+                otherUserName:
+                    data['senderName'] ?? message.notification?.title ?? 'User',
+                otherUserPic: data['senderPic'],
+              ),
+            ),
+          );
+        } else if (data['type'] == 'text') {
           _pendingNotificationData = data;
           // Don't navigate now — main.dart will call consumePendingNotification()
           // after profile is loaded and navigator is ready.
@@ -367,6 +509,16 @@ class FCMHandler {
     final id = data['id'];
     print("FCM Message: $data");
 
+    // Suppress notification if this message was sent by the current user
+    final senderId = data['senderId'] ?? data['sentBy'];
+    final myId = await UserService.getUserId();
+    if (senderId != null &&
+        myId != null &&
+        senderId.toString() == myId.toString()) {
+      print('ℹ️ Suppressing notification for message sent by self ($senderId)');
+      return;
+    }
+
     // Helper: log the raw message for easier debugging
     print(
         'RemoteMessage.raw: ${message.data} | notification=${message.notification}');
@@ -399,25 +551,72 @@ class FCMHandler {
 
     if (showNotification) {
       try {
-        // // Keep notifications grouped per chat/group. We include the data payload
-        // // as the notification payload so taps and inline replies can be handled.
-        // final groupKey =
-        //     data['roomId'] ?? data['groupId'] ?? id ?? 'chitchat_group';
-        // final androidDetails = AndroidNotificationDetails(
-        //   'default',
-        //   'General',
-        //   groupKey: groupKey.toString(),
-        //   // set only basic details to avoid complex API mismatches
-        // );
+        final effectiveTitle =
+            message.notification?.title ?? data['title']?.toString();
+        final effectiveBody = message.notification?.body ??
+            data['body']?.toString() ??
+            (data['message'] is String ? data['message'] : null) ??
+            '';
 
-        // await _localNotifications.show(
-        //   groupKey.hashCode & 0x7FFFFFFF,
-        //   data['title'] ?? 'New Message',
-        //   jsonDecode(data['message'])["message"] ?? "click to see it.",
-        //   NotificationDetails(android: androidDetails),
-        //   payload: jsonEncode(data),
-        // );
-        //Dont show local notification
+        if (shouldShowForegroundNotification(
+          title: effectiveTitle,
+          message: message,
+          data: data,
+        )) {
+          final groupKey = data['roomId'] ??
+              data['groupId'] ??
+              data['pairKey'] ??
+              id ??
+              'chitchat_foreground';
+
+          final androidDetails = AndroidNotificationDetails(
+            _foregroundChannel.id,
+            _foregroundChannel.name,
+            channelDescription: _foregroundChannel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+            icon: '@mipmap/ic_launcher',
+            groupKey: groupKey.toString(),
+          );
+
+          const darwinDetails = DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          );
+
+          final notificationDetails = NotificationDetails(
+            android: androidDetails,
+            iOS: darwinDetails,
+          );
+
+          final notifId = (id != null)
+              ? (id.hashCode & 0x7FFFFFFF)
+              : (DateTime.now().millisecondsSinceEpoch.remainder(100000));
+
+          final Map<String, dynamic> payloadMap =
+              Map<String, dynamic>.from(data);
+          if (effectiveTitle != null && !payloadMap.containsKey('title')) {
+            payloadMap['title'] = effectiveTitle;
+          }
+          if (effectiveBody.isNotEmpty && !payloadMap.containsKey('body')) {
+            payloadMap['body'] = effectiveBody;
+          }
+
+          await _localNotifications.show(
+            notifId,
+            effectiveTitle ?? 'ChitChat',
+            effectiveBody,
+            notificationDetails,
+            payload: jsonEncode(payloadMap),
+          );
+          print(
+              '🔔 Local notification shown in foreground for: "$effectiveTitle"');
+        } else {
+          print(
+              'ℹ️ Foreground notification suppressed for: "$effectiveTitle" (title not in allowed filter)');
+        }
       } catch (e) {
         print('Failed to show local notification: $e');
       }

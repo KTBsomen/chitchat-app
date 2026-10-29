@@ -634,13 +634,8 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       actions: [
-        const PersonalChatButton(),
-        const NotificationIcon(
-          icon: Icons.notifications_none_rounded,
-          type: NotificationIconType.Notification,
-        ),
         NotificationIcon(
-          icon: Icons.forum_outlined,
+          icon: Icons.messenger_outline_rounded,
           type: NotificationIconType.Message,
           onPressed: () {
             print("Messages clicked!");
@@ -657,6 +652,11 @@ class _HomePageState extends State<HomePage> {
           },
           rightPadding: 25,
         ),
+        const NotificationIcon(
+          icon: Icons.notifications_none_rounded,
+          type: NotificationIconType.Notification,
+        ),
+        const PersonalChatButton(),
       ],
     );
   }

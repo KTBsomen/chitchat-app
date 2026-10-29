@@ -17,7 +17,7 @@ class PersonalChatButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.messenger_outline_rounded),
+      icon: const Icon(Icons.forum_outlined),
       iconSize: iconSize,
       color: iconColor,
       padding: EdgeInsets.only(right: rightPadding),

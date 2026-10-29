@@ -388,6 +388,7 @@ class _WatchlistPageState extends State<WatchlistPage> {
 
   Widget _buildTabHeader(int index, String label) {
     final isSelected = selectedTab == index;
+
     return GestureDetector(
       onTap: () {
         if (_scrollController.hasClients) {
@@ -397,14 +398,31 @@ class _WatchlistPageState extends State<WatchlistPage> {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
-            fontSize: 16,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontFamily: 'Poppins',
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color:
+                    isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                fontSize: 16,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            if (index == 1) ...[
+              const SizedBox(width: 5),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

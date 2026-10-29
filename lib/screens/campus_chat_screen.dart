@@ -8,6 +8,7 @@ import 'package:chitchat/appstate/variables.dart';
 import 'package:chitchat/components/zoomableimagepopup.dart';
 import 'package:chitchat/constants/colors.dart';
 import 'package:chitchat/constants/theams.dart';
+import 'package:chitchat/services/fcm.dart';
 import 'package:chitchat/services/mqtt.dart';
 import 'package:chitchat/screens/campus_members_screen.dart';
 import 'package:chitchat/services/user.dart';
@@ -250,6 +251,10 @@ class _CampusChatScreenState extends State<CampusChatScreen> {
     }).catchError((error) {
       print('Error connecting to MQTT broker: $error');
     });
+
+    // Subscribe to FCM topic matching the campus chat room id in which it connects to MQTT
+    FCMService.subscribeToTopic(topic);
+
     runMqttCheck();
   }
 
